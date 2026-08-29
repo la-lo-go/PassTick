@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import org.json.JSONException
 import org.json.JSONObject
-import org.ligi.kaxt.parseColor
 import org.ligi.passandroid.R
 import org.ligi.passandroid.Tracker
 import org.ligi.passandroid.functions.getHumanCategoryString
@@ -155,7 +154,7 @@ object AppleStylePassReader {
 
         readJsonSafe(passJSON, "backgroundColor", object : JsonStringReadCallback {
             override fun onString(string: String) {
-                pass.accentColor = string.parseColor(Color.BLACK)
+                pass.accentColor = runCatching { Color.parseColor(string) }.getOrDefault(Color.BLACK)
             }
         })
 

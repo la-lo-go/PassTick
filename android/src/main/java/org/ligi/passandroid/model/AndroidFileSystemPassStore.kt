@@ -23,14 +23,13 @@ object PassStoreUpdateEvent
 
 class AndroidFileSystemPassStore(
         private val context: Context,
-        settings: Settings,
         private val moshi: Moshi
 ) : PassStore, KoinComponent {
 
     private val mutableUpdates = MutableSharedFlow<PassStoreUpdateEvent>(extraBufferCapacity = 1)
     override val updates = mutableUpdates.asSharedFlow()
 
-    private val path: File = settings.getPassesDir()
+    private val path = File(context.filesDir, "passes")
 
     override val passMap = HashMap<String, Pass>()
 
@@ -39,7 +38,7 @@ class AndroidFileSystemPassStore(
     private val tracker: Tracker by inject()
 
     override val classifier: PassClassifier by lazy {
-        val classificationFile = File(settings.getStateDir(), "classifier_state.json")
+        val classificationFile = File(context.filesDir, "state/classifier_state.json")
         FileBackedPassClassifier(classificationFile, this, moshi)
     }
 

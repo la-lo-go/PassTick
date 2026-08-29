@@ -58,6 +58,7 @@ data class MainUiState(
 
 sealed interface AppAction {
     data class Import(val uri: Uri) : AppAction
+    data class Export(val id: String, val destination: Uri) : AppAction
     data class DeletePass(val id: String) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
     data class SetTheme(val value: ThemeMode) : AppAction

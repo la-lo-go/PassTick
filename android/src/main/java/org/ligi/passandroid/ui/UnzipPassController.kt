@@ -1,4 +1,4 @@
-package org.ligi.passandroid.ui
+package org.ligi.passandroid.repository.io
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -19,7 +19,6 @@ import org.ligi.passandroid.functions.createPassForPDFImport
 import org.ligi.passandroid.functions.readJSONSafely
 import org.ligi.passandroid.model.InputStreamWithSource
 import org.ligi.passandroid.model.PassStore
-import org.ligi.passandroid.model.Settings
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -28,7 +27,6 @@ import java.util.*
 object UnzipPassController : KoinComponent {
 
     val tracker :Tracker by inject()
-    val settings : Settings by inject()
 
     interface SuccessCallback {
         fun call(uuid: String)
@@ -166,6 +164,6 @@ object UnzipPassController : KoinComponent {
     }
 
     class InputStreamUnzipControllerSpec(internal val inputStreamWithSource: InputStreamWithSource, context: Context, passStore: PassStore,
-                                         onSuccessCallback: SuccessCallback?, failCallback: FailCallback?) : UnzipControllerSpec(context, passStore, onSuccessCallback, failCallback, settings)
+                                         onSuccessCallback: SuccessCallback?, failCallback: FailCallback?) : UnzipControllerSpec(context, passStore, onSuccessCallback, failCallback)
 
 }

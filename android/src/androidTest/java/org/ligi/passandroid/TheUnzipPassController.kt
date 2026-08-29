@@ -5,7 +5,7 @@ import org.junit.Before
 import org.junit.Test
 import org.ligi.passandroid.model.InputStreamWithSource
 import org.ligi.passandroid.model.PassStore
-import org.ligi.passandroid.ui.UnzipPassController
+import org.ligi.passandroid.repository.io.UnzipPassController
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.Mockito.never

@@ -62,6 +62,7 @@ private class FakePassRepository(initial: List<Pass>) : PassRepository {
         return true
     }
     override suspend fun export(id: String, destination: Uri) = Result.success(Unit)
+    override suspend fun prepareShare(id: String) = Result.failure<Uri>(UnsupportedOperationException())
 }
 
 private class FakeSettingsRepository : SettingsRepository {

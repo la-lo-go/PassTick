@@ -32,7 +32,7 @@ android {
     buildFeatures {
         buildConfig = true
         compose = true
-        viewBinding = true
+        viewBinding = false
     }
 
     compileOptions {
@@ -53,7 +53,6 @@ android {
     }
 
     lint {
-        baseline = file("lint-baseline.xml")
         warning += setOf("MissingTranslation", "InvalidPackage")
         disable += "NullSafeMutableLiveData"
     }
@@ -75,7 +74,6 @@ dependencies {
 
     implementation(libs.activity.compose)
     implementation(libs.annotation)
-    implementation(libs.appcompat)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material.icons)
     implementation(libs.compose.material3)
@@ -85,38 +83,22 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.coroutines.android)
     implementation(libs.datastore.preferences)
-    implementation(libs.fragment.ktx)
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
-    implementation(libs.kotpref)
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.runtime.ktx)
-    implementation(libs.lifecycle.service)
     implementation(libs.lifecycle.viewmodel.compose)
-    implementation(libs.material)
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
     implementation(libs.navigation3.runtime)
     implementation(libs.navigation3.ui)
     implementation(libs.okhttp)
     implementation(libs.okio)
-    implementation(libs.preference.ktx)
     implementation(libs.threetenabp)
     implementation(libs.timber)
-    implementation(libs.webkit)
     implementation(libs.zip4j)
     implementation(libs.zxing)
-
-    implementation("com.github.permissions-dispatcher:permissionsdispatcher-ktx:4.8.0")
-    implementation("com.github.ligi:ExtraCompats:1.0")
-    implementation("com.github.ligi:KAXT:1.0")
-    implementation("com.github.ligi:KAXTUI:1.0")
-    implementation("com.github.ligi:tracedroid:4.1")
-    implementation("com.larswerkman:HoloColorPicker:1.5")
-    implementation("net.i2p.android.ext:floatingactionbutton:1.10.1") {
-        exclude(group = "com.android.support", module = "support-v4")
-    }
 
     testImplementation(libs.junit4)
     testImplementation(libs.assertj)
@@ -128,16 +110,11 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test)
     androidTestImplementation(libs.assertj)
     androidTestImplementation(libs.espresso.core)
-    androidTestImplementation("androidx.test.espresso:espresso-contrib:3.6.1")
-    androidTestImplementation("androidx.test.espresso:espresso-intents:3.6.1")
     androidTestImplementation(libs.mockito)
     androidTestImplementation(libs.threetenbp)
     androidTestImplementation(libs.test.core)
     androidTestImplementation(libs.test.ext.junit)
-    androidTestImplementation("com.github.ligi:trulesk:4.3")
     androidTestImplementation("com.linkedin.dexmaker:dexmaker-mockito:2.28.4")
-    androidTestImplementation("com.linkedin.testbutler:test-butler-library:2.2.1")
-    androidTestUtil("com.linkedin.testbutler:test-butler-app:2.2.1")
     debugImplementation(libs.compose.ui.test.manifest)
     debugImplementation(libs.compose.ui.tooling)
 }

@@ -32,6 +32,9 @@ class MainViewModel(
     fun onAction(action: AppAction) {
         when (action) {
             is AppAction.Import -> launchOperation("Pass imported") { passRepository.import(action.uri).getOrThrow() }
+            is AppAction.Export -> launchOperation("Pass exported") {
+                passRepository.export(action.id, action.destination).getOrThrow()
+            }
             is AppAction.DeletePass -> launchOperation("Pass deleted") { check(passRepository.delete(action.id)) }
             is AppAction.SavePass -> launchOperation("Pass saved") { save(action) }
             is AppAction.SetTheme -> viewModelScope.launch { settingsRepository.setThemeMode(action.value) }

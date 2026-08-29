@@ -1,9 +1,9 @@
 package org.ligi.passandroid
 
-import org.ligi.trulesk.AppReplacingRunnerBase
+import android.content.Context
+import androidx.test.runner.AndroidJUnitRunner
 
-class AppReplacingRunner : AppReplacingRunnerBase() {
-
-    override fun testAppClass() = TestApp::class.java
-
+class AppReplacingRunner : AndroidJUnitRunner() {
+    override fun newApplication(classLoader: ClassLoader?, className: String?, context: Context?) =
+        super.newApplication(classLoader, TestApp::class.java.name, context)
 }

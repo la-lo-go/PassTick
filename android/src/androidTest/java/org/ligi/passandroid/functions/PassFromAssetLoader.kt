@@ -8,9 +8,9 @@ import org.ligi.passandroid.model.InputStreamWithSource
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.reader.AppleStylePassReader
-import org.ligi.passandroid.ui.UnzipPassController
-import org.ligi.passandroid.ui.UnzipPassController.FailCallback
-import org.ligi.passandroid.ui.UnzipPassController.InputStreamUnzipControllerSpec
+import org.ligi.passandroid.repository.io.UnzipPassController
+import org.ligi.passandroid.repository.io.UnzipPassController.FailCallback
+import org.ligi.passandroid.repository.io.UnzipPassController.InputStreamUnzipControllerSpec
 import org.mockito.Mockito.*
 import java.io.File
 

@@ -2,6 +2,7 @@ package org.ligi.passandroid.repository
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -14,8 +15,8 @@ import org.ligi.passandroid.Tracker
 import org.ligi.passandroid.functions.fromURI
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.pass.Pass
-import org.ligi.passandroid.ui.PassExporter
-import org.ligi.passandroid.ui.UnzipPassController
+import org.ligi.passandroid.repository.io.PassExporter
+import org.ligi.passandroid.repository.io.UnzipPassController
 import java.io.File
 
 interface PassRepository {
@@ -30,6 +31,8 @@ interface PassRepository {
     suspend fun delete(id: String): Boolean
 
     suspend fun export(id: String, destination: Uri): Result<Unit>
+
+    suspend fun prepareShare(id: String): Result<Uri>
 }
 
 class FilePassRepository(
@@ -97,6 +100,16 @@ class FilePassRepository(
             } finally {
                 target.delete()
             }
+        }
+    }
+
+    override suspend fun prepareShare(id: String): Result<Uri> = withContext(ioDispatcher) {
+        runCatching {
+            val target = File(context.filesDir, "share/$id.espass")
+            val exporter = PassExporter(passStore.getPathForID(id), target)
+            exporter.export()
+            exporter.exception?.let { throw it }
+            FileProvider.getUriForFile(context, context.getString(R.string.authority_fileprovider), target)
         }
     }
 

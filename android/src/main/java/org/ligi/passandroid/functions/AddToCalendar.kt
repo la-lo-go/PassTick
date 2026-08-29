@@ -1,13 +1,8 @@
 package org.ligi.passandroid.functions
 
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.CalendarContract
 import androidx.annotation.VisibleForTesting
-import com.google.android.material.snackbar.Snackbar
-import androidx.appcompat.app.AlertDialog
-import android.view.View
-import org.ligi.passandroid.R
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassImpl
 
@@ -19,29 +14,6 @@ data class CalendarEvent(
     val endTimeMillis: Long,
     val location: String?,
 )
-
-fun tryAddDateToCalendar(pass: Pass, contextView: View, timeSpan: PassImpl.TimeSpan) {
-    if (pass.calendarTimespan == null) {
-        AlertDialog.Builder(contextView.context).setMessage(R.string.expiration_date_to_calendar_warning_message)
-                .setTitle(R.string.expiration_date_to_calendar_warning_title)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(android.R.string.ok) { _, _ -> reallyAddToCalendar(pass, contextView, timeSpan) }
-                .show()
-    } else {
-        reallyAddToCalendar(pass, contextView, timeSpan)
-    }
-}
-
-private fun reallyAddToCalendar(pass: Pass, contextView: View, timeSpan: PassImpl.TimeSpan) = try {
-
-    val intent = createIntent(pass, timeSpan)
-    contextView.context.startActivity(intent)
-
-} catch (exception: ActivityNotFoundException) {
-    // TODO maybe action to install calendar app
-    Snackbar.make(contextView, R.string.no_calendar_app_found, Snackbar.LENGTH_LONG).show()
-}
-
 
 @VisibleForTesting
 fun createCalendarEvent(pass: Pass, timeSpan: PassImpl.TimeSpan): CalendarEvent {

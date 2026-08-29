@@ -1,4 +1,4 @@
-package org.ligi.passandroid.ui
+package org.ligi.passandroid.repository.io
 
 import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.model.ZipParameters
