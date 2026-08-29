@@ -12,6 +12,7 @@ espresso = "3.6.1"
 fragment = "1.9.0"
 junit = "4.13.2"
 json = "20250517"
+kotlinx-serialization = "1.9.0"
 kotlin = "2.3.20"
 koin = "4.2.2"
 kotpref = "2.13.2"
@@ -55,6 +56,7 @@ espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref =
 fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
 junit4 = { module = "junit:junit", version.ref = "junit" }
 json = { module = "org.json:json", version.ref = "json" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
 kotpref = { module = "com.chibatching.kotpref:kotpref", version.ref = "kotpref" }
@@ -83,3 +85,4 @@ zxing = { module = "com.google.zxing:core", version.ref = "zxing" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
