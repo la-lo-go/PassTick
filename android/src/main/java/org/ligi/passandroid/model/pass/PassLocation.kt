@@ -2,7 +2,7 @@ package org.ligi.passandroid.model.pass
 
 import com.squareup.moshi.JsonClass
 
-@JsonClass(generateAdapter = true)
+@JsonClass(generateAdapter = false)
 class PassLocation {
 
     var name: String? = null

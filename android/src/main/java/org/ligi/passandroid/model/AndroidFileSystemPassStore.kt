@@ -3,9 +3,8 @@ package org.ligi.passandroid.model
 import android.content.Context
 import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.Moshi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.channels.ConflatedBroadcastChannel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import okio.buffer
 import okio.sink
 import okio.source
@@ -28,7 +27,8 @@ class AndroidFileSystemPassStore(
         private val moshi: Moshi
 ) : PassStore, KoinComponent {
 
-    override val updateChannel = ConflatedBroadcastChannel<PassStoreUpdateEvent>()
+    private val mutableUpdates = MutableSharedFlow<PassStoreUpdateEvent>(extraBufferCapacity = 1)
+    override val updates = mutableUpdates.asSharedFlow()
 
     private val path: File = settings.getPassesDir()
 
@@ -128,9 +128,7 @@ class AndroidFileSystemPassStore(
     }
 
     override fun notifyChange() {
-        GlobalScope.launch {
-            updateChannel.send(PassStoreUpdateEvent)
-        }
+        mutableUpdates.tryEmit(PassStoreUpdateEvent)
     }
 
     override fun syncPassStoreWithClassifier(defaultTopic: String) {

@@ -1,6 +1,5 @@
 package org.ligi.passandroid.unittest
 
-import androidx.core.net.toUri
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.ligi.passandroid.Tracker
@@ -13,14 +12,14 @@ class TheURLRewriteController {
 
     @Test
     fun testAppSpotRewrite() {
-        val res = tested.getUrlByUri("http://pass-cloud.appspot.com/open_or_install?url=http://espass.it/assets/download/pass/movie.espass".toUri())
+        val res = tested.getUrl("http://pass-cloud.appspot.com/open_or_install?url=http://espass.it/assets/download/pass/movie.espass")
 
         assertThat(res).isEqualTo("http://espass.it/assets/download/pass/movie.espass")
     }
 
     @Test
     fun testPass2URewrite() {
-        val res = tested.getUrlByUri("pass2u://import/https://api.passdock.com/passes/17969/e5dfb0afff61b1294235918a6a9ac75255daa89f.pkpass".toUri())
+        val res = tested.getUrl("pass2u://import/https://api.passdock.com/passes/17969/e5dfb0afff61b1294235918a6a9ac75255daa89f.pkpass")
 
         assertThat(res).isEqualTo("https://api.passdock.com/passes/17969/e5dfb0afff61b1294235918a6a9ac75255daa89f.pkpass")
     }
@@ -28,14 +27,14 @@ class TheURLRewriteController {
 
     @Test
     fun testRejection() {
-        val res = tested.getUrlByUri("http://foo.bar".toUri())
+        val res = tested.getUrl("http://foo.bar")
 
         assertThat(res).isNull()
     }
 
     @Test
     fun testThatBrusselWorks() {
-        val res = tested.getUrlByUri("http://prod.wap.ncrwebhost.mobi/mobiqa/wap/14foo/83bar/".toUri())
+        val res = tested.getUrl("http://prod.wap.ncrwebhost.mobi/mobiqa/wap/14foo/83bar/")
 
         assertThat(res).isEqualTo("http://prod.wap.ncrwebhost.mobi/mobiqa/wap/14foo/83bar/passbook")
     }
@@ -43,14 +42,14 @@ class TheURLRewriteController {
 
     @Test
     fun testThatSwissWorks() {
-        val res = tested.getUrlByUri("http://mbp.swiss.com/mobiqa/wap/14foo/83bar/".toUri())
+        val res = tested.getUrl("http://mbp.swiss.com/mobiqa/wap/14foo/83bar/")
 
         assertThat(res).isEqualTo("http://prod.wap.ncrwebhost.mobi/mobiqa/wap/14foo/83bar/passbook")
     }
 
     @Test
     fun testThatCathayWorks() {
-        val res = tested.getUrlByUri("https://www.cathaypacific.com/foo?v=bar".toUri())
+        val res = tested.getUrl("https://www.cathaypacific.com/foo?v=bar")
 
         assertThat(res).isEqualTo("https://www.cathaypacific.com/icheckin2/PassbookServlet?v=bar")
     }
@@ -58,7 +57,7 @@ class TheURLRewriteController {
 
     @Test
     fun testVirgin1() {
-        val res = tested.getUrlByUri("https://bazz.virginaustralia.com/boarding/CheckInApiIntegration?key=foo".toUri())
+        val res = tested.getUrl("https://bazz.virginaustralia.com/boarding/CheckInApiIntegration?key=foo")
 
         assertThat(res).isEqualTo("https://mobile.virginaustralia.com/boarding/pass.pkpass?key=foo")
     }
@@ -66,14 +65,14 @@ class TheURLRewriteController {
 
     @Test
     fun testVirgin() {
-        val res = tested.getUrlByUri("https://bazz.virginaustralia.com/boarding/pass.pkpass?c=foo".toUri())
+        val res = tested.getUrl("https://bazz.virginaustralia.com/boarding/pass.pkpass?c=foo")
 
         assertThat(res).isEqualTo("https://mobile.virginaustralia.com/boarding/pass.pkpass?key=foo")
     }
 
     @Test
     fun testAirCanada() {
-        val res = tested.getUrlByUri("http://m.aircanada.ca/ebp/XYZ".toUri())
+        val res = tested.getUrl("http://m.aircanada.ca/ebp/XYZ")
 
         assertThat(res).isEqualTo("http://m.aircanada.ca/ebp/XYZ?appDetection=false")
     }

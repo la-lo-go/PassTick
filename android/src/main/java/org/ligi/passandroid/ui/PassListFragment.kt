@@ -55,7 +55,7 @@ class PassListFragment : Fragment() {
         itemTouchHelper.attachToRecyclerView(inflate.passRecyclerview)
 
         lifecycleScope.launch {
-            for (update in passStore.updateChannel.openSubscription()) {
+            passStore.updates.collect {
                 passStoreProjection.refresh()
                 adapter.notifyDataSetChanged()
             }

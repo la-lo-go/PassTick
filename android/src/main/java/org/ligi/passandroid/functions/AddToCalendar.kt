@@ -13,6 +13,13 @@ import org.ligi.passandroid.model.pass.PassImpl
 
 const val DEFAULT_EVENT_LENGTH_IN_HOURS = 8L
 
+data class CalendarEvent(
+    val title: String?,
+    val beginTimeMillis: Long,
+    val endTimeMillis: Long,
+    val location: String?,
+)
+
 fun tryAddDateToCalendar(pass: Pass, contextView: View, timeSpan: PassImpl.TimeSpan) {
     if (pass.calendarTimespan == null) {
         AlertDialog.Builder(contextView.context).setMessage(R.string.expiration_date_to_calendar_warning_message)
@@ -37,24 +44,29 @@ private fun reallyAddToCalendar(pass: Pass, contextView: View, timeSpan: PassImp
 
 
 @VisibleForTesting
-fun createIntent(pass: Pass, timeSpan: PassImpl.TimeSpan) = Intent(Intent.ACTION_EDIT).apply {
+fun createCalendarEvent(pass: Pass, timeSpan: PassImpl.TimeSpan): CalendarEvent {
     if (timeSpan.from == null && timeSpan.to == null) {
         throw IllegalArgumentException("span must have either a to or a from")
     }
 
-    type = "vnd.android.cursor.item/event"
     val from = timeSpan.from ?: timeSpan.to!!.minusHours(DEFAULT_EVENT_LENGTH_IN_HOURS)
-    putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, from.toEpochSecond() * 1000)
-
     val to = timeSpan.to ?: timeSpan.from!!.plusHours(DEFAULT_EVENT_LENGTH_IN_HOURS)
-    putExtra(CalendarContract.EXTRA_EVENT_END_TIME, to.toEpochSecond() * 1000)
-    putExtra("title", pass.description)
+    return CalendarEvent(
+        title = pass.description,
+        beginTimeMillis = from.toEpochSecond() * 1000,
+        endTimeMillis = to.toEpochSecond() * 1000,
+        location = pass.locations.firstOrNull()?.name,
+    )
+}
 
-
-    pass.locations.firstOrNull()?.name?.let {
-        putExtra("eventLocation", it)
-    }
-
+@VisibleForTesting
+fun createIntent(pass: Pass, timeSpan: PassImpl.TimeSpan) = Intent(Intent.ACTION_EDIT).apply {
+    val event = createCalendarEvent(pass, timeSpan)
+    type = "vnd.android.cursor.item/event"
+    putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.beginTimeMillis)
+    putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.endTimeMillis)
+    putExtra("title", event.title)
+    event.location?.let { putExtra("eventLocation", it) }
 }
 
 

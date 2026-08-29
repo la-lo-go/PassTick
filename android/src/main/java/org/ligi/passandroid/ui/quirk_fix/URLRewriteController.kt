@@ -2,13 +2,18 @@ package org.ligi.passandroid.ui.quirk_fix
 
 import android.net.Uri
 import org.ligi.passandroid.Tracker
+import java.net.URI
+import java.net.URLDecoder
 import java.net.URLEncoder
 
 private const val CHARSET = "UTF-8"
 
 class URLRewriteController(private val tracker: Tracker) {
 
-    fun getUrlByUri(uri: Uri): String? {
+    fun getUrlByUri(uri: Uri): String? = getUrl(uri.toString())
+
+    fun getUrl(rawUrl: String): String? {
+        val uri = URI(rawUrl)
 
         if (uri.scheme != null && uri.authority != null && uri.authority == "import") {
             when (uri.scheme) {
@@ -23,7 +28,7 @@ class URLRewriteController(private val tracker: Tracker) {
         }
 
         return when (host) {
-            "pass-cloud.appspot.com" -> uri.getQueryParameter("url")
+            "pass-cloud.appspot.com" -> uri.queryParameter("url")
             "m.aircanada.ca", "services.aircanada.com" -> getAirCanada(uri)
             "mci.aircanada.com" -> getAirCanada2(uri)
             "www.cathaypacific.com" -> getCathay(uri)
@@ -32,18 +37,18 @@ class URLRewriteController(private val tracker: Tracker) {
         }
     }
 
-    private fun getAirCanada(uri: Uri) = "$uri?appDetection=false"
-    private fun getAirCanada2(uri: Uri) = "$uri.pkpass"
+    private fun getAirCanada(uri: URI) = "$uri?appDetection=false"
+    private fun getAirCanada2(uri: URI) = "$uri.pkpass"
 
-    private fun getVirginAustraliaURL(uri: Uri): String? {
+    private fun getVirginAustraliaURL(uri: URI): String? {
 
         val passId: String?
         if ("$uri".contains("CheckInApiIntegration")) {
-            passId = uri.getQueryParameter("key")
+            passId = uri.queryParameter("key")
             tracker.trackEvent("quirk_fix", "redirect_attempt", "virgin_australia2", null)
         } else {
             tracker.trackEvent("quirk_fix", "redirect_attempt", "virgin_australia1", null)
-            passId = uri.getQueryParameter("c")
+            passId = uri.queryParameter("c")
         }
 
         if (passId == null) {
@@ -55,8 +60,8 @@ class URLRewriteController(private val tracker: Tracker) {
         return "https://mobile.virginaustralia.com/boarding/pass.pkpass?key=" + URLEncoder.encode(passId, CHARSET)
     }
 
-    private fun getCathay(uri: Uri): String? {
-        val passId = uri.getQueryParameter("v")
+    private fun getCathay(uri: URI): String? {
+        val passId = uri.queryParameter("v")
 
         tracker.trackEvent("quirk_fix", "redirect_attempt", "cathay", null)
 
@@ -69,7 +74,7 @@ class URLRewriteController(private val tracker: Tracker) {
         return "https://www.cathaypacific.com/icheckin2/PassbookServlet?v=" + URLEncoder.encode(passId, CHARSET)
     }
 
-    private fun getNrcWebHost(uri: Uri): String? {
+    private fun getNrcWebHost(uri: URI): String? {
         var url = "$uri"
         if (url.endsWith("/")) {
             url = url.dropLast(1)
@@ -84,3 +89,11 @@ class URLRewriteController(private val tracker: Tracker) {
         return "http://prod.wap.ncrwebhost.mobi/mobiqa/wap/" + split[split.size - 2] + "/" + split[split.size - 1] + "/passbook"
     }
 }
+
+private fun URI.queryParameter(name: String): String? = rawQuery
+    ?.split('&')
+    ?.asSequence()
+    ?.map { it.substringBefore('=') to it.substringAfter('=', "") }
+    ?.firstOrNull { it.first == name }
+    ?.second
+    ?.let { URLDecoder.decode(it, CHARSET) }

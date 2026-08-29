@@ -170,7 +170,7 @@ class PassListActivity : PassAndroidActivity() {
         }
 
         lifecycleScope.launch {
-            for (update in passStore.updateChannel.openSubscription()) {
+            passStore.updates.collect {
                 binding.navigationView.passStoreUpdate()
 
                refresh()

@@ -4,7 +4,7 @@ import android.content.res.Resources
 import androidx.annotation.StringRes
 import com.squareup.moshi.JsonClass
 
-@JsonClass(generateAdapter = true)
+@JsonClass(generateAdapter = false)
 class PassField(var key: String?, var label: String?, var value: String?, var hide: Boolean, var hint:String? = null) {
 
     fun toHtmlSnippet(): String {

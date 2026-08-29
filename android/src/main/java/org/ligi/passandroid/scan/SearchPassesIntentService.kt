@@ -109,7 +109,7 @@ class SearchPassesIntentService : LifecycleService() {
             delay(10000)
             notifyManager.cancel(PROGRESS_NOTIFICATION_ID)
 
-            progressChannelProvider.channel.send(ScanFinished(foundList))
+            progressChannelProvider.emit(ScanFinished(foundList))
         }
 
         return START_STICKY
@@ -123,7 +123,7 @@ class SearchPassesIntentService : LifecycleService() {
         if (System.currentTimeMillis() - lastProgressUpdate > 1000) {
             lastProgressUpdate = System.currentTimeMillis()
             val msg = "$path"
-            progressChannelProvider.channel.send(DirectoryProcessed(msg))
+            progressChannelProvider.emit(DirectoryProcessed(msg))
             progressNotificationBuilder!!.setContentText(msg)
             notifyManager.notify(PROGRESS_NOTIFICATION_ID, progressNotificationBuilder!!.build())
         }
@@ -143,7 +143,7 @@ class SearchPassesIntentService : LifecycleService() {
             Timber.i("search " + file.absoluteFile)
             if (recursive && file.isDirectory) {
                 searchIn(file, true)
-            } else if (file.name.lowercase(Locale.ROOT).endsWith(".pkpass") || file.name.toLowerCase().endsWith(".espass")) {
+            } else if (file.name.lowercase(Locale.ROOT).endsWith(".pkpass") || file.name.lowercase().endsWith(".espass")) {
                 Timber.i("found" + file.absolutePath)
 
                 try {

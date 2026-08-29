@@ -187,7 +187,7 @@ open class PassViewActivityBase : PassAndroidActivity() {
             val response: Response
             try {
                 response = client.newCall(request).execute()
-                val body = response.body()
+                val body = response.body
                 if (body != null) {
                     val inputStreamWithSource = InputStreamWithSource(url, body.byteStream())
                     val spec = InputStreamUnzipControllerSpec(inputStreamWithSource, this@PassViewActivityBase, passStore,

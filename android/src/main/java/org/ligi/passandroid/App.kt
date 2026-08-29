@@ -3,27 +3,22 @@ package org.ligi.passandroid
 import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import com.jakewharton.threetenabp.AndroidThreeTen
-import com.squareup.moshi.Moshi
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.module
-import org.ligi.passandroid.json_adapter.ColorAdapter
-import org.ligi.passandroid.json_adapter.ZonedTimeAdapter
 import org.ligi.passandroid.model.AndroidFileSystemPassStore
 import org.ligi.passandroid.model.AndroidSettings
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.Settings
+import org.ligi.passandroid.model.createPassMoshi
 import org.ligi.passandroid.scan.events.PassScanEventChannelProvider
 import org.ligi.tracedroid.TraceDroid
 
 open class App : Application() {
 
-    private val moshi = Moshi.Builder()
-            .add(ZonedTimeAdapter())
-            .add(ColorAdapter())
-            .build()
+    private val moshi = createPassMoshi()
 
     private val settings by lazy { AndroidSettings(this) }
 

@@ -28,7 +28,7 @@ class PassScanActivity : PassAndroidActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         lifecycleScope.launch {
-            for (event in progressChannelProvider.channel.openSubscription()) {
+            progressChannelProvider.events.collect { event ->
                 when (event) {
                     is DirectoryProcessed -> binding.progressText.text = event.dir
                     is ScanFinished -> {

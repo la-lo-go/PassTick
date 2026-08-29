@@ -11,11 +11,22 @@ import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.util.*
 
-@JsonClass(generateAdapter = true)
-class PassImpl(override val id: String) : Pass {
+@JsonClass(generateAdapter = false)
+class PassImpl(
+    override val id: String,
+    @HexColor override var accentColor: Int = 0,
+) : Pass {
 
 
     @Retention(AnnotationRetention.RUNTIME)
+    @Target(
+        AnnotationTarget.FIELD,
+        AnnotationTarget.PROPERTY,
+        AnnotationTarget.PROPERTY_GETTER,
+        AnnotationTarget.PROPERTY_SETTER,
+        AnnotationTarget.VALUE_PARAMETER,
+        AnnotationTarget.FUNCTION,
+    )
     @JsonQualifier
     annotation class HexColor
 
@@ -24,9 +35,6 @@ class PassImpl(override val id: String) : Pass {
     override var type: PassType = PassType.EVENT
 
     override var barCode: BarCode? = null
-
-    @field:[HexColor]
-    override var accentColor: Int = 0
 
     override var description: String? = null
         get() {
@@ -39,10 +47,10 @@ class PassImpl(override val id: String) : Pass {
             return field
         }
 
-    @JsonClass(generateAdapter = true)
+    @JsonClass(generateAdapter = false)
     class TimeRepeat(val offset: Int, val count: Int)
 
-    @JsonClass(generateAdapter = true)
+    @JsonClass(generateAdapter = false)
     class TimeSpan(val from: ZonedDateTime? = null, val to: ZonedDateTime? = null, val repeat: TimeRepeat? = null)
 
     override var validTimespans: List<TimeSpan> = ArrayList()

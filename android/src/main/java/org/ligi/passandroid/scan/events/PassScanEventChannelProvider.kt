@@ -1,7 +1,13 @@
 package org.ligi.passandroid.scan.events
 
-import kotlinx.coroutines.channels.ConflatedBroadcastChannel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 class PassScanEventChannelProvider {
-    val channel = ConflatedBroadcastChannel<PassScanEvent>()
+    private val mutableEvents = MutableSharedFlow<PassScanEvent>(extraBufferCapacity = 1)
+    val events = mutableEvents.asSharedFlow()
+
+    suspend fun emit(event: PassScanEvent) {
+        mutableEvents.emit(event)
+    }
 }

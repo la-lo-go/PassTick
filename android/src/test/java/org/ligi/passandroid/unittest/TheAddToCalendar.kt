@@ -2,7 +2,7 @@ package org.ligi.passandroid.unittest
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import org.ligi.passandroid.functions.createIntent
+import org.ligi.passandroid.functions.createCalendarEvent
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassImpl
 import org.ligi.passandroid.model.pass.PassLocation
@@ -27,27 +27,27 @@ class TheAddToCalendar {
 
     @Test(expected = IllegalArgumentException::class)
     fun shouldThrowIllegalArgumentWhenNoFromOrTo() {
-        createIntent(mock(Pass::class.java), mock(PassImpl.TimeSpan::class.java))
+        createCalendarEvent(mock(Pass::class.java), mock(PassImpl.TimeSpan::class.java))
     }
 
     @Test
     fun descriptionShouldShow() {
-        val tested = createIntent(pass, validTimeSpan)
-        assertThat(tested.getStringExtra("title")).isEqualTo(DESCRIPTIONPROBE)
+        val tested = createCalendarEvent(pass, validTimeSpan)
+        assertThat(tested.title).isEqualTo(DESCRIPTIONPROBE)
     }
 
     @Test
-    fun typeIsCorrect() {
-        val tested = createIntent(pass, validTimeSpan)
-        assertThat(tested.type).isEqualTo("vnd.android.cursor.item/event")
+    fun timesAreCorrect() {
+        val tested = createCalendarEvent(pass, validTimeSpan)
+        assertThat(tested.endTimeMillis).isGreaterThan(tested.beginTimeMillis)
     }
 
     @Test
     fun locationIsCorrect() {
         `when`(pass.locations).thenReturn(listOf(PassLocation().apply { name = LOCATIONPROBE }))
 
-        val tested = createIntent(pass, validTimeSpan)
-        assertThat(tested.getStringExtra("eventLocation")).isEqualTo(LOCATIONPROBE)
+        val tested = createCalendarEvent(pass, validTimeSpan)
+        assertThat(tested.location).isEqualTo(LOCATIONPROBE)
     }
 
 

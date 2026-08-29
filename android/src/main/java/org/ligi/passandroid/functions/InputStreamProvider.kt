@@ -56,7 +56,7 @@ private fun fromOKHttp(uri: Uri, tracker: Tracker): InputStreamWithSource? {
 
     val response = client.newCall(request).execute()
 
-    val body = response.body()
+    val body = response.body
 
     if (body != null) {
         return InputStreamWithSource("$uri", body.byteStream())

@@ -39,7 +39,7 @@ class ExtractURLAsIphoneActivity : PassAndroidActivity() {
                 val requestBuilder = Request.Builder().url(URI(intent?.data.toString()).toURL())
                 requestBuilder.header("User-Agent", IPHONE_USER_AGENT)
 
-                val body = client.newCall(requestBuilder.build()).execute().body()
+                val body = client.newCall(requestBuilder.build()).execute().body
 
                 if (body != null) {
                     val bodyString = body.string()
