@@ -11,7 +11,6 @@ datastore = "1.2.1"
 espresso = "3.6.1"
 fragment = "1.9.0"
 junit = "4.13.2"
-jsr305 = "3.0.2"
 json = "20250517"
 kotlin = "2.3.20"
 koin = "4.2.2"
@@ -55,7 +54,6 @@ datastore-preferences = { module = "androidx.datastore:datastore-preferences", v
 espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
 fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
 junit4 = { module = "junit:junit", version.ref = "junit" }
-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "jsr305" }
 json = { module = "org.json:json", version.ref = "json" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }

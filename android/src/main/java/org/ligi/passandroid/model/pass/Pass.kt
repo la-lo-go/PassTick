@@ -2,7 +2,11 @@ package org.ligi.passandroid.model.pass
 
 import android.graphics.Bitmap
 import androidx.annotation.StringDef
-import org.ligi.passandroid.model.PassBitmapDefinitions.*
+import org.ligi.passandroid.model.PassBitmapDefinitions.BITMAP_FOOTER
+import org.ligi.passandroid.model.PassBitmapDefinitions.BITMAP_ICON
+import org.ligi.passandroid.model.PassBitmapDefinitions.BITMAP_LOGO
+import org.ligi.passandroid.model.PassBitmapDefinitions.BITMAP_STRIP
+import org.ligi.passandroid.model.PassBitmapDefinitions.BITMAP_THUMBNAIL
 import org.ligi.passandroid.model.PassStore
 
 

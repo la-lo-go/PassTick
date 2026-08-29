@@ -13,7 +13,6 @@ import org.ligi.passandroid.model.PassBitmapDefinitions
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassField
-import org.ligi.passandroid.ui.Visibility
 import org.ligi.passandroid.ui.showNavigateToLocationsDialog
 import org.ligi.passandroid.ui.views.BaseCategoryIndicatorView
 import org.ligi.passandroid.ui.views.CategoryIndicatorViewWithIcon
@@ -113,7 +112,6 @@ abstract class PassViewHolder(val view: CardView) : RecyclerView.ViewHolder(view
         else -> null
     }
 
-    @Visibility
     protected open fun getVisibilityForGlobalAndLocal(global: Boolean, local: Boolean) = when {
         global -> GONE
         local -> VISIBLE

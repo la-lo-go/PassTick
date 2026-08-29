@@ -69,7 +69,6 @@ kotlin {
 }
 
 dependencies {
-    compileOnly(libs.jsr305)
     implementation(platform(libs.compose.bom))
     androidTestImplementation(platform(libs.compose.bom))
 
@@ -125,9 +124,18 @@ dependencies {
     testImplementation(libs.threetenbp)
 
     androidTestImplementation(libs.compose.ui.test)
+    androidTestImplementation(libs.assertj)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation("androidx.test.espresso:espresso-contrib:3.6.1")
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.6.1")
+    androidTestImplementation(libs.mockito)
+    androidTestImplementation(libs.threetenbp)
     androidTestImplementation(libs.test.core)
     androidTestImplementation(libs.test.ext.junit)
+    androidTestImplementation("com.github.ligi:trulesk:4.3")
+    androidTestImplementation("com.linkedin.dexmaker:dexmaker-mockito:2.28.4")
+    androidTestImplementation("com.linkedin.testbutler:test-butler-library:2.2.1")
+    androidTestUtil("com.linkedin.testbutler:test-butler-app:2.2.1")
     debugImplementation(libs.compose.ui.test.manifest)
     debugImplementation(libs.compose.ui.tooling)
 }

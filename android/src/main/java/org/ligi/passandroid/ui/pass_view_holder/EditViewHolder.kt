@@ -13,7 +13,6 @@ import org.ligi.passandroid.R
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassImpl
-import org.ligi.passandroid.ui.Visibility
 import org.ligi.passandroid.ui.views.TimeAndNavBar
 import org.threeten.bp.ZonedDateTime
 import org.threeten.bp.temporal.ChronoUnit
@@ -55,7 +54,6 @@ class EditViewHolder(view: CardView) : VerbosePassViewHolder(view), TimePickerDi
 
     }
 
-    @Visibility
     override fun getVisibilityForGlobalAndLocal(global: Boolean, local: Boolean): Int {
         return VISIBLE
     }

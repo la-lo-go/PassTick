@@ -4,6 +4,8 @@ import android.content.Intent
 import android.view.View
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.appcompat.widget.AppCompatImageButton
@@ -28,12 +30,22 @@ class BarcodeEditController(private val rootView: View, internal val context: Ap
     class IntentFragment : Fragment() {
         var scanCallback: (format: String, result: String) -> Unit = { _, _ -> }
 
-        override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-            data?.let { dataNotNull ->
-                val scanResultFormat = dataNotNull.getStringExtra("SCAN_RESULT_FORMAT") ?: return
-                val scanResult = dataNotNull.getStringExtra("SCAN_RESULT") ?: return
-                scanCallback(scanResultFormat, scanResult)
+        private val scanLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val data = result.data ?: return@registerForActivityResult
+            val format = data.getStringExtra("SCAN_RESULT_FORMAT") ?: return@registerForActivityResult
+            val message = data.getStringExtra("SCAN_RESULT") ?: return@registerForActivityResult
+            scanCallback(format, message)
+        }
+
+        fun scan(formats: List<String>) {
+            val intent = Intent("com.google.zxing.client.android.SCAN").apply {
+                addCategory(Intent.CATEGORY_DEFAULT)
+                putExtra("SCAN_FORMATS", formats.joinToString(","))
             }
+            runCatching { scanLauncher.launch(intent) }
+                .onFailure {
+                    Toast.makeText(requireContext(), "No barcode scanner is available", Toast.LENGTH_LONG).show()
+                }
         }
     }
 
@@ -75,8 +87,7 @@ class BarcodeEditController(private val rootView: View, internal val context: Ap
         }
 
         rootView.findViewById<View>(R.id.scanButton).setOnClickListener {
-            val barCodeIntentIntegrator = BarCodeIntentIntegrator(intentFragment)
-            barCodeIntentIntegrator.initiateScan(PassBarCodeFormat.values().map { it.name })
+            intentFragment.scan(PassBarCodeFormat.values().map { it.name })
         }
 
         intentFragment.scanCallback = { newFormat, newMessage ->
