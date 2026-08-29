@@ -4,6 +4,11 @@
 
 # PassAndroid
 
+> This independent modernization preserves the full history of the original
+> [PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its
+> contributors. The work remains licensed under GPL-3.0. The application keeps
+> its current name and identifiers only until a new name is selected.
+
 Android App to view Passes (e.g. event tickets, coupons, loyalty cards, boarding passes, ...)
 
 ![Screenshots](https://ligi.de/img/passandroid_screenshots.png)
