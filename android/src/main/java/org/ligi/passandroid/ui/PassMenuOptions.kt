@@ -67,7 +67,7 @@ class PassMenuOptions(val activity: Activity, val pass: Pass) : KoinComponent {
             }
 
             R.id.menu_map -> {
-                PassbookMapsFacade.startFullscreenMap(activity)
+                pass.locations.firstOrNull()?.let { PassbookMapsFacade.openLocation(activity, it) }
                 return true
             }
 

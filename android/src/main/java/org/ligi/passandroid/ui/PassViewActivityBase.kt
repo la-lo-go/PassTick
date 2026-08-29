@@ -10,7 +10,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.view.ViewConfiguration
 import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -40,20 +39,6 @@ open class PassViewActivityBase : PassAndroidActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // a little hack because I strongly disagree with the style guide here
-        // ;-)
-        // not having the Actionbar overflow menu also with devices with hardware
-        // key really helps discoverability
-        // http://stackoverflow.com/questions/9286822/how-to-force-use-of-overflow-menu-on-devices-with-menu-button
-        try {
-            val config = ViewConfiguration.get(this)
-            val menuKeyField = ViewConfiguration::class.java.getDeclaredField("sHasPermanentMenuKey")
-            menuKeyField.isAccessible = true
-            menuKeyField.setBoolean(config, false)
-        } catch (ex: Exception) {
-            // Ignore - but at least we tried ;-)
-        }
 
         updateCurrentPass()
     }

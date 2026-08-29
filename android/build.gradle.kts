@@ -17,17 +17,6 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
-    flavorDimensions += listOf("maps", "analytics", "distribution")
-    productFlavors {
-        create("withMaps") { dimension = "maps" }
-        create("noMaps") { dimension = "maps" }
-        create("withAnalytics") { dimension = "analytics" }
-        create("noAnalytics") { dimension = "analytics" }
-        create("forFDroid") { dimension = "distribution" }
-        create("forPlay") { dimension = "distribution" }
-        create("forAmazon") { dimension = "distribution" }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -70,21 +59,6 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
-    }
-}
-
-androidComponents {
-    beforeVariants(selector().all()) { variant ->
-        val flavors = variant.productFlavors.associate { it.first to it.second }
-        val maps = flavors["maps"]
-        val analytics = flavors["analytics"]
-        val distribution = flavors["distribution"]
-        variant.enable = when {
-            distribution == "forFDroid" -> maps == "noMaps" && analytics == "noAnalytics"
-            distribution == "forPlay" -> maps == "withMaps" && analytics == "withAnalytics"
-            distribution == "forAmazon" -> maps == "withMaps" && analytics == "withAnalytics"
-            else -> false
-        }
     }
 }
 
@@ -142,12 +116,6 @@ dependencies {
     implementation("net.i2p.android.ext:floatingactionbutton:1.10.1") {
         exclude(group = "com.android.support", module = "support-v4")
     }
-
-    add("forPlayImplementation", "com.github.ligi.snackengage:snackengage-playrate:0.30")
-    add("forFDroidImplementation", "com.github.ligi.snackengage:snackengage-playrate:0.30")
-    add("forAmazonImplementation", "com.github.ligi.snackengage:snackengage-amazonrate:0.30")
-    add("withAnalyticsImplementation", "com.google.android.gms:play-services-analytics:18.1.1")
-    add("withMapsImplementation", "com.google.android.gms:play-services-maps:19.2.0")
 
     testImplementation(libs.junit4)
     testImplementation(libs.assertj)

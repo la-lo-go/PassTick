@@ -13,6 +13,7 @@ import android.view.MenuItem
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.view.ViewGroup
+import androidx.activity.addCallback
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
@@ -31,9 +32,6 @@ import org.ligi.passandroid.functions.createAndAddEmptyPass
 import org.ligi.passandroid.model.PassStoreProjection
 import org.ligi.passandroid.model.State
 import org.ligi.passandroid.scan.PassScanActivity
-import org.ligi.snackengage.SnackEngage
-import org.ligi.snackengage.snacks.BaseSnack
-import org.ligi.snackengage.snacks.DefaultRateSnack
 import org.ligi.tracedroid.TraceDroid
 import org.ligi.tracedroid.sending.sendTraceDroidStackTracesIfExist
 import permissions.dispatcher.NeedsPermission
@@ -103,14 +101,21 @@ class PassListActivity : PassAndroidActivity() {
             if (settings.doTraceDroidEmailSend()) {
                 sendTraceDroidStackTracesIfExist("ligi+passandroid@ligi.de", this)
             }
-        } else { // if no error - check if there is a new version of the app
-            tracker.trackEvent("ui_event", "processFile", "updatenotice", null)
-
-            SnackEngage.from(binding.fam).withSnack(DefaultRateSnack().withDuration(BaseSnack.DURATION_INDEFINITE))
-                    .build().engageWhenAppropriate()
         }
 
         binding.drawerLayout.addDrawerListener(drawerToggle)
+
+        onBackPressedDispatcher.addCallback(this) {
+            when {
+                binding.drawerLayout.isDrawerOpen(GravityCompat.START) -> binding.drawerLayout.closeDrawer(GravityCompat.START)
+                binding.fam.isExpanded -> binding.fam.collapse()
+                else -> {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        }
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
@@ -263,11 +268,4 @@ class PassListActivity : PassAndroidActivity() {
         return true
     }
 
-    override fun onBackPressed() {
-        when {
-            binding.drawerLayout.isDrawerOpen(GravityCompat.START) -> binding.drawerLayout.closeDrawer(GravityCompat.START)
-            binding.fam.isExpanded -> binding.fam.collapse()
-            else -> super.onBackPressed()
-        }
-    }
 }

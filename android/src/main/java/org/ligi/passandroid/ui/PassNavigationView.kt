@@ -19,12 +19,7 @@ class PassNavigationView(context: Context, attrs: AttributeSet) : NavigationView
     private fun getIntent(id: Int) = when (id) {
         R.id.menu_settings -> Intent(context, PreferenceActivity::class.java)
         R.id.menu_github -> intentFromUrl("https://github.com/ligi/PassAndroid")
-        R.id.menu_beta -> intentFromUrl("https://play.google.com/apps/testing/org.ligi.passandroid")
         R.id.menu_language -> intentFromUrl("https://transifex.com/projects/p/passandroid")
-        R.id.menu_share -> Intent(Intent.ACTION_SEND).apply {
-            putExtra(Intent.EXTRA_TEXT, marketUrl)
-            type = "text/plain"
-        }
         else -> null
     }
 
@@ -43,8 +38,6 @@ class PassNavigationView(context: Context, attrs: AttributeSet) : NavigationView
 
         passStoreUpdate()
     }
-
-    private val marketUrl by lazy { context.getString(R.string.market_url, context.packageName) }
 
     fun passStoreUpdate() {
 

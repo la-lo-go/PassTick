@@ -14,11 +14,9 @@ import android.widget.LinearLayout
 import androidx.core.text.parseAsHtml
 import androidx.core.text.util.LinkifyCompat
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentActivity
 import org.koin.android.ext.android.inject
 import org.ligi.kaxt.startActivityFromClass
 import org.ligi.passandroid.R
-import org.ligi.passandroid.maps.PassbookMapsFacade
 import org.ligi.passandroid.model.PassBitmapDefinitions
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.pass.Pass
@@ -83,13 +81,7 @@ class PassViewPKFragment : Fragment() {
         processImage(requireActivity().findViewById(R.id.thumbnail_img_view), PassBitmapDefinitions.BITMAP_THUMBNAIL, pass)
         processImage(requireActivity().findViewById(R.id.strip_img_view), PassBitmapDefinitions.BITMAP_STRIP, pass)
 
-        val mapContainer = requireActivity().findViewById<View>(R.id.map_container)
-        if (mapContainer != null) {
-            if (!(pass.locations.isNotEmpty() && PassbookMapsFacade.init(activity as FragmentActivity))) {
-                @Suppress("PLUGIN_WARNING")
-                mapContainer.visibility = View.GONE
-            }
-        }
+        requireActivity().findViewById<View?>(R.id.map_container)?.visibility = View.GONE
 
         val backStrBuilder = StringBuilder()
 

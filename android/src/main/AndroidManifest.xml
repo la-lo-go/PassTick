@@ -29,15 +29,6 @@
             android:theme="@style/AppTheme"
             android:requestLegacyExternalStorage="true">
 
-        <receiver
-                android:name=".InstallListener"
-                android:permission="android.permission.INSTALL_PACKAGES"
-                android:exported="true">
-            <intent-filter>
-                <action android:name="com.android.vending.INSTALL_REFERRER"/>
-            </intent-filter>
-        </receiver>
-
         <provider
                 android:name="androidx.core.content.FileProvider"
                 android:authorities="@string/authority_fileprovider"

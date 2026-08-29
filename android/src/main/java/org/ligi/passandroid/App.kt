@@ -27,7 +27,7 @@ open class App : Application() {
         return module {
             single { AndroidFileSystemPassStore(this@App, get(), moshi) as PassStore }
             single { settings as Settings }
-            single { createTracker(this@App) }
+            single<Tracker> { LocalTracker() }
             single { PassScanEventChannelProvider() }
         }
     }
