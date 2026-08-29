@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.R
 import org.ligi.passandroid.model.comparator.PassSortOrder
@@ -112,7 +113,12 @@ fun PassListScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onImport, icon = { Icon(Icons.Default.Add, null) }, text = { Text("Import pass") })
+            ExtendedFloatingActionButton(
+                onClick = onImport,
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text("Import pass") },
+                modifier = Modifier.testTag("import_pass"),
+            )
         },
     ) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {

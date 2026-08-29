@@ -19,6 +19,7 @@ import org.junit.Test
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassImpl
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.SettingsRepository
@@ -46,22 +47,60 @@ class MainViewModelTest {
         assertThat(repository.deletedIds).containsExactly("pass-1")
         assertThat(viewModel.uiState.value.passes).isEmpty()
     }
+
+    @Test
+    fun `saves edited text and barcode through the repository`() = runTest(dispatcher) {
+        val source = PassImpl("pass-1").apply { description = "Old" }
+        val repository = FakePassRepository(listOf(source))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository())
+
+        viewModel.onAction(
+            AppAction.SavePass(
+                "pass-1",
+                PassDraft("Updated", "Issuer", PassBarCodeFormat.QR_CODE, "payload", "Show this"),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertThat(repository.savedPasses).containsExactly(source)
+        assertThat(source.description).isEqualTo("Updated")
+        assertThat(source.creator).isEqualTo("Issuer")
+        assertThat(source.barCode?.message).isEqualTo("payload")
+        assertThat(source.barCode?.alternativeText).isEqualTo("Show this")
+    }
+
+    @Test
+    fun `exports through a content uri`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val viewModel = MainViewModel(repository, FakeSettingsRepository())
+        val destination = org.mockito.Mockito.mock(Uri::class.java)
+
+        viewModel.onAction(AppAction.Export("pass-1", destination))
+        advanceUntilIdle()
+
+        assertThat(repository.exports).containsExactly("pass-1" to destination)
+    }
 }
 
 private class FakePassRepository(initial: List<Pass>) : PassRepository {
     private val passes = MutableStateFlow(initial)
     val deletedIds = mutableListOf<String>()
+    val savedPasses = mutableListOf<Pass>()
+    val exports = mutableListOf<Pair<String, Uri>>()
 
     override fun observePasses() = passes.asStateFlow()
     override fun find(id: String) = passes.value.firstOrNull { it.id == id }
     override suspend fun import(uri: Uri) = Result.failure<Pass>(UnsupportedOperationException())
-    override suspend fun save(pass: Pass) = Unit
+    override suspend fun save(pass: Pass) { savedPasses += pass }
     override suspend fun delete(id: String): Boolean {
         deletedIds += id
         passes.value = passes.value.filterNot { it.id == id }
         return true
     }
-    override suspend fun export(id: String, destination: Uri) = Result.success(Unit)
+    override suspend fun export(id: String, destination: Uri): Result<Unit> {
+        exports += id to destination
+        return Result.success(Unit)
+    }
     override suspend fun prepareShare(id: String) = Result.failure<Uri>(UnsupportedOperationException())
 }
 
