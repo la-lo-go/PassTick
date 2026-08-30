@@ -219,6 +219,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
 
 private class FakePlatformActions : PlatformActions {
     override fun addToCalendar(event: CalendarEvent) = Unit
+    override fun addToCalendarAutomatically(event: CalendarEvent) = true
     override fun share(uri: Uri, mimeType: String) = Unit
     override fun print(pass: PrintablePass) = Unit
     override fun openLocation(location: PlatformLocation) = Unit

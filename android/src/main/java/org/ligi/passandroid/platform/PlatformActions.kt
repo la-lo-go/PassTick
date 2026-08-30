@@ -1,14 +1,17 @@
 package org.ligi.passandroid.platform
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.CalendarContract
 import androidx.annotation.VisibleForTesting
 import org.ligi.passandroid.functions.createIntent
 import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.printing.doPrint
 import androidx.core.net.toUri
+import java.util.TimeZone
 
 data class PlatformLocation(
     val address: String?,
@@ -26,6 +29,7 @@ data class PrintablePass(
 
 interface PlatformActions {
     fun addToCalendar(event: CalendarEvent)
+    fun addToCalendarAutomatically(event: CalendarEvent): Boolean
     fun share(uri: Uri, mimeType: String)
     fun print(pass: PrintablePass)
     fun openLocation(location: PlatformLocation)
@@ -34,6 +38,31 @@ interface PlatformActions {
 class AndroidPlatformActions(private val context: Context) : PlatformActions {
     override fun addToCalendar(event: CalendarEvent) {
         context.startActivity(createIntent(event).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    override fun addToCalendarAutomatically(event: CalendarEvent): Boolean {
+        val calendarId = findWritableCalendarId() ?: return false
+        val values = ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+            put(CalendarContract.Events.DTSTART, event.beginTimeMillis)
+            put(CalendarContract.Events.DTEND, event.endTimeMillis)
+            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+            put(CalendarContract.Events.TITLE, event.title)
+            put(CalendarContract.Events.EVENT_LOCATION, event.location)
+            put(CalendarContract.Events.DESCRIPTION, event.description)
+        }
+        return context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values) != null
+    }
+
+    private fun findWritableCalendarId(): Long? = context.contentResolver.query(
+        CalendarContract.Calendars.CONTENT_URI,
+        arrayOf(CalendarContract.Calendars._ID),
+        "${CalendarContract.Calendars.VISIBLE} = 1 AND " +
+            "${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?",
+        arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()),
+        "${CalendarContract.Calendars.IS_PRIMARY} DESC, ${CalendarContract.Calendars._ID} ASC",
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) cursor.getLong(0) else null
     }
 
     override fun share(uri: Uri, mimeType: String) {

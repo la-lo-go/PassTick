@@ -17,11 +17,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -75,6 +80,8 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val backStack = rememberNavBackStack(AppDestination.PassList)
             val snackbarHostState = remember { SnackbarHostState() }
+            val coroutineScope = rememberCoroutineScope()
+            var showCalendarPermissionWarning by remember { mutableStateOf(false) }
             val undoCategories = remember { mutableMapOf<String, String>() }
             var expandedCodePassId by remember { mutableStateOf<String?>(null) }
             val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -102,6 +109,16 @@ class MainActivity : ComponentActivity() {
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
             ) { granted -> viewModel.onAction(AppAction.SetRemindersEnabled(granted)) }
+            val calendarPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestMultiplePermissions(),
+            ) { permissions ->
+                val granted = permissions[Manifest.permission.READ_CALENDAR] == true &&
+                    permissions[Manifest.permission.WRITE_CALENDAR] == true
+                viewModel.onAction(AppAction.SetOfferCalendarAfterImport(granted))
+                if (!granted) coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Calendar permission is required for automatic events")
+                }
+            }
 
             fun handleHomeAction(action: HomeAction) {
                 when (action) {
@@ -204,8 +221,56 @@ class MainActivity : ComponentActivity() {
                     viewModel.onAction(AppAction.SetRemindersEnabled(false))
                 }
             }
+            LaunchedEffect(state.settings.offerCalendarAfterImport) {
+                if (
+                    state.settings.offerCalendarAfterImport &&
+                    (
+                        ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.READ_CALENDAR) !=
+                            PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.WRITE_CALENDAR) !=
+                            PackageManager.PERMISSION_GRANTED
+                        )
+                ) {
+                    viewModel.onAction(AppAction.SetOfferCalendarAfterImport(false))
+                }
+            }
 
             PassTheme(state.settings.themeMode) {
+                if (showCalendarPermissionWarning) {
+                    AlertDialog(
+                        onDismissRequest = { showCalendarPermissionWarning = false },
+                        title = { Text("Add events automatically?") },
+                        text = {
+                            Text(
+                                "Dated passes will be added directly to your primary writable calendar after import. " +
+                                    "You can turn this off at any time.",
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showCalendarPermissionWarning = false
+                                    val permissions = arrayOf(
+                                        Manifest.permission.READ_CALENDAR,
+                                        Manifest.permission.WRITE_CALENDAR,
+                                    )
+                                    if (permissions.all {
+                                            ContextCompat.checkSelfPermission(this@MainActivity, it) ==
+                                                PackageManager.PERMISSION_GRANTED
+                                        }
+                                    ) {
+                                        viewModel.onAction(AppAction.SetOfferCalendarAfterImport(true))
+                                    } else {
+                                        calendarPermissionLauncher.launch(permissions)
+                                    }
+                                },
+                            ) { Text("Allow") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showCalendarPermissionWarning = false }) { Text("Cancel") }
+                        },
+                    )
+                }
                 Surface {
                     Box(Modifier.fillMaxSize()) {
                     NavDisplay(
@@ -316,9 +381,13 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetAutomaticallyMarkPast -> viewModel.onAction(
                                             AppAction.SetAutomaticallyMarkPast(action.value),
                                         )
-                                        is SettingsAction.SetOfferCalendarAfterImport -> viewModel.onAction(
-                                            AppAction.SetOfferCalendarAfterImport(action.value),
-                                        )
+                                        is SettingsAction.SetOfferCalendarAfterImport -> {
+                                            if (action.value) {
+                                                showCalendarPermissionWarning = true
+                                            } else {
+                                                viewModel.onAction(AppAction.SetOfferCalendarAfterImport(false))
+                                            }
+                                        }
                                         is SettingsAction.SetRemindersEnabled -> {
                                             if (!action.value) {
                                                 viewModel.onAction(AppAction.SetRemindersEnabled(false))

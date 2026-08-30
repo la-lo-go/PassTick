@@ -109,11 +109,11 @@ class MainViewModel(
         when (action) {
             is AppAction.Import -> launchOperation("Pass imported") {
                 val imported = passRepository.import(action.uri).getOrThrow()
-                openCalendarAfterImport(listOf(imported))
+                addCalendarEventsAfterImport(listOf(imported))
             }
             is AppAction.ImportFiles -> launchOperation("Passes imported") {
                 val imported = action.uris.map { passRepository.import(it).getOrThrow() }
-                openCalendarAfterImport(imported)
+                addCalendarEventsAfterImport(imported)
             }
             is AppAction.Export -> launchOperation("Pass exported") {
                 passRepository.export(action.id, action.destination).getOrThrow()
@@ -197,10 +197,11 @@ class MainViewModel(
         passRepository.update(action.id, action.draft.toPassUpdate())
     }
 
-    private fun openCalendarAfterImport(imported: List<PassSnapshot>) {
+    private fun addCalendarEventsAfterImport(imported: List<PassSnapshot>) {
         if (!uiState.value.settings.offerCalendarAfterImport) return
-        imported.asSequence().map(PassUiModel::from).mapNotNull(PassUiModel::calendarEvent).firstOrNull()
-            ?.let(platformActions::addToCalendar)
+        imported.asSequence().map(PassUiModel::from).mapNotNull(PassUiModel::calendarEvent).forEach { event ->
+            check(platformActions.addToCalendarAutomatically(event)) { "No writable calendar is available" }
+        }
     }
 
     private fun withPass(id: String, action: (PassUiModel) -> Unit) {

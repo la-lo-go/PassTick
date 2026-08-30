@@ -603,7 +603,7 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                 }
                 item {
                     SettingsGroup("Calendar") {
-                        SettingSwitch("Open calendar after import", settings.offerCalendarAfterImport) {
+                        SettingSwitch("Automatically add imported passes", settings.offerCalendarAfterImport) {
                             onAction(SettingsAction.SetOfferCalendarAfterImport(it))
                         }
                     }
