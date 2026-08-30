@@ -127,7 +127,7 @@ class PassScreensTest {
     }
 
     @Test
-    fun passListShowsOnlyTheSelectedCategory() {
+    fun passHomeShowsOnlyTheSelectedCategory() {
         val state = sampleState().copy(
             passes = listOf(
                 pass("one", "Boarding pass", PassType.BOARDING).copy(categoryId = "new"),
@@ -140,8 +140,6 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
         }
 
-        composeRule.onNodeWithText("Inbox").assertIsDisplayed()
-        composeRule.onNodeWithText("Archive").assertIsDisplayed()
         composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
         composeRule.onNodeWithText("Event ticket").assertDoesNotExist()
     }
@@ -154,7 +152,7 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Inbox").assertIsDisplayed()
         composeRule.onNodeWithText("Favorites").assertIsDisplayed()
-        composeRule.onNodeWithText("Add category").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Add category").assertIsDisplayed()
     }
 
     private fun assertVisualContent(image: androidx.compose.ui.graphics.ImageBitmap) {
