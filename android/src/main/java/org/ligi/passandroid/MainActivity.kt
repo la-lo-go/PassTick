@@ -28,7 +28,12 @@ import org.ligi.passandroid.ui.compose.PassListScreen
 import org.ligi.passandroid.ui.compose.ScannerScreen
 import org.ligi.passandroid.ui.compose.SettingsScreen
 import org.ligi.passandroid.ui.state.AppAction
+import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.MainViewModel
+import org.ligi.passandroid.ui.state.PassDetailAction
+import org.ligi.passandroid.ui.state.PassFinderAction
+import org.ligi.passandroid.ui.state.PassListAction
+import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.theme.PassTheme
 
 class MainActivity : ComponentActivity() {
@@ -70,49 +75,78 @@ class MainActivity : ComponentActivity() {
                             entry<AppDestination.PassList> {
                                 PassListScreen(
                                     state = state,
-                                    onOpen = { backStack.add(AppDestination.PassDetail(it)) },
-                                    onImport = { importLauncher.launch(PASS_MIME_TYPES) },
-                                    onScan = { backStack.add(AppDestination.Scanner) },
-                                    onSettings = { backStack.add(AppDestination.Settings) },
-                                    onHelp = { backStack.add(AppDestination.Help) },
+                                    onAction = { action ->
+                                        when (action) {
+                                            is PassListAction.OpenPass -> backStack.add(AppDestination.PassDetail(action.id))
+                                            PassListAction.ImportPass -> importLauncher.launch(PASS_MIME_TYPES)
+                                            PassListAction.FindPassFiles -> backStack.add(AppDestination.Scanner)
+                                            PassListAction.OpenSettings -> backStack.add(AppDestination.Settings)
+                                            PassListAction.OpenHelp -> backStack.add(AppDestination.Help)
+                                        }
+                                    },
                                 )
                             }
                             entry<AppDestination.PassDetail> { destination ->
                                 val pass = state.passes.firstOrNull { it.id == destination.passId }
                                 PassDetailScreen(
                                     pass = pass,
-                                    onBack = { backStack.removeLastOrNull() },
-                                    onEdit = { backStack.add(AppDestination.EditPass(destination.passId)) },
-                                    onDelete = {
-                                        viewModel.onAction(AppAction.DeletePass(destination.passId))
-                                        backStack.removeLastOrNull()
-                                    },
-                                    onExport = {
-                                        pendingExportId = destination.passId
-                                        exportLauncher.launch("${pass?.description ?: "pass"}.espass")
-                                    },
                                     automaticBrightness = state.settings.automaticBrightness,
-                                    onAction = viewModel::onAction,
+                                    onAction = { action ->
+                                        when (action) {
+                                            PassDetailAction.Back -> backStack.removeLastOrNull()
+                                            PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(destination.passId))
+                                            PassDetailAction.Delete -> {
+                                                viewModel.onAction(AppAction.DeletePass(destination.passId))
+                                                backStack.removeLastOrNull()
+                                            }
+                                            PassDetailAction.Export -> {
+                                                pendingExportId = destination.passId
+                                                exportLauncher.launch("${pass?.description ?: "pass"}.espass")
+                                            }
+                                            PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(destination.passId))
+                                            PassDetailAction.Print -> viewModel.onAction(AppAction.PrintPass(destination.passId))
+                                            PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(destination.passId))
+                                            is PassDetailAction.OpenLocation -> viewModel.onAction(
+                                                AppAction.OpenLocation(destination.passId, action.index),
+                                            )
+                                        }
+                                    },
                                 )
                             }
                             entry<AppDestination.EditPass> { destination ->
                                 EditPassScreen(
                                     pass = state.passes.firstOrNull { it.id == destination.passId },
-                                    onBack = { backStack.removeLastOrNull() },
-                                    onSave = {
-                                        viewModel.onAction(AppAction.SavePass(destination.passId, it))
-                                        backStack.removeLastOrNull()
+                                    onAction = { action ->
+                                        when (action) {
+                                            EditPassAction.Back -> backStack.removeLastOrNull()
+                                            is EditPassAction.Save -> {
+                                                viewModel.onAction(AppAction.SavePass(destination.passId, action.draft))
+                                                backStack.removeLastOrNull()
+                                            }
+                                        }
                                     },
                                 )
                             }
                             entry<AppDestination.Scanner> {
                                 ScannerScreen(
-                                    onBack = { backStack.removeLastOrNull() },
-                                    onFilesSelected = { viewModel.onAction(AppAction.ImportFiles(it)) },
+                                    onAction = { action ->
+                                        when (action) {
+                                            PassFinderAction.Back -> backStack.removeLastOrNull()
+                                            is PassFinderAction.Import -> viewModel.onAction(AppAction.ImportFiles(action.uris))
+                                        }
+                                    },
                                 )
                             }
                             entry<AppDestination.Settings> {
-                                SettingsScreen(state.settings, viewModel::onAction) { backStack.removeLastOrNull() }
+                                SettingsScreen(state.settings) { action ->
+                                    when (action) {
+                                        SettingsAction.Back -> backStack.removeLastOrNull()
+                                        is SettingsAction.SetTheme -> viewModel.onAction(AppAction.SetTheme(action.value))
+                                        is SettingsAction.SetCondensedPasses -> viewModel.onAction(AppAction.SetCondensedPasses(action.value))
+                                        is SettingsAction.SetAutomaticBrightness -> viewModel.onAction(AppAction.SetAutomaticBrightness(action.value))
+                                        is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
+                                    }
+                                }
                             }
                             entry<AppDestination.Help> { HelpScreen { backStack.removeLastOrNull() } }
                         },

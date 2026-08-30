@@ -75,22 +75,22 @@ import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassArtworkKind
-import org.ligi.passandroid.ui.state.AppAction
+import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.MainUiState
+import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassDraft
 import org.ligi.passandroid.ui.state.PassArtworkDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
+import org.ligi.passandroid.ui.state.PassFinderAction
+import org.ligi.passandroid.ui.state.PassListAction
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.SettingsAction
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PassListScreen(
     state: MainUiState,
-    onOpen: (String) -> Unit,
-    onImport: () -> Unit,
-    onScan: () -> Unit,
-    onSettings: () -> Unit,
-    onHelp: () -> Unit,
+    onAction: (PassListAction) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Scaffold(
@@ -98,19 +98,19 @@ fun PassListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    IconButton(onClick = onScan) { Icon(Icons.Default.FolderOpen, "Find pass files") }
+                    IconButton(onClick = { onAction(PassListAction.FindPassFiles) }) { Icon(Icons.Default.FolderOpen, "Find pass files") }
                     Box {
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "More") }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
                                 text = { Text("Settings") },
                                 leadingIcon = { Icon(Icons.Default.Settings, null) },
-                                onClick = { menuOpen = false; onSettings() },
+                                onClick = { menuOpen = false; onAction(PassListAction.OpenSettings) },
                             )
                             DropdownMenuItem(
                                 text = { Text("Help") },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Help, null) },
-                                onClick = { menuOpen = false; onHelp() },
+                                onClick = { menuOpen = false; onAction(PassListAction.OpenHelp) },
                             )
                         }
                     }
@@ -119,7 +119,7 @@ fun PassListScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onImport,
+                onClick = { onAction(PassListAction.ImportPass) },
                 icon = { Icon(Icons.Default.Add, null) },
                 text = { Text("Import pass") },
                 modifier = Modifier.testTag("import_pass"),
@@ -139,7 +139,7 @@ fun PassListScreen(
                 ) {
                     items(state.passes.chunked(columns), key = { row -> row.joinToString { it.id } }) { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            row.forEach { pass -> PassCard(pass, state.settings.condensedPasses, Modifier.weight(1f), onOpen) }
+                            row.forEach { pass -> PassCard(pass, state.settings.condensedPasses, Modifier.weight(1f), onAction) }
                             repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
@@ -160,8 +160,8 @@ private fun EmptyPassList(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PassCard(pass: PassUiModel, condensed: Boolean, modifier: Modifier, onOpen: (String) -> Unit) {
-    Card(modifier.clickable { onOpen(pass.id) }) {
+private fun PassCard(pass: PassUiModel, condensed: Boolean, modifier: Modifier, onAction: (PassListAction) -> Unit) {
+    Card(modifier.clickable { onAction(PassListAction.OpenPass(pass.id)) }) {
         Row(Modifier.fillMaxWidth()) {
             Box(Modifier.size(10.dp, 104.dp).background(Color(pass.accentColor)))
             Column(Modifier.padding(16.dp).weight(1f)) {
@@ -179,12 +179,8 @@ private fun PassCard(pass: PassUiModel, condensed: Boolean, modifier: Modifier, 
 @Composable
 fun PassDetailScreen(
     pass: PassUiModel?,
-    onBack: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onExport: () -> Unit,
     automaticBrightness: Boolean,
-    onAction: (AppAction) -> Unit,
+    onAction: (PassDetailAction) -> Unit,
 ) {
     val activity = LocalActivity.current
     DisposableEffect(automaticBrightness, activity) {
@@ -205,11 +201,11 @@ fun PassDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text(pass?.description ?: "Pass") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { onAction(PassDetailAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
-                    IconButton(onClick = { pass?.let { onAction(AppAction.SharePass(it.id)) } }, enabled = pass != null) { Icon(Icons.Default.Share, "Share") }
-                    IconButton(onClick = onEdit, enabled = pass != null) { Icon(Icons.Default.Edit, "Edit") }
-                    IconButton(onClick = onDelete, enabled = pass != null) { Icon(Icons.Default.Delete, "Delete") }
+                    IconButton(onClick = { onAction(PassDetailAction.Share) }, enabled = pass != null) { Icon(Icons.Default.Share, "Share") }
+                    IconButton(onClick = { onAction(PassDetailAction.Edit) }, enabled = pass != null) { Icon(Icons.Default.Edit, "Edit") }
+                    IconButton(onClick = { onAction(PassDetailAction.Delete) }, enabled = pass != null) { Icon(Icons.Default.Delete, "Delete") }
                 },
             )
         },
@@ -235,16 +231,16 @@ fun PassDetailScreen(
                 }
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onExport, modifier = Modifier.weight(1f)) { Text("Export") }
-                        OutlinedButton(onClick = { onAction(AppAction.PrintPass(pass.id)) }, modifier = Modifier.weight(1f)) { Text("Print") }
+                        OutlinedButton(onClick = { onAction(PassDetailAction.Export) }, modifier = Modifier.weight(1f)) { Text("Export") }
+                        OutlinedButton(onClick = { onAction(PassDetailAction.Print) }, modifier = Modifier.weight(1f)) { Text("Print") }
                     }
                 }
                 pass.calendarEvent?.let {
-                    item { Button(onClick = { onAction(AppAction.AddToCalendar(pass.id)) }, Modifier.fillMaxWidth()) { Text("Add to calendar") } }
+                    item { Button(onClick = { onAction(PassDetailAction.AddToCalendar) }, Modifier.fillMaxWidth()) { Text("Add to calendar") } }
                 }
                 items(pass.locations.size) { index ->
                     val location = pass.locations[index]
-                    FilledTonalButton(onClick = { onAction(AppAction.OpenLocation(pass.id, index)) }, Modifier.fillMaxWidth()) {
+                    FilledTonalButton(onClick = { onAction(PassDetailAction.OpenLocation(index)) }, Modifier.fillMaxWidth()) {
                         Text(location.name ?: "Open location")
                     }
                 }
@@ -281,7 +277,7 @@ private fun BarcodeCard(pass: PassUiModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -> Unit) {
+fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
     var description by remember(pass?.id) { mutableStateOf(pass?.description.orEmpty()) }
     var creator by remember(pass?.id) { mutableStateOf(pass?.creator.orEmpty()) }
     var passType by remember(pass?.id) { mutableStateOf(pass?.type ?: PassType.EVENT) }
@@ -305,7 +301,7 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
         topBar = {
             TopAppBar(
                 title = { Text("Edit pass") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { onAction(EditPassAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             )
         },
     ) { padding ->
@@ -378,7 +374,7 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
                 Button(
                     enabled = pass != null && description.isNotBlank(),
                     onClick = {
-                        onSave(
+                        onAction(EditPassAction.Save(
                             PassDraft(
                                 description,
                                 creator,
@@ -390,7 +386,7 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
                                 fields,
                                 artworkUpdates,
                             ),
-                        )
+                        ))
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Save") }
@@ -410,9 +406,9 @@ private fun parseColor(value: String, fallback: Int) =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScannerScreen(onBack: () -> Unit, onFilesSelected: (List<Uri>) -> Unit) {
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(), onFilesSelected)
-    Scaffold(topBar = { TopAppBar(title = { Text("Find pass files") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
+fun ScannerScreen(onAction: (PassFinderAction) -> Unit) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { onAction(PassFinderAction.Import(it)) }
+    Scaffold(topBar = { TopAppBar(title = { Text("Find pass files") }, navigationIcon = { IconButton(onClick = { onAction(PassFinderAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.FolderOpen, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(16.dp))
@@ -425,25 +421,25 @@ fun ScannerScreen(onBack: () -> Unit, onFilesSelected: (List<Uri>) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(settings: AppSettings, onAction: (AppAction) -> Unit, onBack: () -> Unit) {
-    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
+fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
             item { Text("Theme", Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium) }
             items(ThemeMode.entries) { mode ->
                 ListItem(
                     headlineContent = { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) },
-                    trailingContent = { androidx.compose.material3.RadioButton(mode == settings.themeMode, { onAction(AppAction.SetTheme(mode)) }) },
-                    modifier = Modifier.clickable { onAction(AppAction.SetTheme(mode)) },
+                    trailingContent = { androidx.compose.material3.RadioButton(mode == settings.themeMode, { onAction(SettingsAction.SetTheme(mode)) }) },
+                    modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
                 )
             }
-            item { SettingSwitch("Condensed pass list", settings.condensedPasses) { onAction(AppAction.SetCondensedPasses(it)) } }
-            item { SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(AppAction.SetAutomaticBrightness(it)) } }
+            item { SettingSwitch("Condensed pass list", settings.condensedPasses) { onAction(SettingsAction.SetCondensedPasses(it)) } }
+            item { SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) } }
             item { Text("Sort order", Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium) }
             items(PassSortOrder.entries) { order ->
                 ListItem(
                     headlineContent = { Text(order.name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)) },
-                    trailingContent = { androidx.compose.material3.RadioButton(order == settings.sortOrder, { onAction(AppAction.SetSortOrder(order)) }) },
-                    modifier = Modifier.clickable { onAction(AppAction.SetSortOrder(order)) },
+                    trailingContent = { androidx.compose.material3.RadioButton(order == settings.sortOrder, { onAction(SettingsAction.SetSortOrder(order)) }) },
+                    modifier = Modifier.clickable { onAction(SettingsAction.SetSortOrder(order)) },
                 )
             }
         }
