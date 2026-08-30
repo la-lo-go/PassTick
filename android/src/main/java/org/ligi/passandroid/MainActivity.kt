@@ -10,6 +10,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -19,7 +23,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -200,6 +207,7 @@ class MainActivity : ComponentActivity() {
 
             PassTheme(state.settings.themeMode) {
                 Surface {
+                    Box(Modifier.fillMaxSize()) {
                     NavDisplay(
                         backStack = backStack,
                         onBack = { backStack.removeLastOrNull() },
@@ -239,6 +247,7 @@ class MainActivity : ComponentActivity() {
                                             onInitialCodeShown = { expandedCodePassId = null },
                                             flashlightAvailable = flashlight.isAvailable || !hasCameraPermission,
                                             flashlightEnabled = flashlight.isEnabled,
+                                            enhanceCodeBrightness = state.settings.automaticBrightness,
                                             onAction = { action ->
                                                 handlePassDetailAction(selected.passId, action)
                                             },
@@ -349,7 +358,13 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                     )
-                    SnackbarHost(snackbarHostState)
+                        SnackbarHost(
+                            hostState = snackbarHostState,
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(16.dp),
+                        )
+                    }
                 }
             }
         }

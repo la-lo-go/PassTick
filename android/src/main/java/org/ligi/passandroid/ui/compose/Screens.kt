@@ -54,6 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -116,6 +117,7 @@ fun PassDetailScreen(
     onInitialCodeShown: () -> Unit = {},
     flashlightAvailable: Boolean = false,
     flashlightEnabled: Boolean = false,
+    enhanceCodeBrightness: Boolean = true,
     onAction: (PassDetailAction) -> Unit,
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
@@ -131,6 +133,7 @@ fun PassDetailScreen(
             format = pass.barcodeFormat,
             message = pass.barcodeMessage,
             alternativeText = pass.barcodeAlternativeText,
+            enhanceBrightness = enhanceCodeBrightness,
             onDismiss = {
                 codeHeld = false
                 codePinned = false
@@ -259,7 +262,10 @@ fun PassDetailScreen(
                         Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                             Column(Modifier.padding(vertical = 8.dp)) {
                                 visibleFields.forEach { field ->
-                                    ListItem(supportingContent = { Text(field.label) }) { Text(field.value) }
+                                    ListItem(
+                                        supportingContent = { Text(field.label) },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    ) { Text(field.value) }
                                 }
                             }
                         }
@@ -573,10 +579,11 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                             ListItem(
                                 trailingContent = { androidx.compose.material3.RadioButton(mode == settings.themeMode, { onAction(SettingsAction.SetTheme(mode)) }) },
                                 modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             ) { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) }
                         }
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                        SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
+                        SettingSwitch("Use HDR and maximum code brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
                     }
                 }
                 item {
@@ -590,6 +597,7 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                         ListItem(
                             supportingContent = { Text("Manage names, colors, and order") },
                             modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         ) { Text("Categories") }
                     }
                 }
@@ -622,6 +630,7 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                                     )
                                 },
                                 modifier = Modifier.clickable(enabled = settings.remindersEnabled, onClick = ::toggle),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             ) {
                                 Text(
                                     label,
@@ -744,6 +753,7 @@ fun CategorySettingsScreen(
                         }
                     },
                     modifier = Modifier.clickable { editing = category },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     ) { Text(category.name) }
                 }
             }
@@ -782,7 +792,11 @@ private fun CategoryEditorDialog(
 
 @Composable
 private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    ListItem(trailingContent = { Switch(checked, onChange) }, modifier = Modifier.clickable { onChange(!checked) }) {
+    ListItem(
+        trailingContent = { Switch(checked, onChange) },
+        modifier = Modifier.clickable { onChange(!checked) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    ) {
         Text(label)
     }
 }

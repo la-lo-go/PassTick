@@ -77,9 +77,10 @@ fun ExpandedPassCodeDialog(
     format: PassBarCodeFormat,
     message: String,
     alternativeText: String?,
+    enhanceBrightness: Boolean,
     onDismiss: () -> Unit,
 ) {
-    MaxBrightnessAndHdrEffect()
+    if (enhanceBrightness) MaxBrightnessAndHdrEffect()
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = true),
@@ -90,7 +91,7 @@ fun ExpandedPassCodeDialog(
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(12.dp).sizeIn(maxWidth = 960.dp, maxHeight = 720.dp)
-                    .clickable(enabled = false) {},
+                    .clickable {},
                 shape = RoundedCornerShape(32.dp),
                 color = Color.White,
                 contentColor = Color.Black,
