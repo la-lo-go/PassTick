@@ -100,6 +100,25 @@ fun PassDetailScreen(
     onAction: (PassDetailAction) -> Unit,
 ) {
     var moveMenuOpen by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete pass permanently?") },
+            text = { Text("This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete = false
+                        onAction(PassDetailAction.Delete)
+                    },
+                ) { Text("Delete permanently") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+            },
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -108,7 +127,9 @@ fun PassDetailScreen(
                 actions = {
                     IconButton(onClick = { onAction(PassDetailAction.Share) }, enabled = pass != null) { Icon(Icons.Default.Share, "Share") }
                     IconButton(onClick = { onAction(PassDetailAction.Edit) }, enabled = pass != null) { Icon(Icons.Default.Edit, "Edit") }
-                    IconButton(onClick = { onAction(PassDetailAction.Delete) }, enabled = pass != null) { Icon(Icons.Default.Delete, "Delete") }
+                    IconButton(onClick = { confirmDelete = true }, enabled = pass != null) {
+                        Icon(Icons.Default.Delete, "Delete pass")
+                    }
                 },
             )
         },

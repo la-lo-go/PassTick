@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import org.junit.Rule
 import org.junit.Test
@@ -26,6 +27,7 @@ import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.theme.PassTheme
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -153,6 +155,23 @@ class PassScreensTest {
         composeRule.onNodeWithText("Inbox").assertIsDisplayed()
         composeRule.onNodeWithText("Favorites").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Add category").assertIsDisplayed()
+    }
+
+    @Test
+    fun permanentDeleteRequiresConfirmation() {
+        val actions = mutableListOf<PassDetailAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Delete pass").performClick()
+        composeRule.onNodeWithText("Delete pass permanently?").assertIsDisplayed()
+        assertThat(actions).doesNotContain(PassDetailAction.Delete)
+
+        composeRule.onNodeWithText("Delete permanently").performClick()
+        assertThat(actions).containsExactly(PassDetailAction.Delete)
     }
 
     private fun assertVisualContent(image: androidx.compose.ui.graphics.ImageBitmap) {
