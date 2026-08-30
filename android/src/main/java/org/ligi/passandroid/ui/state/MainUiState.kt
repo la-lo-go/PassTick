@@ -17,6 +17,7 @@ import org.ligi.passandroid.platform.PrintableField
 import org.ligi.passandroid.platform.PrintablePass
 import org.threeten.bp.ZonedDateTime
 import org.ligi.passandroid.domain.timeline.PassTimeline
+import org.ligi.passandroid.navigation.passDeepLink
 
 data class PassFieldUiModel(
     val key: String?,
@@ -67,6 +68,7 @@ data class PassUiModel(
                     beginTimeMillis = from.toEpochSecond() * 1000,
                     endTimeMillis = to.toEpochSecond() * 1000,
                     location = pass.locations.firstOrNull()?.name,
+                    description = "Open pass: ${passDeepLink(pass.id)}",
                 )
             },
             artwork = pass.artwork.map { PassArtworkUiModel(it.kind, it.bytes) },

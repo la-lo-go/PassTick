@@ -13,6 +13,7 @@ data class CalendarEvent(
     val beginTimeMillis: Long,
     val endTimeMillis: Long,
     val location: String?,
+    val description: String? = null,
 )
 
 @VisibleForTesting
@@ -32,21 +33,18 @@ fun createCalendarEvent(pass: Pass, timeSpan: PassImpl.TimeSpan): CalendarEvent 
 }
 
 @VisibleForTesting
-fun createIntent(pass: Pass, timeSpan: PassImpl.TimeSpan) = Intent(Intent.ACTION_EDIT).apply {
-    val event = createCalendarEvent(pass, timeSpan)
-    putCalendarEvent(event)
-}
+fun createIntent(pass: Pass, timeSpan: PassImpl.TimeSpan) = createIntent(createCalendarEvent(pass, timeSpan))
 
-fun createIntent(event: CalendarEvent) = Intent(Intent.ACTION_EDIT).apply {
+fun createIntent(event: CalendarEvent) = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
     putCalendarEvent(event)
 }
 
 private fun Intent.putCalendarEvent(event: CalendarEvent) {
-    type = "vnd.android.cursor.item/event"
     putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.beginTimeMillis)
     putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.endTimeMillis)
     putExtra("title", event.title)
     event.location?.let { putExtra("eventLocation", it) }
+    event.description?.let { putExtra(CalendarContract.Events.DESCRIPTION, it) }
 }
 
 

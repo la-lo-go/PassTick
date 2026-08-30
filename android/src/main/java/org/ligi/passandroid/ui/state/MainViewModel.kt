@@ -75,9 +75,13 @@ class MainViewModel(
 
     fun onAction(action: AppAction) {
         when (action) {
-            is AppAction.Import -> launchOperation("Pass imported") { passRepository.import(action.uri).getOrThrow() }
+            is AppAction.Import -> launchOperation("Pass imported") {
+                val imported = passRepository.import(action.uri).getOrThrow()
+                openCalendarAfterImport(listOf(imported))
+            }
             is AppAction.ImportFiles -> launchOperation("Passes imported") {
-                action.uris.forEach { passRepository.import(it).getOrThrow() }
+                val imported = action.uris.map { passRepository.import(it).getOrThrow() }
+                openCalendarAfterImport(imported)
             }
             is AppAction.CreatePass -> launchOperation("Pass created") {
                 passRepository.create(action.draft.toPassUpdate())
@@ -158,6 +162,12 @@ class MainViewModel(
 
     private suspend fun save(action: AppAction.SavePass) {
         passRepository.update(action.id, action.draft.toPassUpdate())
+    }
+
+    private fun openCalendarAfterImport(imported: List<PassSnapshot>) {
+        if (!uiState.value.settings.offerCalendarAfterImport) return
+        imported.asSequence().map(PassUiModel::from).mapNotNull(PassUiModel::calendarEvent).firstOrNull()
+            ?.let(platformActions::addToCalendar)
     }
 
     private fun withPass(id: String, action: (PassUiModel) -> Unit) {

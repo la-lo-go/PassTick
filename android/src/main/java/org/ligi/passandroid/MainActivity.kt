@@ -29,6 +29,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.ligi.passandroid.navigation.AppDestination
+import org.ligi.passandroid.navigation.passIdOrNull
 import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
@@ -55,13 +56,16 @@ import org.ligi.passandroid.repository.PassCategoryRole
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModel()
+    private val deepLinkedPassId = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        deepLinkedPassId.value = intent.data?.passIdOrNull()
         if (savedInstanceState == null) importFrom(intent)
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val requestedPassId by deepLinkedPassId.collectAsStateWithLifecycle()
             val backStack = rememberNavBackStack(AppDestination.PassList)
             val snackbarHostState = remember { SnackbarHostState() }
             val undoCategories = remember { mutableMapOf<String, String>() }
@@ -81,6 +85,13 @@ class MainActivity : ComponentActivity() {
                 state.message?.let {
                     snackbarHostState.showSnackbar(it)
                     viewModel.onAction(AppAction.ClearMessage)
+                }
+            }
+            LaunchedEffect(requestedPassId, state.passes) {
+                val passId = requestedPassId ?: return@LaunchedEffect
+                if (state.passes.any { it.id == passId }) {
+                    backStack.add(AppDestination.PassDetail(passId))
+                    deepLinkedPassId.value = null
                 }
             }
 
@@ -324,6 +335,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        deepLinkedPassId.value = intent.data?.passIdOrNull()
         importFrom(intent)
     }
 

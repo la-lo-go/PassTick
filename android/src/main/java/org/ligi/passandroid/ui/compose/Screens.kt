@@ -426,7 +426,7 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
             item { SettingsSectionTitle("Calendar") }
             item {
                 SettingSwitch(
-                    "Offer to add imported passes",
+                    "Open calendar after import",
                     settings.offerCalendarAfterImport,
                 ) { onAction(SettingsAction.SetOfferCalendarAfterImport(it)) }
             }
