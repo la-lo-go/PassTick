@@ -9,12 +9,9 @@ import org.ligi.passandroid.model.pass.Pass
 import java.io.File
 
 class FixedPassListPassStore(private var passes: List<Pass>) : PassStore {
+    var pathForId: File = File("")
 
-    override lateinit var classifier: PassClassifier
-
-    init {
-        classifier = PassClassifier(HashMap(), this)
-    }
+    override var classifier: PassClassifier = PassClassifier(HashMap(), this)
 
     fun setList(newPasses: List<Pass>, newCurrentPass: Pass? = newPasses.firstOrNull()) {
         currentPass = newCurrentPass
@@ -48,22 +45,16 @@ class FixedPassListPassStore(private var passes: List<Pass>) : PassStore {
     }
 
     override fun getPathForID(id: String): File {
-        return File("")
+        return pathForId
     }
 
     private val mutableUpdates = MutableSharedFlow<PassStoreUpdateEvent>(extraBufferCapacity = 1)
     override val updates = mutableUpdates.asSharedFlow()
 
-    override fun save(pass: Pass) {
-        // no effect in this impl
-    }
+    override fun save(pass: Pass) = Unit
 
-    override fun notifyChange() {
-        // no effect in this impl
-    }
+    override fun notifyChange() = Unit
 
-    override fun syncPassStoreWithClassifier(defaultTopic: String) {
-        // no effect in this impl
-    }
+    override fun syncPassStoreWithClassifier(defaultTopic: String) = Unit
 
 }
