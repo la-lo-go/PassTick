@@ -189,6 +189,22 @@ class MainViewModel(
                 if (!excluded.add(action.passId)) excluded.remove(action.passId)
                 settingsRepository.setReminderExcludedPassIds(excluded)
             }
+            is AppAction.ConfigurePassReminder -> viewModelScope.launch {
+                val settings = uiState.value.settings
+                val excluded = settings.reminderExcludedPassIds.toMutableSet().apply {
+                    if (action.enabled) remove(action.passId) else add(action.passId)
+                }
+                val leads = settings.reminderLeadMinutesByPass.toMutableMap().apply {
+                    val minutes = action.leadMinutes
+                    if (action.enabled && minutes != null) {
+                        put(action.passId, minutes.coerceIn(0, 10_080))
+                    } else {
+                        remove(action.passId)
+                    }
+                }
+                settingsRepository.setReminderExcludedPassIds(excluded)
+                settingsRepository.setReminderLeadMinutesByPass(leads)
+            }
             AppAction.ClearMessage -> message.value = null
         }
     }

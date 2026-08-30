@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -63,6 +64,7 @@ import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.platform.AndroidFlashlightController
 import org.ligi.passandroid.platform.FlashlightState
 import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.reminder.reminderNotificationsAvailable
 import org.ligi.passandroid.ui.adaptive.AdaptivePassListDetailShell
 
 class MainActivity : ComponentActivity() {
@@ -108,7 +110,13 @@ class MainActivity : ComponentActivity() {
             val flashlight by flashlightFlow.collectAsStateWithLifecycle()
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
-            ) { granted -> viewModel.onAction(AppAction.SetRemindersEnabled(granted)) }
+            ) { granted ->
+                if (granted && reminderNotificationsAvailable(context)) {
+                    viewModel.onAction(AppAction.SetRemindersEnabled(true))
+                } else {
+                    viewModel.onAction(AppAction.SetRemindersEnabled(false))
+                }
+            }
             val calendarPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestMultiplePermissions(),
             ) { permissions ->
@@ -183,13 +191,10 @@ class MainActivity : ComponentActivity() {
                             flashlightController?.setEnabled(action.enabled)
                         }
                     }
-                    PassDetailAction.ToggleReminder -> {
-                        if (state.settings.remindersEnabled) {
-                            viewModel.onAction(AppAction.TogglePassReminder(passId))
-                        } else {
-                            backStack.add(AppDestination.Settings)
-                        }
-                    }
+                    PassDetailAction.OpenReminderSettings -> backStack.add(AppDestination.Settings)
+                    is PassDetailAction.ConfigureReminder -> viewModel.onAction(
+                        AppAction.ConfigurePassReminder(passId, action.enabled, action.leadMinutes),
+                    )
                     is PassDetailAction.OpenLocation -> viewModel.onAction(AppAction.OpenLocation(passId, action.index))
                     is PassDetailAction.MoveToCategory -> viewModel.onAction(
                         AppAction.MovePass(passId, action.categoryId),
@@ -214,9 +219,16 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(state.settings.remindersEnabled) {
                 if (
                     state.settings.remindersEnabled &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) !=
-                    PackageManager.PERMISSION_GRANTED
+                    (
+                        (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                ContextCompat.checkSelfPermission(
+                                    this@MainActivity,
+                                    Manifest.permission.POST_NOTIFICATIONS,
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) ||
+                            !reminderNotificationsAvailable(this@MainActivity)
+                        )
                 ) {
                     viewModel.onAction(AppAction.SetRemindersEnabled(false))
                 }
@@ -308,6 +320,8 @@ class MainActivity : ComponentActivity() {
                                             categories = state.categories,
                                             passReminderEnabled = state.settings.remindersEnabled &&
                                                 selected.passId !in state.settings.reminderExcludedPassIds,
+                                            remindersGloballyEnabled = state.settings.remindersEnabled,
+                                            reminderLeadMinutes = state.settings.reminderLeadMinutesByPass[selected.passId],
                                             initialCodeExpanded = expandedCodePassId == selected.passId,
                                             onInitialCodeShown = { expandedCodePassId = null },
                                             flashlightAvailable = flashlight.isAvailable || !hasCameraPermission,
@@ -399,6 +413,18 @@ class MainActivity : ComponentActivity() {
                                                 ) != PackageManager.PERMISSION_GRANTED
                                             ) {
                                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            } else if (!reminderNotificationsAvailable(this@MainActivity)) {
+                                                viewModel.onAction(AppAction.SetRemindersEnabled(false))
+                                                startActivity(
+                                                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                                                    },
+                                                )
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        "Allow pass reminders in Android notification settings",
+                                                    )
+                                                }
                                             } else {
                                                 viewModel.onAction(AppAction.SetRemindersEnabled(true))
                                             }

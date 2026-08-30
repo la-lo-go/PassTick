@@ -10,7 +10,8 @@ sealed interface PassDetailAction {
     data object Share : PassDetailAction
     data object Print : PassDetailAction
     data object AddToCalendar : PassDetailAction
-    data object ToggleReminder : PassDetailAction
+    data object OpenReminderSettings : PassDetailAction
+    data class ConfigureReminder(val enabled: Boolean, val leadMinutes: Int?) : PassDetailAction
     data class SetFlashlightEnabled(val enabled: Boolean) : PassDetailAction
     data class OpenLocation(val index: Int) : PassDetailAction
     data class MoveToCategory(val categoryId: String) : PassDetailAction

@@ -169,6 +169,24 @@ class MainViewModelTest {
         assertThat(repository.moved).containsExactly("pass-1" to "new")
         assertThat(settings.settings.value.categories.map { it.id }).doesNotContain("travel")
     }
+
+    @Test
+    fun `configures and disables a reminder for one pass`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        val viewModel = MainViewModel(FakePassRepository(emptyList()), settings, FakePlatformActions())
+
+        viewModel.onAction(AppAction.ConfigurePassReminder("pass-1", enabled = true, leadMinutes = 30))
+        advanceUntilIdle()
+
+        assertThat(settings.settings.value.reminderLeadMinutesByPass).containsEntry("pass-1", 30)
+        assertThat(settings.settings.value.reminderExcludedPassIds).doesNotContain("pass-1")
+
+        viewModel.onAction(AppAction.ConfigurePassReminder("pass-1", enabled = false, leadMinutes = null))
+        advanceUntilIdle()
+
+        assertThat(settings.settings.value.reminderLeadMinutesByPass).doesNotContainKey("pass-1")
+        assertThat(settings.settings.value.reminderExcludedPassIds).contains("pass-1")
+    }
 }
 
 private fun snapshot(id: String, description: String, categoryId: String = "new") = PassSnapshot(
@@ -238,6 +256,10 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setOfferCalendarAfterImport(value: Boolean) = Unit
     override suspend fun setRemindersEnabled(value: Boolean) = Unit
     override suspend fun setReminderMinutes(value: Set<Int>) = Unit
-    override suspend fun setReminderExcludedPassIds(value: Set<String>) = Unit
-    override suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>) = Unit
+    override suspend fun setReminderExcludedPassIds(value: Set<String>) {
+        settings.value = settings.value.copy(reminderExcludedPassIds = value)
+    }
+    override suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>) {
+        settings.value = settings.value.copy(reminderLeadMinutesByPass = value)
+    }
 }

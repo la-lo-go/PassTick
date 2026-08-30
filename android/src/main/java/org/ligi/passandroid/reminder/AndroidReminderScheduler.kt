@@ -64,12 +64,7 @@ class PassReminderReceiver : BroadcastReceiver() {
             PackageManager.PERMISSION_GRANTED
         ) return
 
-        val notificationManager = context.getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Pass reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Notifications for dated passes"
-            },
-        )
+        ensureReminderNotificationChannel(context)
         val openPass = PendingIntent.getActivity(
             context,
             passId.hashCode(),
@@ -96,6 +91,21 @@ class ReminderBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) AndroidReminderScheduler.rescheduleStored(context)
     }
+}
+
+fun ensureReminderNotificationChannel(context: Context) {
+    context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+        NotificationChannel(CHANNEL_ID, "Pass reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Notifications for dated passes"
+        },
+    )
+}
+
+fun reminderNotificationsAvailable(context: Context): Boolean {
+    ensureReminderNotificationChannel(context)
+    val manager = context.getSystemService(NotificationManager::class.java)
+    return NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+        manager.getNotificationChannel(CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE
 }
 
 private const val CHANNEL_ID = "pass_reminders"

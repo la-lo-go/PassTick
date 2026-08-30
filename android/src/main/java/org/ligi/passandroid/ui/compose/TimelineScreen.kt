@@ -226,7 +226,7 @@ private fun EventActions(
         TextButton(onClick = { onAction(TimelineAction.OpenPass(event.pass.passId)) }) { Text("Open pass") }
         TextButton(onClick = { onAction(TimelineAction.AddToCalendar(event.id)) }) { Text("Calendar") }
         TextButton(onClick = { onAction(TimelineAction.ConfigureReminder(event.id)) }) {
-            Text(if (reminderEnabled) "Edit reminder" else "Remind me")
+            Text(if (reminderEnabled) "Turn reminder off" else "Remind me")
         }
     }
 }

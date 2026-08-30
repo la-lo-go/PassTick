@@ -58,6 +58,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -113,6 +114,8 @@ fun PassDetailScreen(
     pass: PassUiModel?,
     categories: List<PassCategory> = emptyList(),
     passReminderEnabled: Boolean = false,
+    remindersGloballyEnabled: Boolean = false,
+    reminderLeadMinutes: Int? = null,
     initialCodeExpanded: Boolean = false,
     onInitialCodeShown: () -> Unit = {},
     flashlightAvailable: Boolean = false,
@@ -122,6 +125,7 @@ fun PassDetailScreen(
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var configureReminder by remember { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
     val codeExpanded = codeHeld || codePinned
@@ -161,6 +165,38 @@ fun PassDetailScreen(
             },
         )
     }
+    if (configureReminder) {
+        AlertDialog(
+            onDismissRequest = { configureReminder = false },
+            title = { Text("Pass reminder") },
+            text = {
+                Column {
+                    ReminderChoice(
+                        label = "Use default reminder times",
+                        selected = passReminderEnabled && reminderLeadMinutes == null,
+                    ) {
+                        configureReminder = false
+                        onAction(PassDetailAction.ConfigureReminder(true, null))
+                    }
+                    listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before")
+                        .forEach { (minutes, label) ->
+                            ReminderChoice(label, passReminderEnabled && reminderLeadMinutes == minutes) {
+                                configureReminder = false
+                                onAction(PassDetailAction.ConfigureReminder(true, minutes))
+                            }
+                        }
+                    ReminderChoice("Off for this pass", !passReminderEnabled) {
+                        configureReminder = false
+                        onAction(PassDetailAction.ConfigureReminder(false, null))
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { configureReminder = false }) { Text("Cancel") }
+            },
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -177,11 +213,15 @@ fun PassDetailScreen(
                                 onAction(PassDetailAction.Print)
                             })
                             DropdownMenuItem(
-                                text = { Text(if (passReminderEnabled) "Turn reminder off" else "Turn reminder on") },
+                                text = { Text("Configure reminder") },
                                 enabled = pass?.calendarEvent != null,
                                 onClick = {
                                     overflowOpen = false
-                                    onAction(PassDetailAction.ToggleReminder)
+                                    if (remindersGloballyEnabled) {
+                                        configureReminder = true
+                                    } else {
+                                        onAction(PassDetailAction.OpenReminderSettings)
+                                    }
                                 },
                             )
                             categories.forEach { category ->
@@ -282,6 +322,15 @@ fun PassDetailScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ReminderChoice(label: String, selected: Boolean, onClick: () -> Unit) {
+    ListItem(
+        trailingContent = { RadioButton(selected, onClick) },
+        modifier = Modifier.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    ) { Text(label) }
 }
 
 @Composable
