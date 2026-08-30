@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.then
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
@@ -34,16 +35,16 @@ class PassScreensTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun emptyListShowsImportAction() {
+    fun emptyHomeShowsImportAction() {
         composeRule.setContent {
             PassTheme(AppSettings().themeMode) {
-                PassListScreen(MainUiState(), {})
+                PassHomeScreen(MainUiState(), {})
             }
         }
         composeRule.mainClock.advanceTimeBy(1_000)
 
-        composeRule.onNodeWithText("No passes").assertIsDisplayed()
-        composeRule.onNodeWithTag("import_pass").assertIsDisplayed()
+        composeRule.onNodeWithText("Your passes live here").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Import pass").assertIsDisplayed()
     }
 
     @Test
@@ -66,7 +67,7 @@ class PassScreensTest {
                     .then(DeviceConfigurationOverride.FontScale(1.3f))
                     .then(DeviceConfigurationOverride.DarkMode(false)),
             ) {
-                PassTheme(ThemeMode.SYSTEM) { PassListScreen(sampleState(), {}) }
+                PassTheme(ThemeMode.SYSTEM) { PassHomeScreen(sampleState(), {}) }
             }
         }
 
@@ -83,7 +84,7 @@ class PassScreensTest {
                     .then(DeviceConfigurationOverride.FontScale(1.8f))
                     .then(DeviceConfigurationOverride.DarkMode(true)),
             ) {
-                PassTheme(ThemeMode.SYSTEM) { PassListScreen(sampleState(), {}) }
+                PassTheme(ThemeMode.SYSTEM) { PassHomeScreen(sampleState(), {}) }
             }
         }
 
@@ -136,7 +137,7 @@ class PassScreensTest {
             selectedCategoryId = "new",
         )
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { PassListScreen(state, {}) }
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
         }
 
         composeRule.onNodeWithText("Inbox").assertIsDisplayed()
