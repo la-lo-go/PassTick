@@ -136,11 +136,12 @@ fun PassDetailScreen(
         if (pass == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("Pass not found") }
         } else {
-            LazyColumn(
-                Modifier.fillMaxSize().padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                LazyColumn(
+                    Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
                 item {
                     PassArtwork(
                         pass,
@@ -149,13 +150,22 @@ fun PassDetailScreen(
                     )
                 }
                 item { BarcodeCard(pass) { onAction(PassDetailAction.OpenCode) } }
-                items(pass.fields.filterNot { it.hidden }) { field ->
-                    ListItem(supportingContent = { Text(field.label) }) { Text(field.value) }
+                val visibleFields = pass.fields.filterNot { it.hidden }
+                if (visibleFields.isNotEmpty()) {
+                    item {
+                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                            Column(Modifier.padding(vertical = 8.dp)) {
+                                visibleFields.forEach { field ->
+                                    ListItem(supportingContent = { Text(field.label) }) { Text(field.value) }
+                                }
+                            }
+                        }
+                    }
                 }
                 item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onAction(PassDetailAction.Export) }, modifier = Modifier.weight(1f)) { Text("Export") }
-                        OutlinedButton(onClick = { onAction(PassDetailAction.Print) }, modifier = Modifier.weight(1f)) { Text("Print") }
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onAction(PassDetailAction.Export) }) { Text("Export") }
+                        OutlinedButton(onClick = { onAction(PassDetailAction.Print) }) { Text("Print") }
                     }
                 }
                 item {
@@ -178,14 +188,12 @@ fun PassDetailScreen(
                 }
                 pass.calendarEvent?.let {
                     item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = { onAction(PassDetailAction.AddToCalendar) },
-                                modifier = Modifier.weight(1f),
                             ) { Text("Add to calendar") }
                             FilledTonalButton(
                                 onClick = { onAction(PassDetailAction.ToggleReminder) },
-                                modifier = Modifier.weight(1f),
                             ) {
                                 Text(
                                     when {
@@ -214,6 +222,7 @@ fun PassDetailScreen(
                         Text(location.name ?: "Open location")
                     }
                 }
+            }
             }
         }
     }
