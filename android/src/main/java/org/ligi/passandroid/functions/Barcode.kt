@@ -32,15 +32,12 @@ fun generateBarCodeBitmap(data: String, type: PassBarCodeFormat): Bitmap? {
         val matrix = getBitMatrix(data, type)
         val is1D = matrix.height == 1
 
-        // generate an image from the byte matrix
         val width = matrix.width
         val height = if (is1D) width / 5 else matrix.height
 
-        // create buffered image to draw to
-        // NTFS Bitmap.Config.ALPHA_8 sounds like an awesome idea - been there - done that ..
+        // RGB_565 keeps barcode pixels opaque on print and screen surfaces.
         val barcodeImage = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
 
-        // iterate through the matrix and draw the pixels to the image
         for (y in 0 until height) {
             for (x in 0 until width) {
                 barcodeImage.setPixel(x, y, if (matrix.get(x, if (is1D) 0 else y)) 0 else 0xFFFFFF)
@@ -50,13 +47,11 @@ fun generateBarCodeBitmap(data: String, type: PassBarCodeFormat): Bitmap? {
         return barcodeImage
     } catch (e: com.google.zxing.WriterException) {
         Timber.w(e, "could not write image")
-        // TODO check if we should better return some rescue Image here
         return null
     } catch (e: IllegalArgumentException) {
         Timber.w("could not write image: $e")
         return null
     } catch (e: ArrayIndexOutOfBoundsException) {
-        // happens for ITF barcode on certain inputs
         Timber.w("could not write image: $e")
         return null
     }

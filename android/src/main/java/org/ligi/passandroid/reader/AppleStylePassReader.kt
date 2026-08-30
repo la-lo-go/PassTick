@@ -56,17 +56,11 @@ object AppleStylePassReader {
         }
 
         if (passJSON == null) {
-            // I had got a strange passbook with UCS-2 which could not be parsed before
-            // was searching for a auto-detection, but could not find one with support for this encoding
-            // and the right license
-
             for (charset in Charset.availableCharsets().values) {
                 try {
                     val json = file.bufferedReader(charset).readText()
                     passJSON = readJSONSafely(json)
-                } catch (ignored: Exception) {
-                    // we try with next charset
-                }
+                } catch (_: Exception) { }
 
                 if (passJSON != null) {
                     break
@@ -94,16 +88,12 @@ object AppleStylePassReader {
                     pass.barCode!!.alternativeText = barcodeJSON.getString("altText")
                 }
             }
-            // TODO should check a bit more with barcode here - this can be dangerous
-        } catch (ignored: Exception) {
-        }
+        } catch (_: Exception) { }
 
         if (passJSON.has("relevantDate")) {
             try {
                 pass.calendarTimespan = PassImpl.TimeSpan(from = ZonedDateTime.parse(passJSON.getString("relevantDate")))
             } catch (e: JSONException) {
-                // be robust when it comes to bad dates - had a RL crash with "2013-12-25T00:00-57:00" here
-                // OK then we just have no date here
                 tracker.trackException("problem parsing relevant date", e, false)
             } catch (e: DateTimeException) {
                 tracker.trackException("problem parsing relevant date", e, false)
@@ -115,8 +105,6 @@ object AppleStylePassReader {
             try {
                 pass.validTimespans = listOf(PassImpl.TimeSpan(to = ZonedDateTime.parse(passJSON.getString("expirationDate"))))
             } catch (e: JSONException) {
-                // be robust when it comes to bad dates - had a RL crash with "2013-12-25T00:00-57:00" here
-                // OK then we just have no date here
                 tracker.trackException("problem parsing expiration date", e, false)
             } catch (e: DateTimeException) {
                 tracker.trackException("problem parsing expiration date", e, false)
@@ -165,8 +153,6 @@ object AppleStylePassReader {
         })
 
 
-        // try to find in a predefined set of tickets
-
         PassDefinitions.TYPE_TO_NAME.forEach {
             if (passJSON.has(it.value)) {
                 pass.type = it.key
@@ -174,20 +160,18 @@ object AppleStylePassReader {
         }
 
         try {
-            val type = PassDefinitions.TYPE_TO_NAME[pass.type]
+            val type = PassDefinitions.TYPE_TO_NAME.getValue(pass.type)
             val typeJSON = passJSON.getJSONObject(type)
-            if (typeJSON != null) {
-                val fieldList: ArrayList<PassField> = ArrayList()
+            val fieldList: ArrayList<PassField> = ArrayList()
 
-                addFields(fieldList, typeJSON, "primaryFields", translation)
-                addFields(fieldList, typeJSON, "headerFields", translation)
-                addFields(fieldList, typeJSON, "secondaryFields", translation)
-                addFields(fieldList, typeJSON, "auxiliaryFields", translation)
-                addFields(fieldList, typeJSON, "backFields", translation, hide = true)
+            addFields(fieldList, typeJSON, "primaryFields", translation)
+            addFields(fieldList, typeJSON, "headerFields", translation)
+            addFields(fieldList, typeJSON, "secondaryFields", translation)
+            addFields(fieldList, typeJSON, "auxiliaryFields", translation)
+            addFields(fieldList, typeJSON, "backFields", translation, hide = true)
 
-                fieldList.add(PassField("", context.getString(R.string.type), context.getString(getHumanCategoryString(pass.type)), false))
-                pass.fields = fieldList
-            }
+            fieldList.add(PassField("", context.getString(R.string.type), context.getString(getHumanCategoryString(pass.type)), false))
+            pass.fields = fieldList
 
         } catch (ignored: JSONException) {
         }
@@ -196,9 +180,7 @@ object AppleStylePassReader {
         try {
             pass.creator = passJSON.getString("organizationName")
             tracker.trackEvent("measure_event", "organisation_parse", pass.creator, 1L)
-        } catch (ignored: JSONException) {
-            // ok - we have no organisation - big deal ..-)
-        }
+        } catch (_: JSONException) { }
 
         ApplePassbookQuirkCorrector(tracker).correctQuirks(pass)
 
@@ -266,9 +248,7 @@ object AppleStylePassReader {
         if (json.has(key)) {
             try {
                 return json.getString(key)
-            } catch (e: JSONException) {
-                // some passes just do not have the field
-            }
+            } catch (_: JSONException) { }
 
         }
         return null
@@ -278,9 +258,7 @@ object AppleStylePassReader {
         if (json.has(key)) {
             try {
                 callback.onString(json.getString(key))
-            } catch (e: JSONException) {
-                // some passes just do not have the field
-            }
+            } catch (_: JSONException) { }
         }
     }
 

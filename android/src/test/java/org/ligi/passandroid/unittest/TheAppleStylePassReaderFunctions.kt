@@ -14,9 +14,7 @@ class TheAppleStylePassReaderFunctions {
     }
 
     @Test
-            // https://github.com/ligi/PassAndroid/issues/138
     fun testArrayWorks() {
-        //language=JSON
         val json = "{ \"barcodes\":[{\"format\":\"PKBarcodeFormatQR\",\"message\":\"YO!\"}] }"
         val tested = JSONObject(json).getBarcodeJson()
 
@@ -26,7 +24,6 @@ class TheAppleStylePassReaderFunctions {
 
     @Test
     fun testSingleWorks() {
-        //language=JSON
         val json = "{ \"barcode\":{\"format\":\"PKBarcodeFormatQR\",\"message\":\"YO!\"} }"
         val tested = JSONObject(json).getBarcodeJson()
 
@@ -36,7 +33,6 @@ class TheAppleStylePassReaderFunctions {
 
     @Test
     fun testSingleIsPreferred() {
-        //language=JSON
         val json = "{ \"barcodes\":[{\"format\":\"PKBarcodeFormatQR\",\"message\":\"NO!\"}] ,\"barcode\":{\"format\":\"PKBarcodeFormatQR\",\"message\":\"YO!\"} }"
         val tested = JSONObject(json).getBarcodeJson()
 

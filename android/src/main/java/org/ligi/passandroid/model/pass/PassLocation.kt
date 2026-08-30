@@ -11,7 +11,7 @@ class PassLocation {
     var lon: Double = 0.toDouble()
 
     fun getNameWithFallback(pass: Pass) = if (name.isNullOrBlank()) {
-        // fallback for passes with locations without description - e.g. AirBerlin
+        // Some pass formats omit a location label.
         pass.description
     } else {
         name
