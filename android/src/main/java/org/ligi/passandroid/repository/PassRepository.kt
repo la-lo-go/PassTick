@@ -15,18 +15,54 @@ import org.ligi.passandroid.Tracker
 import org.ligi.passandroid.functions.fromURI
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.pass.Pass
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.io.PassExporter
 import org.ligi.passandroid.repository.io.UnzipPassController
 import java.io.File
+import org.threeten.bp.ZonedDateTime
+
+data class PassFieldSnapshot(
+    val key: String?,
+    val label: String,
+    val value: String,
+    val hidden: Boolean,
+    val hint: String?,
+)
+data class PassLocationSnapshot(val name: String?, val latitude: Double, val longitude: Double)
+data class PassTimeSpanSnapshot(val from: ZonedDateTime?, val to: ZonedDateTime?)
+
+data class PassSnapshot(
+    val id: String,
+    val description: String,
+    val creator: String?,
+    val type: PassType,
+    val accentColor: Int,
+    val barcodeFormat: PassBarCodeFormat?,
+    val barcodeMessage: String?,
+    val barcodeAlternativeText: String?,
+    val fields: List<PassFieldSnapshot>,
+    val locations: List<PassLocationSnapshot>,
+    val calendarTimeSpan: PassTimeSpanSnapshot?,
+)
+
+data class PassUpdate(
+    val description: String,
+    val creator: String,
+    val type: PassType,
+    val accentColor: Int,
+    val barcodeFormat: PassBarCodeFormat?,
+    val barcodeMessage: String,
+    val barcodeAlternativeText: String,
+    val fields: List<PassFieldSnapshot>,
+)
 
 interface PassRepository {
-    fun observePasses(): Flow<List<Pass>>
+    fun observePasses(): Flow<List<PassSnapshot>>
 
-    fun find(id: String): Pass?
+    suspend fun import(uri: Uri): Result<PassSnapshot>
 
-    suspend fun import(uri: Uri): Result<Pass>
-
-    suspend fun save(pass: Pass)
+    suspend fun update(id: String, update: PassUpdate)
 
     suspend fun delete(id: String): Boolean
 
@@ -41,15 +77,13 @@ class FilePassRepository(
     private val tracker: Tracker,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : PassRepository {
-    override fun observePasses(): Flow<List<Pass>> = flow {
+    override fun observePasses(): Flow<List<PassSnapshot>> = flow {
         passStore.syncPassStoreWithClassifier(context.getString(R.string.topic_new))
         emit(snapshot())
         emitAll(passStore.updates.map { snapshot() })
     }
 
-    override fun find(id: String) = passStore.getPassbookForId(id)
-
-    override suspend fun import(uri: Uri): Result<Pass> = withContext(ioDispatcher) {
+    override suspend fun import(uri: Uri): Result<PassSnapshot> = withContext(ioDispatcher) {
         runCatching {
             val source = requireNotNull(fromURI(context, uri, tracker)) { "Cannot open the selected file" }
             var importedId: String? = null
@@ -73,11 +107,25 @@ class FilePassRepository(
             failure?.let { error(it) }
             val pass = requireNotNull(importedId?.let(passStore::getPassbookForId)) { "Imported pass is unreadable" }
             passStore.classifier.moveToTopic(pass, context.getString(R.string.topic_new))
-            pass
+            pass.toSnapshot()
         }
     }
 
-    override suspend fun save(pass: Pass) = withContext(ioDispatcher) {
+    override suspend fun update(id: String, update: PassUpdate) = withContext(ioDispatcher) {
+        val pass = passStore.getPassbookForId(id) as? org.ligi.passandroid.model.pass.PassImpl
+            ?: error("Pass not found")
+        pass.description = update.description
+        pass.creator = update.creator
+        pass.type = update.type
+        pass.accentColor = update.accentColor
+        pass.fields = update.fields.mapTo(mutableListOf()) {
+            org.ligi.passandroid.model.pass.PassField(it.key, it.label, it.value, it.hidden, it.hint)
+        }
+        pass.barCode = update.barcodeFormat?.let { format ->
+            org.ligi.passandroid.model.pass.BarCode(format, update.barcodeMessage).apply {
+                alternativeText = update.barcodeAlternativeText.ifBlank { null }
+            }
+        }
         passStore.save(pass)
         passStore.notifyChange()
     }
@@ -113,5 +161,20 @@ class FilePassRepository(
         }
     }
 
-    private fun snapshot() = passStore.passMap.values.toList()
+    private fun snapshot() = passStore.passMap.values.map(Pass::toSnapshot)
 }
+
+private fun Pass.toSnapshot() = PassSnapshot(
+    id = id,
+    description = description.orEmpty(),
+    creator = creator,
+    type = type,
+    accentColor = accentColor,
+    barcodeFormat = barCode?.format,
+    barcodeMessage = barCode?.message,
+    barcodeAlternativeText = barCode?.alternativeText,
+    fields = fields.map { PassFieldSnapshot(it.key, it.label.orEmpty(), it.value.orEmpty(), it.hide, it.hint) },
+    locations = locations.map { PassLocationSnapshot(it.name, it.lat, it.lon) },
+    calendarTimeSpan = calendarTimespan?.let { PassTimeSpanSnapshot(it.from, it.to) }
+        ?: validTimespans?.firstOrNull()?.let { PassTimeSpanSnapshot(it.from, it.to) },
+)

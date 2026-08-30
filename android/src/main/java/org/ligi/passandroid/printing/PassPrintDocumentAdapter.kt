@@ -14,12 +14,13 @@ import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.pdf.PrintedPdfDocument
-import org.ligi.passandroid.model.pass.Pass
+import org.ligi.passandroid.model.pass.BarCode
+import org.ligi.passandroid.platform.PrintablePass
 import java.io.FileOutputStream
 import java.io.IOException
 
 @TargetApi(Build.VERSION_CODES.KITKAT)
-class PassPrintDocumentAdapter(private val context: Context, private val pass: Pass, private val jobName: String) : PrintDocumentAdapter() {
+class PassPrintDocumentAdapter(private val context: Context, private val pass: PrintablePass, private val jobName: String) : PrintDocumentAdapter() {
 
     private var mPdfDocument: PrintedPdfDocument? = null
 
@@ -69,11 +70,13 @@ class PassPrintDocumentAdapter(private val context: Context, private val pass: P
         val centerPaint = Paint()
         centerPaint.textAlign = Paint.Align.CENTER
 
-        canvas.drawText(pass.description!!, canvas.width / 2f, centerPaint.textSize, centerPaint)
+        canvas.drawText(pass.description, canvas.width / 2f, centerPaint.textSize, centerPaint)
         var currentBottom = centerPaint.textSize * 3
 
-        val barCode = pass.barCode
-        if (barCode != null) {
+        if (pass.barcodeFormat != null && pass.barcodeMessage != null) {
+            val barCode = BarCode(pass.barcodeFormat, pass.barcodeMessage).apply {
+                alternativeText = pass.barcodeAlternativeText
+            }
             val bitmapDrawable = barCode.getBitmap(context.resources)
 
             if (bitmapDrawable != null) {
@@ -104,11 +107,9 @@ class PassPrintDocumentAdapter(private val context: Context, private val pass: P
         rightPaint.textAlign = Paint.Align.LEFT
 
         pass.fields.forEach {
-            if (!it.hide) {
-                canvas.drawText(it.label + ": ", canvas.width / 2f, currentBottom, leftPaint)
-                canvas.drawText(" " + it.value, canvas.width / 2f, currentBottom, rightPaint)
-                currentBottom += (centerPaint.textSize * 1.5).toInt()
-            }
+            canvas.drawText(it.label + ": ", canvas.width / 2f, currentBottom, leftPaint)
+            canvas.drawText(" " + it.value, canvas.width / 2f, currentBottom, rightPaint)
+            currentBottom += (centerPaint.textSize * 1.5).toInt()
         }
     }
 }

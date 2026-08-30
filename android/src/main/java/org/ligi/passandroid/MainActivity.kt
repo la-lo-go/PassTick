@@ -14,17 +14,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.koin.androidx.viewmodel.ext.android.viewModel
-import org.koin.compose.koinInject
 import org.ligi.passandroid.navigation.AppDestination
-import org.ligi.passandroid.platform.PlatformActions
-import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.HelpScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
@@ -34,7 +30,6 @@ import org.ligi.passandroid.ui.compose.SettingsScreen
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.theme.PassTheme
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModel()
@@ -47,9 +42,6 @@ class MainActivity : ComponentActivity() {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
             val backStack = rememberNavBackStack(AppDestination.PassList)
             val snackbarHostState = remember { SnackbarHostState() }
-            val repository = koinInject<PassRepository>()
-            val platformActions = koinInject<PlatformActions>()
-            val scope = rememberCoroutineScope()
             var pendingExportId by remember { mutableStateOf<String?>(null) }
             val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 uri?.let { viewModel.onAction(AppAction.Import(it)) }
@@ -89,7 +81,6 @@ class MainActivity : ComponentActivity() {
                                 val pass = state.passes.firstOrNull { it.id == destination.passId }
                                 PassDetailScreen(
                                     pass = pass,
-                                    source = repository.find(destination.passId),
                                     onBack = { backStack.removeLastOrNull() },
                                     onEdit = { backStack.add(AppDestination.EditPass(destination.passId)) },
                                     onDelete = {
@@ -100,15 +91,8 @@ class MainActivity : ComponentActivity() {
                                         pendingExportId = destination.passId
                                         exportLauncher.launch("${pass?.description ?: "pass"}.espass")
                                     },
-                                    onShare = {
-                                        scope.launch {
-                                            repository.prepareShare(destination.passId).onSuccess {
-                                                platformActions.share(it, "application/vnd.espass-espass+zip")
-                                            }
-                                        }
-                                    },
                                     automaticBrightness = state.settings.automaticBrightness,
-                                    platformActions = platformActions,
+                                    onAction = viewModel::onAction,
                                 )
                             }
                             entry<AppDestination.EditPass> { destination ->
@@ -124,7 +108,7 @@ class MainActivity : ComponentActivity() {
                             entry<AppDestination.Scanner> {
                                 ScannerScreen(
                                     onBack = { backStack.removeLastOrNull() },
-                                    onFileSelected = { viewModel.onAction(AppAction.Import(it)) },
+                                    onFilesSelected = { viewModel.onAction(AppAction.ImportFiles(it)) },
                                 )
                             }
                             entry<AppDestination.Settings> {

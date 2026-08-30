@@ -106,6 +106,6 @@ class PassScreensTest {
         barcodeAlternativeText = null,
         fields = emptyList(),
         locations = emptyList(),
-        hasCalendarEntry = false,
+        calendarEvent = null,
     )
 }

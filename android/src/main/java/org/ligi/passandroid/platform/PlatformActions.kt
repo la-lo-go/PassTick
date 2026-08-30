@@ -5,22 +5,32 @@ import android.content.Intent
 import android.net.Uri
 import androidx.annotation.VisibleForTesting
 import org.ligi.passandroid.functions.createIntent
-import org.ligi.passandroid.maps.PassbookMapsFacade
-import org.ligi.passandroid.model.pass.Pass
-import org.ligi.passandroid.model.pass.PassImpl
-import org.ligi.passandroid.model.pass.PassLocation
+import org.ligi.passandroid.functions.CalendarEvent
+import org.ligi.passandroid.maps.geoUri
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.printing.doPrint
+import androidx.core.net.toUri
+
+data class PlatformLocation(val latitude: Double, val longitude: Double)
+data class PrintableField(val label: String, val value: String)
+data class PrintablePass(
+    val description: String,
+    val barcodeFormat: PassBarCodeFormat?,
+    val barcodeMessage: String?,
+    val barcodeAlternativeText: String?,
+    val fields: List<PrintableField>,
+)
 
 interface PlatformActions {
-    fun addToCalendar(pass: Pass, timeSpan: PassImpl.TimeSpan)
+    fun addToCalendar(event: CalendarEvent)
     fun share(uri: Uri, mimeType: String)
-    fun print(pass: Pass)
-    fun openLocation(location: PassLocation)
+    fun print(pass: PrintablePass)
+    fun openLocation(location: PlatformLocation)
 }
 
 class AndroidPlatformActions(private val context: Context) : PlatformActions {
-    override fun addToCalendar(pass: Pass, timeSpan: PassImpl.TimeSpan) {
-        context.startActivity(createIntent(pass, timeSpan).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    override fun addToCalendar(event: CalendarEvent) {
+        context.startActivity(createIntent(event).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     override fun share(uri: Uri, mimeType: String) {
@@ -28,9 +38,11 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
         context.startActivity(Intent.createChooser(shareIntent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    override fun print(pass: Pass) = doPrint(context, pass)
+    override fun print(pass: PrintablePass) = doPrint(context, pass)
 
-    override fun openLocation(location: PassLocation) = PassbookMapsFacade.openLocation(context, location)
+    override fun openLocation(location: PlatformLocation) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, geoUri(location.latitude, location.longitude).toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
 }
 
 @VisibleForTesting

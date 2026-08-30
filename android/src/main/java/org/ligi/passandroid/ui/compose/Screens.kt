@@ -28,7 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
@@ -68,13 +68,14 @@ import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.R
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.BarCode
-import org.ligi.passandroid.model.pass.Pass
-import org.ligi.passandroid.platform.PlatformActions
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassDraft
+import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassUiModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,7 +94,7 @@ fun PassListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    IconButton(onClick = onScan) { Icon(Icons.Default.QrCodeScanner, "Scan") }
+                    IconButton(onClick = onScan) { Icon(Icons.Default.FolderOpen, "Find pass files") }
                     Box {
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "More") }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -173,14 +174,12 @@ private fun PassCard(pass: PassUiModel, condensed: Boolean, modifier: Modifier, 
 @Composable
 fun PassDetailScreen(
     pass: PassUiModel?,
-    source: Pass?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onExport: () -> Unit,
-    onShare: () -> Unit,
     automaticBrightness: Boolean,
-    platformActions: PlatformActions,
+    onAction: (AppAction) -> Unit,
 ) {
     val activity = LocalActivity.current
     DisposableEffect(automaticBrightness, activity) {
@@ -203,14 +202,14 @@ fun PassDetailScreen(
                 title = { Text(pass?.description ?: "Pass") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
-                    IconButton(onClick = onShare, enabled = pass != null) { Icon(Icons.Default.Share, "Share") }
+                    IconButton(onClick = { pass?.let { onAction(AppAction.SharePass(it.id)) } }, enabled = pass != null) { Icon(Icons.Default.Share, "Share") }
                     IconButton(onClick = onEdit, enabled = pass != null) { Icon(Icons.Default.Edit, "Edit") }
                     IconButton(onClick = onDelete, enabled = pass != null) { Icon(Icons.Default.Delete, "Delete") }
                 },
             )
         },
     ) { padding ->
-        if (pass == null || source == null) {
+        if (pass == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("Pass not found") }
         } else {
             LazyColumn(
@@ -225,14 +224,15 @@ fun PassDetailScreen(
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = onExport, modifier = Modifier.weight(1f)) { Text("Export") }
-                        OutlinedButton(onClick = { platformActions.print(source) }, modifier = Modifier.weight(1f)) { Text("Print") }
+                        OutlinedButton(onClick = { onAction(AppAction.PrintPass(pass.id)) }, modifier = Modifier.weight(1f)) { Text("Print") }
                     }
                 }
-                source.calendarTimespan?.let { span ->
-                    item { Button(onClick = { platformActions.addToCalendar(source, span) }, Modifier.fillMaxWidth()) { Text("Add to calendar") } }
+                pass.calendarEvent?.let {
+                    item { Button(onClick = { onAction(AppAction.AddToCalendar(pass.id)) }, Modifier.fillMaxWidth()) { Text("Add to calendar") } }
                 }
-                items(source.locations) { location ->
-                    FilledTonalButton(onClick = { platformActions.openLocation(location) }, Modifier.fillMaxWidth()) {
+                items(pass.locations.size) { index ->
+                    val location = pass.locations[index]
+                    FilledTonalButton(onClick = { onAction(AppAction.OpenLocation(pass.id, index)) }, Modifier.fillMaxWidth()) {
                         Text(location.name ?: "Open location")
                     }
                 }
@@ -262,8 +262,14 @@ private fun BarcodeCard(pass: PassUiModel) {
 fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -> Unit) {
     var description by remember(pass?.id) { mutableStateOf(pass?.description.orEmpty()) }
     var creator by remember(pass?.id) { mutableStateOf(pass?.creator.orEmpty()) }
+    var passType by remember(pass?.id) { mutableStateOf(pass?.type ?: PassType.EVENT) }
+    var accentColor by remember(pass?.id) { mutableStateOf(pass?.accentColor?.let(::formatColor).orEmpty()) }
+    var barcodeFormat by remember(pass?.id) { mutableStateOf(pass?.barcodeFormat) }
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
+    var fields by remember(pass?.id) { mutableStateOf(pass?.fields.orEmpty()) }
+    var typeMenuOpen by remember { mutableStateOf(false) }
+    var barcodeMenuOpen by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -275,12 +281,71 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(creator, { creator = it }, label = { Text("Creator") }, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Box {
+                    OutlinedButton(onClick = { typeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Type: ${passType.displayName()}") }
+                    DropdownMenu(typeMenuOpen, { typeMenuOpen = false }) {
+                        PassType.entries.forEach { type ->
+                            DropdownMenuItem({ Text(type.displayName()) }, onClick = { passType = type; typeMenuOpen = false })
+                        }
+                    }
+                }
+            }
+            item { OutlinedTextField(accentColor, { accentColor = it }, label = { Text("Accent color (#AARRGGBB)") }, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Box {
+                    OutlinedButton(onClick = { barcodeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Barcode: ${barcodeFormat?.name?.replace('_', ' ') ?: "None"}")
+                    }
+                    DropdownMenu(barcodeMenuOpen, { barcodeMenuOpen = false }) {
+                        DropdownMenuItem({ Text("None") }, onClick = { barcodeFormat = null; barcodeMenuOpen = false })
+                        PassBarCodeFormat.entries.forEach { format ->
+                            DropdownMenuItem({ Text(format.name.replace('_', ' ')) }, onClick = { barcodeFormat = format; barcodeMenuOpen = false })
+                        }
+                    }
+                }
+            }
             item { OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text("Barcode data") }, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text("Barcode text") }, modifier = Modifier.fillMaxWidth()) }
+            items(fields.size) { index ->
+                val field = fields[index]
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Field ${index + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                            IconButton(onClick = { fields = fields.toMutableList().also { it.removeAt(index) } }) {
+                                Icon(Icons.Default.Delete, "Delete field")
+                            }
+                        }
+                        OutlinedTextField(field.label, { value -> fields = fields.replace(index, field.copy(label = value)) }, label = { Text("Label") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(field.value, { value -> fields = fields.replace(index, field.copy(value = value)) }, label = { Text("Value") }, modifier = Modifier.fillMaxWidth())
+                        SettingSwitch("Hide field", field.hidden) { value -> fields = fields.replace(index, field.copy(hidden = value)) }
+                    }
+                }
+            }
+            item {
+                OutlinedButton(
+                    onClick = { fields = fields + PassFieldUiModel("local-${fields.size + 1}", "", "", false, null) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Add field") }
+            }
             item {
                 Button(
                     enabled = pass != null && description.isNotBlank(),
-                    onClick = { onSave(PassDraft(description, creator, pass?.barcodeFormat, barcodeMessage, alternativeText)) },
+                    onClick = {
+                        onSave(
+                            PassDraft(
+                                description,
+                                creator,
+                                passType,
+                                parseColor(accentColor, pass?.accentColor ?: 0),
+                                barcodeFormat,
+                                barcodeMessage,
+                                alternativeText,
+                                fields,
+                            ),
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Save") }
             }
@@ -288,17 +353,26 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
     }
 }
 
+private fun <T> List<T>.replace(index: Int, value: T) = toMutableList().also { it[index] = value }
+
+private fun PassType.displayName() = name.lowercase().replaceFirstChar(Char::uppercase)
+
+private fun formatColor(color: Int) = "#%08X".format(java.util.Locale.ROOT, color)
+
+private fun parseColor(value: String, fallback: Int) =
+    runCatching { android.graphics.Color.parseColor(value) }.getOrDefault(fallback)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScannerScreen(onBack: () -> Unit, onFileSelected: (Uri) -> Unit) {
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(onFileSelected) }
-    Scaffold(topBar = { TopAppBar(title = { Text("Scan or select") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
+fun ScannerScreen(onBack: () -> Unit, onFilesSelected: (List<Uri>) -> Unit) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments(), onFilesSelected)
+    Scaffold(topBar = { TopAppBar(title = { Text("Find pass files") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.QrCodeScanner, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.FolderOpen, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(16.dp))
-            Text("Import a pass file from this device.", style = MaterialTheme.typography.bodyLarge)
+            Text("Select one or more pass files from this device or a document provider.", style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { launcher.launch(arrayOf("application/vnd.apple.pkpass", "application/zip")) }) { Text("Select pass file") }
+            Button(onClick = { launcher.launch(arrayOf("application/vnd.apple.pkpass", "application/vnd.espass-espass+zip", "application/zip")) }) { Text("Select pass files") }
         }
     }
 }

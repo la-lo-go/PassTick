@@ -31,7 +31,7 @@ open class App : Application() {
             single<PassRepository> { FilePassRepository(this@App, get(), get()) }
             single<SettingsRepository> { DataStoreSettingsRepository(this@App) }
             single<PlatformActions> { AndroidPlatformActions(this@App) }
-            viewModel { MainViewModel(get(), get()) }
+            viewModel { MainViewModel(get(), get(), get()) }
         }
     }
 

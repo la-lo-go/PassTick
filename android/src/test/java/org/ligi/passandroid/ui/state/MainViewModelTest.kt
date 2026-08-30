@@ -17,11 +17,17 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.ligi.passandroid.model.comparator.PassSortOrder
-import org.ligi.passandroid.model.pass.Pass
-import org.ligi.passandroid.model.pass.PassImpl
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.platform.PlatformActions
+import org.ligi.passandroid.platform.PlatformLocation
+import org.ligi.passandroid.platform.PrintablePass
+import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.PassRepository
+import org.ligi.passandroid.repository.PassFieldSnapshot
+import org.ligi.passandroid.repository.PassSnapshot
+import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.SettingsRepository
 import org.ligi.passandroid.repository.ThemeMode
 
@@ -34,8 +40,8 @@ class MainViewModelTest {
 
     @Test
     fun `exposes immutable pass snapshots and deletes through the repository`() = runTest(dispatcher) {
-        val repository = FakePassRepository(listOf(PassImpl("pass-1").apply { description = "Boarding pass" }))
-        val viewModel = MainViewModel(repository, FakeSettingsRepository())
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
@@ -50,29 +56,44 @@ class MainViewModelTest {
 
     @Test
     fun `saves edited text and barcode through the repository`() = runTest(dispatcher) {
-        val source = PassImpl("pass-1").apply { description = "Old" }
-        val repository = FakePassRepository(listOf(source))
-        val viewModel = MainViewModel(repository, FakeSettingsRepository())
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Old")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
 
         viewModel.onAction(
             AppAction.SavePass(
                 "pass-1",
-                PassDraft("Updated", "Issuer", PassBarCodeFormat.QR_CODE, "payload", "Show this"),
+                PassDraft(
+                    "Updated",
+                    "Issuer",
+                    PassType.COUPON,
+                    0xFF123456.toInt(),
+                    PassBarCodeFormat.QR_CODE,
+                    "payload",
+                    "Show this",
+                    listOf(PassFieldUiModel("key", "Label", "Value", false, null)),
+                ),
             ),
         )
         advanceUntilIdle()
 
-        assertThat(repository.savedPasses).containsExactly(source)
-        assertThat(source.description).isEqualTo("Updated")
-        assertThat(source.creator).isEqualTo("Issuer")
-        assertThat(source.barCode?.message).isEqualTo("payload")
-        assertThat(source.barCode?.alternativeText).isEqualTo("Show this")
+        assertThat(repository.updates.single()).isEqualTo(
+            "pass-1" to PassUpdate(
+                "Updated",
+                "Issuer",
+                PassType.COUPON,
+                0xFF123456.toInt(),
+                PassBarCodeFormat.QR_CODE,
+                "payload",
+                "Show this",
+                listOf(PassFieldSnapshot("key", "Label", "Value", false, null)),
+            ),
+        )
     }
 
     @Test
     fun `exports through a content uri`() = runTest(dispatcher) {
         val repository = FakePassRepository(emptyList())
-        val viewModel = MainViewModel(repository, FakeSettingsRepository())
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
         val destination = org.mockito.Mockito.mock(Uri::class.java)
 
         viewModel.onAction(AppAction.Export("pass-1", destination))
@@ -82,16 +103,29 @@ class MainViewModelTest {
     }
 }
 
-private class FakePassRepository(initial: List<Pass>) : PassRepository {
+private fun snapshot(id: String, description: String) = PassSnapshot(
+    id = id,
+    description = description,
+    creator = null,
+    type = PassType.EVENT,
+    accentColor = 0,
+    barcodeFormat = null,
+    barcodeMessage = null,
+    barcodeAlternativeText = null,
+    fields = emptyList(),
+    locations = emptyList(),
+    calendarTimeSpan = null,
+)
+
+private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     private val passes = MutableStateFlow(initial)
     val deletedIds = mutableListOf<String>()
-    val savedPasses = mutableListOf<Pass>()
+    val updates = mutableListOf<Pair<String, PassUpdate>>()
     val exports = mutableListOf<Pair<String, Uri>>()
 
     override fun observePasses() = passes.asStateFlow()
-    override fun find(id: String) = passes.value.firstOrNull { it.id == id }
-    override suspend fun import(uri: Uri) = Result.failure<Pass>(UnsupportedOperationException())
-    override suspend fun save(pass: Pass) { savedPasses += pass }
+    override suspend fun import(uri: Uri) = Result.failure<PassSnapshot>(UnsupportedOperationException())
+    override suspend fun update(id: String, update: PassUpdate) { updates += id to update }
     override suspend fun delete(id: String): Boolean {
         deletedIds += id
         passes.value = passes.value.filterNot { it.id == id }
@@ -102,6 +136,13 @@ private class FakePassRepository(initial: List<Pass>) : PassRepository {
         return Result.success(Unit)
     }
     override suspend fun prepareShare(id: String) = Result.failure<Uri>(UnsupportedOperationException())
+}
+
+private class FakePlatformActions : PlatformActions {
+    override fun addToCalendar(event: CalendarEvent) = Unit
+    override fun share(uri: Uri, mimeType: String) = Unit
+    override fun print(pass: PrintablePass) = Unit
+    override fun openLocation(location: PlatformLocation) = Unit
 }
 
 private class FakeSettingsRepository : SettingsRepository {
