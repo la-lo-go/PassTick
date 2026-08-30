@@ -32,6 +32,8 @@ import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.SettingsRepository
 import org.ligi.passandroid.repository.ThemeMode
+import org.ligi.passandroid.repository.PassCategory
+import org.ligi.passandroid.repository.PassCategoryRole
 import org.threeten.bp.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -112,9 +114,87 @@ class MainViewModelTest {
 
         assertThat(repository.exports).containsExactly("pass-1" to destination)
     }
+
+    @Test
+    fun `creates a local pass through the repository`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        val draft = PassDraft(
+            description = "Museum ticket",
+            creator = "City museum",
+            type = PassType.EVENT,
+            accentColor = 0xFF123456.toInt(),
+            barcodeFormat = null,
+            barcodeMessage = "",
+            barcodeAlternativeText = "",
+            fields = emptyList(),
+        )
+
+        viewModel.onAction(AppAction.CreatePass(draft))
+        advanceUntilIdle()
+
+        assertThat(repository.created.single().description).isEqualTo("Museum ticket")
+        assertThat(viewModel.uiState.value.passes.single().description).isEqualTo("Museum ticket")
+    }
+
+    @Test
+    fun `selects categories and moves a pass between them`() = runTest(dispatcher) {
+        val repository = FakePassRepository(
+            listOf(
+                snapshot("new-pass", "Train", "new"),
+                snapshot("archived-pass", "Museum", "archive"),
+            ),
+        )
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.categories.map { it.id }).contains("new", "archive")
+        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo("new")
+
+        viewModel.onAction(AppAction.SelectCategory("archive"))
+        viewModel.onAction(AppAction.MovePass("new-pass", "archive"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo("archive")
+        assertThat(repository.moved).containsExactly("new-pass" to "archive")
+        assertThat(viewModel.uiState.value.passes.single { it.id == "new-pass" }.categoryId).isEqualTo("archive")
+    }
+
+    @Test
+    fun `adds a configurable category`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        val viewModel = MainViewModel(FakePassRepository(emptyList()), settings, FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        val category = PassCategory("travel", "Travel", 0xFF006C4C, PassCategoryRole.CUSTOM)
+
+        viewModel.onAction(AppAction.SaveCategory(category))
+        advanceUntilIdle()
+
+        assertThat(settings.settings.value.categories).contains(category)
+    }
+
+    @Test
+    fun `deleting a custom category moves its passes to inbox`() = runTest(dispatcher) {
+        val category = PassCategory("travel", "Travel", 0xFF006C4C, PassCategoryRole.CUSTOM)
+        val settings = FakeSettingsRepository().apply {
+            setCategories(settings.value.categories + category)
+        }
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Train", "travel")))
+        val viewModel = MainViewModel(repository, settings, FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.DeleteCategory("travel"))
+        advanceUntilIdle()
+
+        assertThat(repository.moved).containsExactly("pass-1" to "new")
+        assertThat(settings.settings.value.categories.map { it.id }).doesNotContain("travel")
+    }
 }
 
-private fun snapshot(id: String, description: String) = PassSnapshot(
+private fun snapshot(id: String, description: String, categoryId: String = "new") = PassSnapshot(
     id = id,
     description = description,
     creator = null,
@@ -126,6 +206,7 @@ private fun snapshot(id: String, description: String) = PassSnapshot(
     fields = emptyList(),
     locations = emptyList(),
     calendarTimeSpan = null,
+    categoryId = categoryId,
 )
 
 private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
@@ -133,10 +214,20 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val deletedIds = mutableListOf<String>()
     val updates = mutableListOf<Pair<String, PassUpdate>>()
     val exports = mutableListOf<Pair<String, Uri>>()
+    val created = mutableListOf<PassUpdate>()
+    val moved = mutableListOf<Pair<String, String>>()
 
     override fun observePasses() = passes.asStateFlow()
     override suspend fun import(uri: Uri) = Result.failure<PassSnapshot>(UnsupportedOperationException())
+    override suspend fun create(update: PassUpdate): PassSnapshot {
+        created += update
+        return snapshot("created", update.description).also { passes.value += it }
+    }
     override suspend fun update(id: String, update: PassUpdate) { updates += id to update }
+    override suspend fun moveToCategory(id: String, categoryId: String) {
+        moved += id to categoryId
+        passes.value = passes.value.map { if (it.id == id) it.copy(categoryId = categoryId) else it }
+    }
     override suspend fun delete(id: String): Boolean {
         deletedIds += id
         passes.value = passes.value.filterNot { it.id == id }
@@ -162,4 +253,7 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setCondensedPasses(value: Boolean) = Unit
     override suspend fun setAutomaticBrightness(value: Boolean) = Unit
     override suspend fun setSortOrder(value: PassSortOrder) = Unit
+    override suspend fun setCategories(value: List<PassCategory>) {
+        settings.value = settings.value.copy(categories = value)
+    }
 }

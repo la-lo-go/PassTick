@@ -34,13 +34,23 @@
                 <data android:mimeType="application/pkpass" />
                 <data android:mimeType="application/vnd.espass-espass" />
                 <data android:mimeType="application/vnd.espass-espass+zip" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.apple.pkpass" />
+                <data android:mimeType="application/pkpass" />
+                <data android:mimeType="application/vnd.espass-espass" />
                 <data android:mimeType="application/vnd.espass-espass+zip" />
                 <data android:mimeType="application/zip" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
     </application>

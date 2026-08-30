@@ -21,7 +21,7 @@ The maintained application is a private, offline-first Android app for Android 1
 
 ## Architecture contracts
 
-- `PassRepository` observes, imports, saves, deletes, and exports passes. The repository owns the internal pass representation and storage layout.
+- `PassRepository` observes, imports, creates, updates, classifies, deletes, and exports passes. The repository owns the internal pass representation and storage layout.
 - `SettingsRepository` exposes `Flow<AppSettings>` and persists settings with DataStore.
 - `AppDestination` contains typed Navigation 3 keys.
 - `PlatformActions` owns calendar, sharing, printing, and location intents.
@@ -42,4 +42,3 @@ The maintained application is a private, offline-first Android app for Android 1
 Run the narrowest relevant test during development. Before each milestone, run unit tests, lint, and the release build. Run instrumented and Compose tests on API 29 and API 37 when emulators are available. A release remains blocked until it is also tested on a physical Android 10 or later device.
 
 Modernization is complete only when maintained code contains no Java, XML screens, Fragments, RecyclerView, ViewBinding, backend, analytics, Amazon code, broken dependencies, or product flavors, and all required checks pass.
-

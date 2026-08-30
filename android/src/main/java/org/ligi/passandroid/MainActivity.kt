@@ -21,7 +21,9 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.ligi.passandroid.navigation.AppDestination
+import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.compose.EditPassScreen
+import org.ligi.passandroid.ui.compose.CategorySettingsScreen
 import org.ligi.passandroid.ui.compose.HelpScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
 import org.ligi.passandroid.ui.compose.PassListScreen
@@ -29,6 +31,7 @@ import org.ligi.passandroid.ui.compose.ScannerScreen
 import org.ligi.passandroid.ui.compose.SettingsScreen
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.EditPassAction
+import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassFinderAction
@@ -42,7 +45,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) intent.importUri()?.let { viewModel.onAction(AppAction.Import(it)) }
+        if (savedInstanceState == null) importFrom(intent)
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
             val backStack = rememberNavBackStack(AppDestination.PassList)
@@ -78,7 +81,11 @@ class MainActivity : ComponentActivity() {
                                     onAction = { action ->
                                         when (action) {
                                             is PassListAction.OpenPass -> backStack.add(AppDestination.PassDetail(action.id))
-                                            PassListAction.ImportPass -> importLauncher.launch(PASS_MIME_TYPES)
+                                            is PassListAction.SelectCategory -> viewModel.onAction(
+                                                AppAction.SelectCategory(action.categoryId),
+                                            )
+                                            PassListAction.CreatePass -> backStack.add(AppDestination.CreatePass)
+                                            PassListAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
                                             PassListAction.FindPassFiles -> backStack.add(AppDestination.Scanner)
                                             PassListAction.OpenSettings -> backStack.add(AppDestination.Settings)
                                             PassListAction.OpenHelp -> backStack.add(AppDestination.Help)
@@ -91,6 +98,7 @@ class MainActivity : ComponentActivity() {
                                 PassDetailScreen(
                                     pass = pass,
                                     automaticBrightness = state.settings.automaticBrightness,
+                                    categories = state.categories,
                                     onAction = { action ->
                                         when (action) {
                                             PassDetailAction.Back -> backStack.removeLastOrNull()
@@ -109,6 +117,9 @@ class MainActivity : ComponentActivity() {
                                             is PassDetailAction.OpenLocation -> viewModel.onAction(
                                                 AppAction.OpenLocation(destination.passId, action.index),
                                             )
+                                            is PassDetailAction.MoveToCategory -> viewModel.onAction(
+                                                AppAction.MovePass(destination.passId, action.categoryId),
+                                            )
                                         }
                                     },
                                 )
@@ -121,6 +132,21 @@ class MainActivity : ComponentActivity() {
                                             EditPassAction.Back -> backStack.removeLastOrNull()
                                             is EditPassAction.Save -> {
                                                 viewModel.onAction(AppAction.SavePass(destination.passId, action.draft))
+                                                backStack.removeLastOrNull()
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                            entry<AppDestination.CreatePass> {
+                                EditPassScreen(
+                                    pass = null,
+                                    isNew = true,
+                                    onAction = { action ->
+                                        when (action) {
+                                            EditPassAction.Back -> backStack.removeLastOrNull()
+                                            is EditPassAction.Save -> {
+                                                viewModel.onAction(AppAction.CreatePass(action.draft))
                                                 backStack.removeLastOrNull()
                                             }
                                         }
@@ -145,6 +171,23 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetCondensedPasses -> viewModel.onAction(AppAction.SetCondensedPasses(action.value))
                                         is SettingsAction.SetAutomaticBrightness -> viewModel.onAction(AppAction.SetAutomaticBrightness(action.value))
                                         is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
+                                        SettingsAction.OpenCategories -> backStack.add(AppDestination.CategorySettings)
+                                    }
+                                }
+                            }
+                            entry<AppDestination.CategorySettings> {
+                                CategorySettingsScreen(state.settings.categories) { action ->
+                                    when (action) {
+                                        CategorySettingsAction.Back -> backStack.removeLastOrNull()
+                                        is CategorySettingsAction.Save -> viewModel.onAction(
+                                            AppAction.SaveCategory(action.category),
+                                        )
+                                        is CategorySettingsAction.Delete -> viewModel.onAction(
+                                            AppAction.DeleteCategory(action.categoryId),
+                                        )
+                                        is CategorySettingsAction.Move -> viewModel.onAction(
+                                            AppAction.MoveCategory(action.categoryId, action.offset),
+                                        )
                                     }
                                 }
                             }
@@ -160,17 +203,24 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.importUri()?.let { viewModel.onAction(AppAction.Import(it)) }
+        importFrom(intent)
     }
 
-    private companion object {
-        val PASS_MIME_TYPES = arrayOf(
-            "application/vnd.apple.pkpass",
-            "application/vnd.espass-espass+zip",
-            "application/zip",
-        )
+    private fun importFrom(intent: Intent) {
+        val uris = intent.importUris()
+        if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
     }
 }
 
 @Suppress("DEPRECATION")
-private fun Intent.importUri(): android.net.Uri? = data ?: getParcelableExtra(Intent.EXTRA_STREAM)
+private fun Intent.importUris(): List<android.net.Uri> = buildList {
+    data?.let(::add)
+    clipData?.let { clip ->
+        repeat(clip.itemCount) { index -> clip.getItemAt(index).uri?.let(::add) }
+    }
+    if (action == Intent.ACTION_SEND_MULTIPLE) {
+        getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let(::addAll)
+    } else {
+        getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let(::add)
+    }
+}.filter { it.scheme == "content" }.distinct()

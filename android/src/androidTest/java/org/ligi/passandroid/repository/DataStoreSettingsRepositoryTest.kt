@@ -18,14 +18,22 @@ class DataStoreSettingsRepositoryTest {
             repository.setCondensedPasses(true)
             repository.setAutomaticBrightness(false)
             repository.setSortOrder(PassSortOrder.TYPE)
+            val categories = defaultPassCategories + PassCategory("travel", "Travel", 0xFF006C4C)
+            repository.setCategories(categories)
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.condensedPasses && !it.automaticBrightness &&
-                    it.sortOrder == PassSortOrder.TYPE
+                    it.sortOrder == PassSortOrder.TYPE && it.categories == categories
             }
 
             assertThat(restored).isEqualTo(
-                AppSettings(ThemeMode.DARK, condensedPasses = true, automaticBrightness = false, PassSortOrder.TYPE),
+                AppSettings(
+                    ThemeMode.DARK,
+                    condensedPasses = true,
+                    automaticBrightness = false,
+                    sortOrder = PassSortOrder.TYPE,
+                    categories = categories,
+                ),
             )
         }
     }

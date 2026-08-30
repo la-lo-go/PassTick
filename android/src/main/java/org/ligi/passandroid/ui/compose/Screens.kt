@@ -20,12 +20,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -33,6 +36,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -40,8 +44,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -49,6 +55,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -75,7 +82,11 @@ import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassArtworkKind
+import org.ligi.passandroid.repository.PassCategory
+import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.state.EditPassAction
+import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassDraft
@@ -86,6 +97,7 @@ import org.ligi.passandroid.ui.state.PassListAction
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,6 +115,11 @@ fun PassListScreen(
                     Box {
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "More") }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Create pass") },
+                                leadingIcon = { Icon(Icons.Default.Add, null) },
+                                onClick = { menuOpen = false; onAction(PassListAction.CreatePass) },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Settings") },
                                 leadingIcon = { Icon(Icons.Default.Settings, null) },
@@ -127,9 +144,13 @@ fun PassListScreen(
             )
         },
     ) { padding ->
+        val visiblePasses = state.selectedCategoryId?.let { categoryId ->
+            state.passes.filter { it.categoryId == categoryId }
+        }
+            ?: state.passes
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
             if (state.isBusy) CircularProgressIndicator(Modifier.align(Alignment.Center))
-            if (!state.isBusy && state.passes.isEmpty()) {
+            if (!state.isBusy && visiblePasses.isEmpty()) {
                 EmptyPassList(Modifier.align(Alignment.Center))
             } else {
                 val columns = if (maxWidth >= 600.dp) 2 else 1
@@ -138,7 +159,23 @@ fun PassListScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 96.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.passes.chunked(columns), key = { row -> row.joinToString { it.id } }) { row ->
+                    if (state.categories.size > 1) {
+                        item {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(state.categories, key = PassCategory::id) { category ->
+                                    FilterChip(
+                                        selected = category.id == state.selectedCategoryId,
+                                        onClick = { onAction(PassListAction.SelectCategory(category.id)) },
+                                        label = { Text(category.name) },
+                                        leadingIcon = {
+                                            Box(Modifier.size(10.dp).background(Color(category.colorArgb.toInt()), RoundedCornerShape(50)))
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    items(visiblePasses.chunked(columns), key = { row -> row.joinToString { it.id } }) { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             row.forEach { pass -> PassCard(pass, state.settings.condensedPasses, Modifier.weight(1f), onAction) }
                             repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
@@ -156,7 +193,7 @@ private fun EmptyPassList(modifier: Modifier = Modifier) {
         Icon(Icons.Default.Add, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(12.dp))
         Text("No passes", style = MaterialTheme.typography.headlineSmall)
-        Text("Import a .pkpass or .espass file to begin.", style = MaterialTheme.typography.bodyMedium)
+        Text("Import a pass, image, or PDF file to begin.", style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -181,9 +218,11 @@ private fun PassCard(pass: PassUiModel, condensed: Boolean, modifier: Modifier, 
 fun PassDetailScreen(
     pass: PassUiModel?,
     automaticBrightness: Boolean,
+    categories: List<PassCategory> = emptyList(),
     onAction: (PassDetailAction) -> Unit,
 ) {
     val activity = LocalActivity.current
+    var moveMenuOpen by remember { mutableStateOf(false) }
     DisposableEffect(automaticBrightness, activity) {
         val attributes = activity?.window?.attributes
         val previous = attributes?.screenBrightness
@@ -236,6 +275,24 @@ fun PassDetailScreen(
                         OutlinedButton(onClick = { onAction(PassDetailAction.Print) }, modifier = Modifier.weight(1f)) { Text("Print") }
                     }
                 }
+                item {
+                    Box {
+                        OutlinedButton(onClick = { moveMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Move to category")
+                        }
+                        DropdownMenu(expanded = moveMenuOpen, onDismissRequest = { moveMenuOpen = false }) {
+                            categories.forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category.name) },
+                                    onClick = {
+                                        moveMenuOpen = false
+                                        onAction(PassDetailAction.MoveToCategory(category.id))
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
                 pass.calendarEvent?.let {
                     item { Button(onClick = { onAction(PassDetailAction.AddToCalendar) }, Modifier.fillMaxWidth()) { Text("Add to calendar") } }
                 }
@@ -278,11 +335,13 @@ private fun BarcodeCard(pass: PassUiModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
+fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew: Boolean = false) {
     var description by remember(pass?.id) { mutableStateOf(pass?.description.orEmpty()) }
     var creator by remember(pass?.id) { mutableStateOf(pass?.creator.orEmpty()) }
     var passType by remember(pass?.id) { mutableStateOf(pass?.type ?: PassType.EVENT) }
-    var accentColor by remember(pass?.id) { mutableStateOf(pass?.accentColor?.let(::formatColor).orEmpty()) }
+    var accentColor by remember(pass?.id) {
+        mutableStateOf(pass?.accentColor?.let(::formatColor) ?: formatColor(0xFF3D73E9.toInt()))
+    }
     var barcodeFormat by remember(pass?.id) { mutableStateOf(pass?.barcodeFormat) }
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
@@ -310,7 +369,7 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit pass") },
+                title = { Text(if (isNew) "Create pass" else "Edit pass") },
                 navigationIcon = { IconButton(onClick = { onAction(EditPassAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             )
         },
@@ -413,7 +472,7 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
             }
             item {
                 Button(
-                    enabled = pass != null && description.isNotBlank(),
+                    enabled = (isNew || pass != null) && description.isNotBlank(),
                     onClick = {
                         onAction(EditPassAction.Save(
                             PassDraft(
@@ -456,9 +515,9 @@ fun ScannerScreen(onAction: (PassFinderAction) -> Unit) {
         Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.FolderOpen, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(16.dp))
-            Text("Select one or more pass files from this device or a document provider.", style = MaterialTheme.typography.bodyLarge)
+            Text("Select pass, image, or PDF files from this device or a document provider.", style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(16.dp))
-            Button(onClick = { launcher.launch(arrayOf("application/vnd.apple.pkpass", "application/vnd.espass-espass+zip", "application/zip")) }) { Text("Select pass files") }
+            Button(onClick = { launcher.launch(supportedPassImportMimeTypes.toTypedArray()) }) { Text("Select files") }
         }
     }
 }
@@ -478,6 +537,13 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
             }
             item { SettingSwitch("Condensed pass list", settings.condensedPasses) { onAction(SettingsAction.SetCondensedPasses(it)) } }
             item { SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) } }
+            item {
+                ListItem(
+                    headlineContent = { Text("Categories") },
+                    supportingContent = { Text("Manage names, colors, and order") },
+                    modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
+                )
+            }
             item { Text("Sort order", Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium) }
             items(PassSortOrder.entries) { order ->
                 ListItem(
@@ -488,6 +554,132 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategorySettingsScreen(
+    categories: List<PassCategory>,
+    onAction: (CategorySettingsAction) -> Unit,
+) {
+    var editing by remember { mutableStateOf<PassCategory?>(null) }
+    var deleting by remember { mutableStateOf<PassCategory?>(null) }
+    editing?.let { category ->
+        CategoryEditorDialog(
+            category = category,
+            onDismiss = { editing = null },
+            onSave = {
+                onAction(CategorySettingsAction.Save(it))
+                editing = null
+            },
+        )
+    }
+    deleting?.let { category ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("Delete category?") },
+            text = { Text("Passes in ${category.name} will move to Inbox.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAction(CategorySettingsAction.Delete(category.id))
+                    deleting = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+        )
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Categories") },
+                navigationIcon = {
+                    IconButton(onClick = { onAction(CategorySettingsAction.Back) }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    editing = PassCategory(
+                        id = "custom-${UUID.randomUUID()}",
+                        name = "",
+                        colorArgb = 0xFF6750A4,
+                    )
+                },
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text("Add category") },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp),
+        ) {
+            items(categories, key = PassCategory::id) { category ->
+                ListItem(
+                    headlineContent = { Text(category.name) },
+                    supportingContent = {
+                        Text(category.role.name.lowercase().replaceFirstChar(Char::uppercase))
+                    },
+                    leadingContent = {
+                        Box(
+                            Modifier.size(32.dp)
+                                .background(Color(category.colorArgb.toInt()), RoundedCornerShape(12.dp)),
+                        )
+                    },
+                    trailingContent = {
+                        Row {
+                            IconButton(onClick = { onAction(CategorySettingsAction.Move(category.id, -1)) }) {
+                                Icon(Icons.Default.ArrowUpward, "Move ${category.name} up")
+                            }
+                            IconButton(onClick = { onAction(CategorySettingsAction.Move(category.id, 1)) }) {
+                                Icon(Icons.Default.ArrowDownward, "Move ${category.name} down")
+                            }
+                            if (category.role == PassCategoryRole.CUSTOM) {
+                                IconButton(onClick = { deleting = category }) {
+                                    Icon(Icons.Default.Delete, "Delete ${category.name}")
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.clickable { editing = category },
+                )
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryEditorDialog(
+    category: PassCategory,
+    onDismiss: () -> Unit,
+    onSave: (PassCategory) -> Unit,
+) {
+    var name by remember(category.id) { mutableStateOf(category.name) }
+    var color by remember(category.id) { mutableStateOf(formatColor(category.colorArgb.toInt())) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (category.name.isBlank()) "Add category" else "Edit category") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                OutlinedTextField(color, { color = it }, label = { Text("Color (#AARRGGBB)") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    val parsedColor = parseColor(color, category.colorArgb.toInt()).toUInt().toLong()
+                    onSave(category.copy(name = name.trim(), colorArgb = parsedColor))
+                },
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

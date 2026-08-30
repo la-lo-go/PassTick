@@ -67,6 +67,15 @@ class ThePassClassifier {
         assertThat(tested.getTopics()).isEmpty()
     }
 
+    @Test
+    fun removesBlankClassifications() {
+        val tested = PassClassifier(mutableMapOf(ID_1 to ""), mockedPassStore)
+
+        tested.processDataChange()
+
+        assertThat(tested.topicByIdMap).isEmpty()
+    }
+
     private fun getPassWithId(id: String) = PassImpl(id)
 
 }

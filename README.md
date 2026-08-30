@@ -12,10 +12,11 @@ F-Droid, or Amazon releases of the original application.
 
 ## Current application
 
-The application imports Apple Wallet (`.pkpass`) and esPass (`.espass`) files
-through Android's document providers. It stores passes privately and supports
-offline viewing, barcodes, editing, export, sharing, printing, calendar events,
-and location intents. It contains no analytics.
+The application imports Apple Wallet (`.pkpass`), esPass (`.espass`), image,
+and PDF files through Android's document providers. It stores passes privately
+and supports local pass creation, configurable categories, offline viewing, barcodes, editing,
+export, sharing, printing, calendar events, and location intents. It contains
+no analytics.
 
 The user interface uses Jetpack Compose and Material 3. Production and test
 sources are Kotlin. The app targets Android 16 and supports Android 10 or

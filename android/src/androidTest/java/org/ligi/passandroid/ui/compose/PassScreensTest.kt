@@ -1,6 +1,7 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.DeviceConfigurationOverride
@@ -13,10 +14,12 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTextInput
 import org.junit.Rule
 import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
+import org.ligi.passandroid.repository.defaultPassCategories
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.ui.state.PassFieldUiModel
@@ -116,8 +119,51 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { ScannerScreen({}) }
         }
 
-        composeRule.onNodeWithText("Select pass files").assertIsDisplayed()
-        composeRule.onNodeWithText("Select one or more pass files from this device or a document provider.").assertIsDisplayed()
+        composeRule.onNodeWithText("Select files").assertIsDisplayed()
+        composeRule.onNodeWithText("Select pass, image, or PDF files from this device or a document provider.").assertIsDisplayed()
+    }
+
+    @Test
+    fun newPassEditorAcceptsADescription() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(null, {}, isNew = true) }
+        }
+
+        composeRule.onNodeWithText("Create pass").assertIsDisplayed()
+        composeRule.onNodeWithText("Description").performTextInput("Museum ticket")
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(13)
+        composeRule.onNodeWithText("Save").assertIsEnabled()
+    }
+
+    @Test
+    fun passListShowsOnlyTheSelectedCategory() {
+        val state = sampleState().copy(
+            passes = listOf(
+                pass("one", "Boarding pass", PassType.BOARDING).copy(categoryId = "new"),
+                pass("two", "Event ticket", PassType.EVENT).copy(categoryId = "archive"),
+            ),
+            categories = defaultPassCategories,
+            selectedCategoryId = "new",
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassListScreen(state, {}) }
+        }
+
+        composeRule.onNodeWithText("Inbox").assertIsDisplayed()
+        composeRule.onNodeWithText("Archive").assertIsDisplayed()
+        composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
+        composeRule.onNodeWithText("Event ticket").assertDoesNotExist()
+    }
+
+    @Test
+    fun categorySettingsExposeColorsAndManagementActions() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { CategorySettingsScreen(defaultPassCategories, {}) }
+        }
+
+        composeRule.onNodeWithText("Inbox").assertIsDisplayed()
+        composeRule.onNodeWithText("Favorites").assertIsDisplayed()
+        composeRule.onNodeWithText("Add category").assertIsDisplayed()
     }
 
     private fun assertVisualContent(image: androidx.compose.ui.graphics.ImageBitmap) {

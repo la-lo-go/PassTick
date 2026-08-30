@@ -8,6 +8,8 @@ import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassArtworkKind
+import org.ligi.passandroid.repository.DEFAULT_PASS_CATEGORY_ID
+import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.functions.DEFAULT_EVENT_LENGTH_IN_HOURS
 import org.ligi.passandroid.platform.PlatformLocation
@@ -42,6 +44,7 @@ data class PassUiModel(
     val calendarEvent: CalendarEvent?,
     val artwork: List<PassArtworkUiModel> = emptyList(),
     val calendarTimeSpan: PassTimeSpanUiModel? = null,
+    val categoryId: String = DEFAULT_PASS_CATEGORY_ID,
 ) {
     companion object {
         fun from(pass: PassSnapshot) = PassUiModel(
@@ -67,6 +70,7 @@ data class PassUiModel(
             },
             artwork = pass.artwork.map { PassArtworkUiModel(it.kind, it.bytes) },
             calendarTimeSpan = pass.calendarTimeSpan?.let { PassTimeSpanUiModel(it.from, it.to) },
+            categoryId = pass.categoryId,
         )
     }
 
@@ -101,11 +105,14 @@ data class MainUiState(
     val settings: AppSettings = AppSettings(),
     val isBusy: Boolean = false,
     val message: String? = null,
+    val categories: List<PassCategory> = emptyList(),
+    val selectedCategoryId: String? = null,
 )
 
 sealed interface AppAction {
     data class Import(val uri: Uri) : AppAction
     data class ImportFiles(val uris: List<Uri>) : AppAction
+    data class CreatePass(val draft: PassDraft) : AppAction
     data class Export(val id: String, val destination: Uri) : AppAction
     data class SharePass(val id: String) : AppAction
     data class PrintPass(val id: String) : AppAction
@@ -113,6 +120,11 @@ sealed interface AppAction {
     data class OpenLocation(val id: String, val locationIndex: Int) : AppAction
     data class DeletePass(val id: String) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
+    data class MovePass(val id: String, val categoryId: String) : AppAction
+    data class SelectCategory(val categoryId: String) : AppAction
+    data class SaveCategory(val category: PassCategory) : AppAction
+    data class DeleteCategory(val categoryId: String) : AppAction
+    data class MoveCategory(val categoryId: String, val offset: Int) : AppAction
     data class SetTheme(val value: ThemeMode) : AppAction
     data class SetCondensedPasses(val value: Boolean) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction

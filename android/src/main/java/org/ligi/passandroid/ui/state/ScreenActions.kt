@@ -6,6 +6,8 @@ import org.ligi.passandroid.repository.ThemeMode
 
 sealed interface PassListAction {
     data class OpenPass(val id: String) : PassListAction
+    data class SelectCategory(val categoryId: String) : PassListAction
+    data object CreatePass : PassListAction
     data object ImportPass : PassListAction
     data object FindPassFiles : PassListAction
     data object OpenSettings : PassListAction
@@ -21,6 +23,7 @@ sealed interface PassDetailAction {
     data object Print : PassDetailAction
     data object AddToCalendar : PassDetailAction
     data class OpenLocation(val index: Int) : PassDetailAction
+    data class MoveToCategory(val categoryId: String) : PassDetailAction
 }
 
 sealed interface EditPassAction {
@@ -39,4 +42,12 @@ sealed interface SettingsAction {
     data class SetCondensedPasses(val value: Boolean) : SettingsAction
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
+    data object OpenCategories : SettingsAction
+}
+
+sealed interface CategorySettingsAction {
+    data object Back : CategorySettingsAction
+    data class Save(val category: org.ligi.passandroid.repository.PassCategory) : CategorySettingsAction
+    data class Delete(val categoryId: String) : CategorySettingsAction
+    data class Move(val categoryId: String, val offset: Int) : CategorySettingsAction
 }
