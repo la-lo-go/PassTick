@@ -1,9 +1,7 @@
 package org.ligi.passandroid.ui.compose
 
-import android.net.Uri
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.LocalActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -14,10 +12,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,8 +30,6 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -67,7 +63,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
@@ -318,41 +313,47 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(creator, { creator = it }, label = { Text("Creator") }, modifier = Modifier.fillMaxWidth()) }
             item {
-                Box {
-                    OutlinedButton(onClick = { typeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Type: ${passType.displayName()}") }
-                    DropdownMenu(typeMenuOpen, { typeMenuOpen = false }) {
-                        PassType.entries.forEach { type ->
-                            DropdownMenuItem({ Text(type.displayName()) }, onClick = { passType = type; typeMenuOpen = false })
+                EditorSection("Pass") {
+                    OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(creator, { creator = it }, label = { Text("Creator") }, modifier = Modifier.fillMaxWidth())
+                    Box {
+                        OutlinedButton(onClick = { typeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Type: ${passType.displayName()}") }
+                        DropdownMenu(typeMenuOpen, { typeMenuOpen = false }) {
+                            PassType.entries.forEach { type ->
+                                DropdownMenuItem({ Text(type.displayName()) }, onClick = { passType = type; typeMenuOpen = false })
+                            }
                         }
                     }
+                    OutlinedTextField(accentColor, { accentColor = it }, label = { Text("Accent color (#AARRGGBB)") }, modifier = Modifier.fillMaxWidth())
                 }
             }
-            item { OutlinedTextField(accentColor, { accentColor = it }, label = { Text("Accent color (#AARRGGBB)") }, modifier = Modifier.fillMaxWidth()) }
             item {
-                Box {
-                    OutlinedButton(onClick = { barcodeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Barcode: ${barcodeFormat?.name?.replace('_', ' ') ?: "None"}")
-                    }
-                    DropdownMenu(barcodeMenuOpen, { barcodeMenuOpen = false }) {
-                        DropdownMenuItem({ Text("None") }, onClick = { barcodeFormat = null; barcodeMenuOpen = false })
-                        PassBarCodeFormat.entries.forEach { format ->
-                            DropdownMenuItem({ Text(format.name.replace('_', ' ')) }, onClick = { barcodeFormat = format; barcodeMenuOpen = false })
+                EditorSection("Code") {
+                    Box {
+                        OutlinedButton(onClick = { barcodeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Barcode: ${barcodeFormat?.name?.replace('_', ' ') ?: "None"}")
+                        }
+                        DropdownMenu(barcodeMenuOpen, { barcodeMenuOpen = false }) {
+                            DropdownMenuItem({ Text("None") }, onClick = { barcodeFormat = null; barcodeMenuOpen = false })
+                            PassBarCodeFormat.entries.forEach { format ->
+                                DropdownMenuItem({ Text(format.name.replace('_', ' ')) }, onClick = { barcodeFormat = format; barcodeMenuOpen = false })
+                            }
                         }
                     }
+                    OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text("Barcode data") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text("Barcode text") }, modifier = Modifier.fillMaxWidth())
                 }
             }
-            item { OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text("Barcode data") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text("Barcode text") }, modifier = Modifier.fillMaxWidth()) }
-            item { Text("Calendar", style = MaterialTheme.typography.titleMedium) }
-            item { OutlinedTextField(calendarStart, { calendarStart = it }, label = { Text("Start (ISO 8601)") }, modifier = Modifier.fillMaxWidth()) }
-            item { OutlinedTextField(calendarEnd, { calendarEnd = it }, label = { Text("End (ISO 8601)") }, modifier = Modifier.fillMaxWidth()) }
-            items(locations.size) { index ->
-                val location = locations[index]
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                EditorSection("Calendar") {
+                    OutlinedTextField(calendarStart, { calendarStart = it }, label = { Text("Start (ISO 8601)") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(calendarEnd, { calendarEnd = it }, label = { Text("End (ISO 8601)") }, modifier = Modifier.fillMaxWidth())
+                }
+            }
+            item {
+                EditorSection("Locations") {
+                    locations.forEachIndexed { index, location ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Location ${index + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                             IconButton(onClick = { locations = locations.toMutableList().also { it.removeAt(index) } }) {
@@ -365,32 +366,29 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew
                             OutlinedTextField(location.longitude, { value -> locations = locations.replace(index, location.copy(longitude = value)) }, label = { Text("Longitude") }, modifier = Modifier.weight(1f))
                         }
                     }
+                    OutlinedButton(
+                        onClick = { locations = locations + PassLocationDraft("", "", "") },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Add location") }
                 }
             }
             item {
-                OutlinedButton(
-                    onClick = { locations = locations + PassLocationDraft("", "", "") },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Add location") }
-            }
-            item {
-                Text("Artwork", style = MaterialTheme.typography.titleMedium)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                EditorSection("Artwork") {
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(PassArtworkKind.LOGO, PassArtworkKind.STRIP, PassArtworkKind.THUMBNAIL).forEach { kind ->
                         OutlinedButton(
                             onClick = {
                                 pendingArtworkKind = kind
                                 artworkLauncher.launch(arrayOf("image/*"))
                             },
-                            modifier = Modifier.weight(1f),
                         ) { Text(kind.name.lowercase().replaceFirstChar(Char::uppercase)) }
+                    }
                     }
                 }
             }
-            items(fields.size) { index ->
-                val field = fields[index]
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                EditorSection("Fields") {
+                    fields.forEachIndexed { index, field ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Field ${index + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                             IconButton(onClick = { fields = fields.toMutableList().also { it.removeAt(index) } }) {
@@ -401,13 +399,11 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew
                         OutlinedTextField(field.value, { value -> fields = fields.replace(index, field.copy(value = value)) }, label = { Text("Value") }, modifier = Modifier.fillMaxWidth())
                         SettingSwitch("Hide field", field.hidden) { value -> fields = fields.replace(index, field.copy(hidden = value)) }
                     }
+                    OutlinedButton(
+                        onClick = { fields = fields + PassFieldUiModel("local-${fields.size + 1}", "", "", false, null) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Add field") }
                 }
-            }
-            item {
-                OutlinedButton(
-                    onClick = { fields = fields + PassFieldUiModel("local-${fields.size + 1}", "", "", false, null) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Add field") }
             }
             item {
                 Button(
@@ -433,6 +429,16 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Save") }
             }
+        }
+    }
+}
+
+@Composable
+private fun EditorSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
         }
     }
 }

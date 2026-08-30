@@ -14,7 +14,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import org.junit.Rule
@@ -108,12 +108,9 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(11)
-        composeRule.onNodeWithText("Artwork").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(12)
+        composeRule.onNodeWithText("Artwork").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Gate").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(13)
-        composeRule.onNodeWithText("Add field").assertIsDisplayed()
+        composeRule.onNodeWithText("Add field").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -124,8 +121,7 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Create pass").assertIsDisplayed()
         composeRule.onNodeWithText("Description").performTextInput("Museum ticket")
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(13)
-        composeRule.onNodeWithText("Save").assertIsEnabled()
+        composeRule.onNodeWithText("Save").performScrollTo().assertIsEnabled()
     }
 
     @Test
