@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.ligi.passandroid.model.AppleStylePassTranslation
 import java.nio.charset.StandardCharsets
+import java.nio.charset.Charset
 import java.nio.file.Files
 
 class TheAppleStylePassTranslation {
@@ -43,6 +44,33 @@ class TheAppleStylePassTranslation {
     fun `reads big-endian UTF-16`() {
         val content = "Billet à Genève".toByteArray(StandardCharsets.UTF_16BE)
         assertDecoded(byteArrayOf(0xFE.toByte(), 0xFF.toByte()) + content, "Billet à Genève")
+    }
+
+    @Test
+    fun `reads Shift-JIS translations`() {
+        assertLegacyTranslation("Shift_JIS", "boarding", "\u642d\u4e57\u5238")
+    }
+
+    @Test
+    fun `reads EUC-JP translations`() {
+        assertLegacyTranslation("EUC-JP", "gate", "\u642d\u4e57\u53e3")
+    }
+
+    @Test
+    fun `reads Big5 translations`() {
+        assertLegacyTranslation("Big5", "ticket", "\u8eca\u7968")
+    }
+
+    private fun assertLegacyTranslation(charsetName: String, key: String, value: String) {
+        val tested = AppleStylePassTranslation()
+        val file = Files.createTempFile("pass-translation", ".strings").toFile()
+        try {
+            file.writeBytes("\"$key\"=\"$value\";".toByteArray(Charset.forName(charsetName)))
+            tested.loadFromFile(file)
+            assertThat(tested.translate(key)).isEqualTo(value)
+        } finally {
+            file.delete()
+        }
     }
 
     private fun assertDecoded(bytes: ByteArray, expected: String) {
