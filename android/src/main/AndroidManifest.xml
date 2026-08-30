@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
     <application
         android:name=".App"
         android:allowBackup="true"
@@ -32,6 +29,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
                 <data android:mimeType="application/vnd.apple.pkpass" />
                 <data android:mimeType="application/pkpass" />
                 <data android:mimeType="application/vnd.espass-espass" />
@@ -43,20 +41,6 @@
                 <data android:mimeType="application/vnd.apple.pkpass" />
                 <data android:mimeType="application/vnd.espass-espass+zip" />
                 <data android:mimeType="application/zip" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:host="*" />
-                <data android:scheme="content" android:pathPattern=".*\\.pkpass" />
-                <data android:scheme="content" android:pathPattern=".*\\.espass" />
-                <data android:scheme="file" android:pathPattern=".*\\.pkpass" />
-                <data android:scheme="file" android:pathPattern=".*\\.espass" />
-                <data android:scheme="https" android:pathPattern=".*\\.pkpass" />
-                <data android:scheme="https" android:pathPattern=".*\\.espass" />
-                <data android:scheme="http" android:pathPattern=".*\\.pkpass" />
-                <data android:scheme="http" android:pathPattern=".*\\.espass" />
             </intent-filter>
         </activity>
     </application>

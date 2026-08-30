@@ -93,7 +93,6 @@ dependencies {
     implementation(libs.moshi.kotlin)
     implementation(libs.navigation3.runtime)
     implementation(libs.navigation3.ui)
-    implementation(libs.okhttp)
     implementation(libs.okio)
     implementation(libs.threetenabp)
     implementation(libs.timber)
