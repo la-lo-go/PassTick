@@ -12,13 +12,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -151,7 +155,7 @@ fun PassDetailScreen(
                 }
                 item { BarcodeCard(pass) { onAction(PassDetailAction.OpenCode) } }
                 items(pass.fields.filterNot { it.hidden }) { field ->
-                    ListItem(headlineContent = { Text(field.value) }, supportingContent = { Text(field.label) })
+                    ListItem(supportingContent = { Text(field.label) }) { Text(field.value) }
                 }
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -446,72 +450,67 @@ private fun parseColor(value: String, fallback: Int) =
 @Composable
 fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-            item { SettingsSectionTitle("Appearance") }
-            item { Text("Theme", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge) }
-            items(ThemeMode.entries) { mode ->
-                ListItem(
-                    headlineContent = { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) },
-                    trailingContent = { androidx.compose.material3.RadioButton(mode == settings.themeMode, { onAction(SettingsAction.SetTheme(mode)) }) },
-                    modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
-                )
-            }
-            item { SettingSwitch("Condensed pass list", settings.condensedPasses) { onAction(SettingsAction.SetCondensedPasses(it)) } }
-            item { SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) } }
-            item { SettingsSectionTitle("Pass list") }
-            item {
-                SettingSwitch(
-                    "Show today's passes prominently",
-                    settings.highlightTodayPasses,
-                ) { onAction(SettingsAction.SetHighlightTodayPasses(it)) }
-            }
-            item {
-                SettingSwitch(
-                    "Automatically move past passes",
-                    settings.automaticallyMarkPast,
-                ) { onAction(SettingsAction.SetAutomaticallyMarkPast(it)) }
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Categories") },
-                    supportingContent = { Text("Manage names, colors, and order") },
-                    modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
-                )
-            }
-            item { SettingsSectionTitle("Calendar") }
-            item {
-                SettingSwitch(
-                    "Open calendar after import",
-                    settings.offerCalendarAfterImport,
-                ) { onAction(SettingsAction.SetOfferCalendarAfterImport(it)) }
-            }
-            item { SettingsSectionTitle("Notifications") }
-            item {
-                SettingSwitch("Pass reminders", settings.remindersEnabled) {
-                    onAction(SettingsAction.SetRemindersEnabled(it))
-                }
-            }
-            if (settings.remindersEnabled) {
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(
+                Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
                 item {
-                    Text(
-                        "Default reminder",
-                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
+                    SettingsGroup("Appearance") {
+                        Text("Theme", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+                        ThemeMode.entries.forEach { mode ->
+                            ListItem(
+                                trailingContent = { androidx.compose.material3.RadioButton(mode == settings.themeMode, { onAction(SettingsAction.SetTheme(mode)) }) },
+                                modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
+                            ) { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) }
+                        }
+                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                        SettingSwitch("Condensed pass list", settings.condensedPasses) { onAction(SettingsAction.SetCondensedPasses(it)) }
+                        SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
+                    }
                 }
-                items(listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before")) { (minutes, label) ->
-                    ListItem(
-                        headlineContent = { Text(label) },
-                        trailingContent = {
-                            androidx.compose.material3.RadioButton(
-                                selected = minutes == settings.defaultReminderMinutes,
-                                onClick = { onAction(SettingsAction.SetDefaultReminderMinutes(minutes)) },
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            onAction(SettingsAction.SetDefaultReminderMinutes(minutes))
-                        },
-                    )
+                item {
+                    SettingsGroup("Pass list") {
+                        SettingSwitch("Show today's passes prominently", settings.highlightTodayPasses) {
+                            onAction(SettingsAction.SetHighlightTodayPasses(it))
+                        }
+                        SettingSwitch("Automatically move past passes", settings.automaticallyMarkPast) {
+                            onAction(SettingsAction.SetAutomaticallyMarkPast(it))
+                        }
+                        ListItem(
+                            supportingContent = { Text("Manage names, colors, and order") },
+                            modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
+                        ) { Text("Categories") }
+                    }
+                }
+                item {
+                    SettingsGroup("Calendar") {
+                        SettingSwitch("Open calendar after import", settings.offerCalendarAfterImport) {
+                            onAction(SettingsAction.SetOfferCalendarAfterImport(it))
+                        }
+                    }
+                }
+                item {
+                    SettingsGroup("Notifications") {
+                        SettingSwitch("Pass reminders", settings.remindersEnabled) {
+                            onAction(SettingsAction.SetRemindersEnabled(it))
+                        }
+                        if (settings.remindersEnabled) {
+                            Text("Default reminder", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+                            listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before").forEach { (minutes, label) ->
+                                ListItem(
+                                    trailingContent = {
+                                        androidx.compose.material3.RadioButton(
+                                            selected = minutes == settings.defaultReminderMinutes,
+                                            onClick = { onAction(SettingsAction.SetDefaultReminderMinutes(minutes)) },
+                                        )
+                                    },
+                                    modifier = Modifier.clickable { onAction(SettingsAction.SetDefaultReminderMinutes(minutes)) },
+                                ) { Text(label) }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -519,13 +518,16 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
 }
 
 @Composable
-private fun SettingsSectionTitle(text: String) {
-    Text(
-        text,
-        Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 8.dp),
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.titleMedium,
-    )
+private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+        ) {
+            Column(Modifier.padding(vertical = 8.dp), content = content)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -591,8 +593,12 @@ fun CategorySettingsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp),
         ) {
             items(categories, key = PassCategory::id) { category ->
-                ListItem(
-                    headlineContent = { Text(category.name) },
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                ) {
+                    ListItem(
                     supportingContent = {
                         Text(category.role.name.lowercase().replaceFirstChar(Char::uppercase))
                     },
@@ -618,8 +624,8 @@ fun CategorySettingsScreen(
                         }
                     },
                     modifier = Modifier.clickable { editing = category },
-                )
-                HorizontalDivider()
+                    ) { Text(category.name) }
+                }
             }
         }
     }
@@ -657,5 +663,7 @@ private fun CategoryEditorDialog(
 
 @Composable
 private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    ListItem(headlineContent = { Text(label) }, trailingContent = { Switch(checked, onChange) }, modifier = Modifier.clickable { onChange(!checked) })
+    ListItem(trailingContent = { Switch(checked, onChange) }, modifier = Modifier.clickable { onChange(!checked) }) {
+        Text(label)
+    }
 }
