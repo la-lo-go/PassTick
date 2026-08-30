@@ -67,6 +67,8 @@ data class PassUpdate(
     val barcodeAlternativeText: String,
     val fields: List<PassFieldSnapshot>,
     val artworkUpdates: List<PassArtworkUpdate> = emptyList(),
+    val calendarTimeSpan: PassTimeSpanSnapshot? = null,
+    val locations: List<PassLocationSnapshot> = emptyList(),
 )
 
 interface PassRepository {
@@ -139,6 +141,16 @@ class FilePassRepository(
                 ?: error("Cannot decode the selected image")
             target.outputStream().use { output ->
                 check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output))
+            }
+        }
+        pass.calendarTimespan = update.calendarTimeSpan?.let {
+            org.ligi.passandroid.model.pass.PassImpl.TimeSpan(from = it.from, to = it.to)
+        }
+        pass.locations = update.locations.map { location ->
+            org.ligi.passandroid.model.pass.PassLocation().apply {
+                name = location.name
+                lat = location.latitude
+                lon = location.longitude
             }
         }
         pass.barCode = update.barcodeFormat?.let { format ->

@@ -26,10 +26,13 @@ import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.PassFieldSnapshot
+import org.ligi.passandroid.repository.PassLocationSnapshot
+import org.ligi.passandroid.repository.PassTimeSpanSnapshot
 import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.SettingsRepository
 import org.ligi.passandroid.repository.ThemeMode
+import org.threeten.bp.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
@@ -55,7 +58,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `saves edited text and barcode through the repository`() = runTest(dispatcher) {
+    fun `saves all edited pass data through the repository`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Old")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
 
@@ -71,6 +74,9 @@ class MainViewModelTest {
                     "payload",
                     "Show this",
                     listOf(PassFieldUiModel("key", "Label", "Value", false, null)),
+                    calendarStart = "2026-09-01T10:00:00+02:00",
+                    calendarEnd = "2026-09-01T12:00:00+02:00",
+                    locations = listOf(PassLocationDraft("Station", "40.4", "-3.7")),
                 ),
             ),
         )
@@ -86,6 +92,11 @@ class MainViewModelTest {
                 "payload",
                 "Show this",
                 listOf(PassFieldSnapshot("key", "Label", "Value", false, null)),
+                calendarTimeSpan = PassTimeSpanSnapshot(
+                    ZonedDateTime.parse("2026-09-01T10:00:00+02:00"),
+                    ZonedDateTime.parse("2026-09-01T12:00:00+02:00"),
+                ),
+                locations = listOf(PassLocationSnapshot("Station", 40.4, -3.7)),
             ),
         )
     }

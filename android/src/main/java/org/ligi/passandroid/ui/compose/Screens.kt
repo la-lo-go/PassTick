@@ -83,6 +83,7 @@ import org.ligi.passandroid.ui.state.PassArtworkDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassFinderAction
 import org.ligi.passandroid.ui.state.PassListAction
+import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
 
@@ -286,6 +287,15 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
     var fields by remember(pass?.id) { mutableStateOf(pass?.fields.orEmpty()) }
+    var calendarStart by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.from?.toString().orEmpty()) }
+    var calendarEnd by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.to?.toString().orEmpty()) }
+    var locations by remember(pass?.id) {
+        mutableStateOf(
+            pass?.locations.orEmpty().map {
+                PassLocationDraft(it.name.orEmpty(), it.latitude.toString(), it.longitude.toString())
+            },
+        )
+    }
     var artworkUpdates by remember(pass?.id) { mutableStateOf(emptyList<PassArtworkDraft>()) }
     var pendingArtworkKind by remember { mutableStateOf<PassArtworkKind?>(null) }
     val artworkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -334,6 +344,33 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
             }
             item { OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text("Barcode data") }, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text("Barcode text") }, modifier = Modifier.fillMaxWidth()) }
+            item { Text("Calendar", style = MaterialTheme.typography.titleMedium) }
+            item { OutlinedTextField(calendarStart, { calendarStart = it }, label = { Text("Start (ISO 8601)") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(calendarEnd, { calendarEnd = it }, label = { Text("End (ISO 8601)") }, modifier = Modifier.fillMaxWidth()) }
+            items(locations.size) { index ->
+                val location = locations[index]
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Location ${index + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                            IconButton(onClick = { locations = locations.toMutableList().also { it.removeAt(index) } }) {
+                                Icon(Icons.Default.Delete, "Delete location")
+                            }
+                        }
+                        OutlinedTextField(location.name, { value -> locations = locations.replace(index, location.copy(name = value)) }, label = { Text("Location name") }, modifier = Modifier.fillMaxWidth())
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(location.latitude, { value -> locations = locations.replace(index, location.copy(latitude = value)) }, label = { Text("Latitude") }, modifier = Modifier.weight(1f))
+                            OutlinedTextField(location.longitude, { value -> locations = locations.replace(index, location.copy(longitude = value)) }, label = { Text("Longitude") }, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+            item {
+                OutlinedButton(
+                    onClick = { locations = locations + PassLocationDraft("", "", "") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Add location") }
+            }
             item {
                 Text("Artwork", style = MaterialTheme.typography.titleMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -385,6 +422,9 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
                                 alternativeText,
                                 fields,
                                 artworkUpdates,
+                                calendarStart,
+                                calendarEnd,
+                                locations,
                             ),
                         ))
                     },

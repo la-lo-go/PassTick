@@ -13,6 +13,8 @@ import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassArtworkUpdate
+import org.ligi.passandroid.repository.PassLocationSnapshot
+import org.ligi.passandroid.repository.PassTimeSpanSnapshot
 import org.ligi.passandroid.repository.SettingsRepository
 import org.threeten.bp.Duration
 import org.threeten.bp.LocalDateTime
@@ -89,6 +91,14 @@ class MainViewModel(
                     )
                 },
                 artworkUpdates = action.draft.artworkUpdates.map { PassArtworkUpdate(it.kind, it.uri) },
+                calendarTimeSpan = action.draft.toTimeSpan(),
+                locations = action.draft.locations.map { location ->
+                    PassLocationSnapshot(
+                        name = location.name.ifBlank { null },
+                        latitude = location.latitude.toDoubleOrNull() ?: error("Invalid location latitude"),
+                        longitude = location.longitude.toDoubleOrNull() ?: error("Invalid location longitude"),
+                    )
+                },
             ),
         )
     }
@@ -129,6 +139,16 @@ private fun PassSortOrder.snapshotComparator(): Comparator<PassSnapshot> {
 }
 
 private fun PassSnapshot.sortDate() = calendarTimeSpan?.from
+
+private fun PassDraft.toTimeSpan(): PassTimeSpanSnapshot? {
+    val from = calendarStart.takeIf(String::isNotBlank)?.let {
+        runCatching { org.threeten.bp.ZonedDateTime.parse(it) }.getOrElse { error("Invalid calendar start") }
+    }
+    val to = calendarEnd.takeIf(String::isNotBlank)?.let {
+        runCatching { org.threeten.bp.ZonedDateTime.parse(it) }.getOrElse { error("Invalid calendar end") }
+    }
+    return if (from == null && to == null) null else PassTimeSpanSnapshot(from, to)
+}
 
 private fun <T : Comparable<T>> compareNullable(
     left: T?,

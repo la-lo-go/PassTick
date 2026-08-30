@@ -12,6 +12,7 @@ import androidx.compose.ui.test.then
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import org.junit.Rule
 import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
@@ -102,8 +103,8 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
         composeRule.onNodeWithText("Artwork").assertIsDisplayed()
-        composeRule.onNodeWithText("Gate").assertIsDisplayed()
-        composeRule.onNodeWithText("Add field").assertIsDisplayed()
+        composeRule.onNodeWithText("Gate").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Add field").performScrollTo().assertIsDisplayed()
     }
 
     @Test

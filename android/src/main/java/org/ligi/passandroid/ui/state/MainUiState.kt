@@ -13,6 +13,7 @@ import org.ligi.passandroid.functions.DEFAULT_EVENT_LENGTH_IN_HOURS
 import org.ligi.passandroid.platform.PlatformLocation
 import org.ligi.passandroid.platform.PrintableField
 import org.ligi.passandroid.platform.PrintablePass
+import org.threeten.bp.ZonedDateTime
 
 data class PassFieldUiModel(
     val key: String?,
@@ -22,6 +23,8 @@ data class PassFieldUiModel(
     val hint: String?,
 )
 data class PassLocationUiModel(val name: String?, val latitude: Double, val longitude: Double)
+data class PassLocationDraft(val name: String, val latitude: String, val longitude: String)
+data class PassTimeSpanUiModel(val from: ZonedDateTime?, val to: ZonedDateTime?)
 data class PassArtworkUiModel(val kind: PassArtworkKind, val bytes: ByteArray)
 data class PassArtworkDraft(val kind: PassArtworkKind, val uri: Uri)
 
@@ -38,6 +41,7 @@ data class PassUiModel(
     val locations: List<PassLocationUiModel>,
     val calendarEvent: CalendarEvent?,
     val artwork: List<PassArtworkUiModel> = emptyList(),
+    val calendarTimeSpan: PassTimeSpanUiModel? = null,
 ) {
     companion object {
         fun from(pass: PassSnapshot) = PassUiModel(
@@ -62,6 +66,7 @@ data class PassUiModel(
                 )
             },
             artwork = pass.artwork.map { PassArtworkUiModel(it.kind, it.bytes) },
+            calendarTimeSpan = pass.calendarTimeSpan?.let { PassTimeSpanUiModel(it.from, it.to) },
         )
     }
 
@@ -86,6 +91,9 @@ data class PassDraft(
     val barcodeAlternativeText: String,
     val fields: List<PassFieldUiModel>,
     val artworkUpdates: List<PassArtworkDraft> = emptyList(),
+    val calendarStart: String = "",
+    val calendarEnd: String = "",
+    val locations: List<PassLocationDraft> = emptyList(),
 )
 
 data class MainUiState(
