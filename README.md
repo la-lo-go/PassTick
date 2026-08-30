@@ -1,33 +1,38 @@
-[![on Google Play](https://ligi.de/img/play_badge.png)](https://play.google.com/store/apps/details?id=org.ligi.passandroid)
-[![on FDroid](https://ligi.de/img/fdroid_badge.png)](https://f-droid.org/repository/browse/?fdid=org.ligi.passandroid)
-[![on Amazon](https://ligi.de/img/amazon_badge.png)](https://www.amazon.com/ligi-Passandroid/dp/B01LX9DMSQ)
+# PassAndroid modernization
 
-# PassAndroid
+This repository is an independent modernization of the original
+[PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its
+contributors. It preserves the complete project history, original copyright,
+and GNU GPL version 3 license.
 
-> This independent modernization preserves the full history of the original
-> [PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its
-> contributors. The work remains licensed under GPL-3.0. The application keeps
-> its current name and identifiers only until a new name is selected.
+The current application name and `org.ligi.passandroid` identifiers are
+temporary. They will change after the replacement name is selected. This
+repository is not yet published and does not represent the Play Store,
+F-Droid, or Amazon releases of the original application.
 
-Android App to view Passes (e.g. event tickets, coupons, loyalty cards, boarding passes, ...)
+## Current application
 
-![Screenshots](https://ligi.de/img/passandroid_screenshots.png)
+The application imports Apple Wallet (`.pkpass`) and esPass (`.espass`) files
+through Android's document providers. It stores passes privately and supports
+offline viewing, barcodes, editing, export, sharing, printing, calendar events,
+and location intents. It contains no analytics.
 
-Displays [esPass](https://espass.it) (`*.esPass`) & Passbook (`*.pkpass`) files, shows the Barcode (QR, PDF417, AZTEC, Code 39 and Code 128 format) and is also usable offline.
+The user interface uses Jetpack Compose and Material 3. Production and test
+sources are Kotlin. The app targets Android 16 and supports Android 10 or
+newer.
 
-When preparing for the Chaos Communication Congress 2012 #29c3 I stumbled upon a passbook file for the first time.
-I really like the idea of paperless tickets as it saves time and trees which are both very valuable to me.
-The problem was that I was unable to find an app to open and use the downloaded passbook files with, that's why I wrote my own one.
+## Build
 
-## Legal
+Use JDK 17 and the included wrapper:
 
-This project is licensed under the [GNU General Public License v3.0](COPYING).
+```powershell
+.\gradlew.bat testDebugUnitTest lintDebug assembleRelease
+```
 
-We are not affiliated with Apple - Passbook might be trademarked by Apple, but it's introduced like a standard so this should be okay.
+The automated suite is validated with emulators at API 29 and API 37. A release
+must also be tested on a physical Android 10 or newer device before publication.
 
-THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+## License
 
+This project is licensed under the [GNU General Public License version 3](COPYING).
+It is not affiliated with Apple.
