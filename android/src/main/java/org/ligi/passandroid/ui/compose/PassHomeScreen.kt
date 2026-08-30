@@ -32,14 +32,12 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,7 +92,6 @@ sealed interface HomeAction {
     data class Delete(val id: String) : HomeAction
     data class Undo(val operation: UndoOperation) : HomeAction
     data object ImportPass : HomeAction
-    data object CreatePass : HomeAction
     data object OpenTimeline : HomeAction
     data object OpenSettings : HomeAction
 }
@@ -150,16 +147,11 @@ fun PassHomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                FloatingActionButton(onClick = { onAction(HomeAction.CreatePass) }) {
-                    Icon(Icons.Default.Add, "Create pass")
-                }
-                ExtendedFloatingActionButton(
-                    onClick = { onAction(HomeAction.ImportPass) },
-                    modifier = Modifier.semantics { contentDescription = "Import pass" },
-                    icon = { Icon(Icons.Default.UploadFile, null) },
-                    text = { Text("Import pass") },
-                )
+            LargeFloatingActionButton(
+                onClick = { onAction(HomeAction.ImportPass) },
+                modifier = Modifier.semantics { contentDescription = "Import passes" },
+            ) {
+                Icon(Icons.Default.Add, null, Modifier.size(36.dp))
             }
         },
     ) { scaffoldPadding ->
@@ -190,7 +182,7 @@ fun PassHomeScreen(
                     item(key = "empty") { EmptyHome() }
                 }
                 if (todayPasses.isNotEmpty()) {
-                    item(key = "today-heading") { SectionHeading("Today", "${todayPasses.size} current") }
+                    item(key = "today-heading") { SectionHeading("Today") }
                     item(key = "today-feed") {
                         TicketFeed(
                             passes = todayPasses,
@@ -207,7 +199,9 @@ fun PassHomeScreen(
                     }
                 }
                 if (remainingPasses.isNotEmpty()) {
-                    item(key = "passes-heading") { SectionHeading(if (todayPasses.isEmpty()) "Passes" else "Later", "${remainingPasses.size} passes") }
+                    if (todayPasses.isNotEmpty()) {
+                        item(key = "passes-heading") { SectionHeading("Later") }
+                    }
                     item(key = "pass-feed") {
                         TicketFeed(
                             passes = remainingPasses,
@@ -343,8 +337,8 @@ private fun TicketSwipeContainer(
     val restoring = category?.role == PassCategoryRole.ARCHIVE
     val archiveLabel = if (restoring) "Restore" else "Archive"
     val dismissState = rememberSwipeToDismissBoxState()
-    LaunchedEffect(dismissState.currentValue) {
-        when (dismissState.currentValue) {
+    LaunchedEffect(dismissState.settledValue) {
+        when (dismissState.settledValue) {
             SwipeToDismissBoxValue.StartToEnd -> onArchive(pass.id, restoring)
             SwipeToDismissBoxValue.EndToStart -> onDelete(pass.id)
             SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
@@ -489,10 +483,9 @@ private fun CategoryDot(colorArgb: Long) {
 }
 
 @Composable
-private fun SectionHeading(title: String, supporting: String) {
+private fun SectionHeading(title: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-        Text(supporting, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -504,7 +497,7 @@ private fun EmptyHome() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("Your passes live here", style = MaterialTheme.typography.headlineSmall)
-        Text("Import an existing pass or create one.", style = MaterialTheme.typography.bodyLarge)
+        Text("Import one or more pass files.", style = MaterialTheme.typography.bodyLarge)
     }
 }
 

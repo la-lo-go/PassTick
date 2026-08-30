@@ -30,6 +30,9 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -37,8 +40,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
@@ -54,6 +60,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,20 +93,44 @@ import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
+import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
+import org.ligi.passandroid.ui.barcode.PassCodePreview
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PassDetailScreen(
     pass: PassUiModel?,
     categories: List<PassCategory> = emptyList(),
-    quickCodePassId: String? = null,
-    remindersEnabled: Boolean = false,
     passReminderEnabled: Boolean = false,
+    initialCodeExpanded: Boolean = false,
+    onInitialCodeShown: () -> Unit = {},
+    flashlightAvailable: Boolean = false,
+    flashlightEnabled: Boolean = false,
     onAction: (PassDetailAction) -> Unit,
 ) {
-    var moveMenuOpen by remember { mutableStateOf(false) }
+    var overflowOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var codeHeld by remember(pass?.id) { mutableStateOf(false) }
+    var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
+    val codeExpanded = codeHeld || codePinned
+    LaunchedEffect(initialCodeExpanded) {
+        if (initialCodeExpanded) onInitialCodeShown()
+    }
+    if (codeExpanded && pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
+        ExpandedPassCodeDialog(
+            format = pass.barcodeFormat,
+            message = pass.barcodeMessage,
+            alternativeText = pass.barcodeAlternativeText,
+            onDismiss = {
+                codeHeld = false
+                codePinned = false
+            },
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose { onAction(PassDetailAction.SetFlashlightEnabled(false)) }
+    }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -124,13 +155,70 @@ fun PassDetailScreen(
                 title = { Text(pass?.description ?: "Pass") },
                 navigationIcon = { IconButton(onClick = { onAction(PassDetailAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
-                    IconButton(onClick = { onAction(PassDetailAction.Share) }, enabled = pass != null) { Icon(Icons.Default.Share, "Share") }
-                    IconButton(onClick = { onAction(PassDetailAction.Edit) }, enabled = pass != null) { Icon(Icons.Default.Edit, "Edit") }
-                    IconButton(onClick = { confirmDelete = true }, enabled = pass != null) {
-                        Icon(Icons.Default.Delete, "Delete pass")
+                    Box {
+                        IconButton(onClick = { overflowOpen = true }, enabled = pass != null) {
+                            Icon(Icons.Default.MoreVert, "Pass actions")
+                        }
+                        DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                            DropdownMenuItem(text = { Text("Print") }, onClick = {
+                                overflowOpen = false
+                                onAction(PassDetailAction.Print)
+                            })
+                            DropdownMenuItem(
+                                text = { Text(if (passReminderEnabled) "Turn reminder off" else "Turn reminder on") },
+                                enabled = pass?.calendarEvent != null,
+                                onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.ToggleReminder)
+                                },
+                            )
+                            categories.forEach { category ->
+                                DropdownMenuItem(text = { Text("Move to ${category.name}") }, onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.MoveToCategory(category.id))
+                                })
+                            }
+                            pass?.locations?.forEachIndexed { index, location ->
+                                DropdownMenuItem(text = { Text(location.name?.takeIf(String::isNotBlank) ?: "Open location") }, onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.OpenLocation(index))
+                                })
+                            }
+                            DropdownMenuItem(text = { Text("Delete permanently") }, onClick = {
+                                overflowOpen = false
+                                confirmDelete = true
+                            })
+                        }
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            if (pass != null) {
+                HorizontalFloatingToolbar(
+                    expanded = true,
+                    floatingActionButton = {
+                        FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = { onAction(PassDetailAction.Edit) }) {
+                            Icon(Icons.Default.Edit, "Edit pass")
+                        }
+                    },
+                ) {
+                    IconButton(onClick = { onAction(PassDetailAction.Share) }) {
+                        Icon(Icons.Default.Share, "Share pass")
+                    }
+                    if (!pass.barcodeMessage.isNullOrBlank()) {
+                        IconButton(
+                            onClick = { onAction(PassDetailAction.SetFlashlightEnabled(!flashlightEnabled)) },
+                            enabled = flashlightAvailable || flashlightEnabled,
+                        ) {
+                            Icon(
+                                if (flashlightEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                                if (flashlightEnabled) "Turn flashlight off" else "Turn flashlight on",
+                            )
+                        }
+                    }
+                }
+            }
         },
     ) { padding ->
         if (pass == null) {
@@ -149,7 +237,13 @@ fun PassDetailScreen(
                         Modifier.fillMaxWidth().height(160.dp),
                     )
                 }
-                item { BarcodeCard(pass) { onAction(PassDetailAction.OpenCode) } }
+                item {
+                    BarcodeCard(
+                        pass = pass,
+                        onHoldChanged = { codeHeld = it },
+                        onPin = { codePinned = true },
+                    )
+                }
                 val visibleFields = pass.fields.filterNot { it.hidden }
                 if (visibleFields.isNotEmpty()) {
                     item {
@@ -162,64 +256,11 @@ fun PassDetailScreen(
                         }
                     }
                 }
-                item {
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onAction(PassDetailAction.Export) }) { Text("Export") }
-                        OutlinedButton(onClick = { onAction(PassDetailAction.Print) }) { Text("Print") }
-                    }
-                }
-                item {
-                    Box {
-                        OutlinedButton(onClick = { moveMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Move to category")
-                        }
-                        DropdownMenu(expanded = moveMenuOpen, onDismissRequest = { moveMenuOpen = false }) {
-                            categories.forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text(category.name) },
-                                    onClick = {
-                                        moveMenuOpen = false
-                                        onAction(PassDetailAction.MoveToCategory(category.id))
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
                 pass.calendarEvent?.let {
                     item {
-                        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { onAction(PassDetailAction.AddToCalendar) },
-                            ) { Text("Add to calendar") }
-                            FilledTonalButton(
-                                onClick = { onAction(PassDetailAction.ToggleReminder) },
-                            ) {
-                                Text(
-                                    when {
-                                        !remindersEnabled -> "Enable reminders"
-                                        passReminderEnabled -> "Reminder on"
-                                        else -> "Reminder off"
-                                    },
-                                )
-                            }
+                        Button(onClick = { onAction(PassDetailAction.AddToCalendar) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Add to calendar")
                         }
-                    }
-                }
-                if (!pass.barcodeMessage.isNullOrBlank()) {
-                    item {
-                        FilledTonalButton(
-                            onClick = { onAction(PassDetailAction.UseForQuickCodeWidget) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(if (quickCodePassId == pass.id) "Quick code widget pass" else "Use in quick code widget")
-                        }
-                    }
-                }
-                items(pass.locations.size) { index ->
-                    val location = pass.locations[index]
-                    FilledTonalButton(onClick = { onAction(PassDetailAction.OpenLocation(index)) }, Modifier.fillMaxWidth()) {
-                        Text(location.name ?: "Open location")
                     }
                 }
             }
@@ -239,39 +280,16 @@ private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>
 }
 
 @Composable
-private fun BarcodeCard(pass: PassUiModel, onOpen: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+private fun BarcodeCard(pass: PassUiModel, onHoldChanged: (Boolean) -> Unit, onPin: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             val format = pass.barcodeFormat
             val message = pass.barcodeMessage
             if (format != null && !message.isNullOrBlank()) {
                 BoxWithConstraints(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                    val density = androidx.compose.ui.platform.LocalDensity.current
-                    val bitmap = remember(format, message, constraints.maxWidth, constraints.maxHeight) {
-                        org.ligi.passandroid.ui.barcode.CrispBarcodeRenderer.renderBitmap(
-                            message,
-                            format,
-                            constraints.maxWidth,
-                            constraints.maxHeight,
-                        )
-                    }
-                    if (bitmap != null) {
-                        Image(
-                            bitmap.asImageBitmap(),
-                            "Pass barcode. Tap to enlarge",
-                            Modifier.size(
-                                with(density) { bitmap.width.toDp() },
-                                with(density) { bitmap.height.toDp() },
-                            ),
-                            contentScale = ContentScale.None,
-                            filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
-                        )
-                    } else {
-                        Text("Code cannot be displayed", style = MaterialTheme.typography.titleMedium)
-                    }
+                    PassCodePreview(format, message, onHoldChanged, onPin, Modifier.fillMaxSize())
                 }
             } else Text("No barcode", style = MaterialTheme.typography.titleMedium)
-            pass.barcodeAlternativeText?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
         }
     }
 }

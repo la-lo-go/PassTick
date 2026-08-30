@@ -16,10 +16,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -43,8 +41,6 @@ import org.ligi.passandroid.ui.compose.TimelineAction
 import org.ligi.passandroid.ui.compose.TimelineScreen
 import org.ligi.passandroid.ui.compose.TimelineUiState
 import org.ligi.passandroid.ui.compose.UndoOperation
-import org.ligi.passandroid.ui.barcode.CodeScreenAction
-import org.ligi.passandroid.ui.barcode.PassCodeScreen
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
@@ -69,20 +65,33 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
             val requestedPass by deepLinkRequest.collectAsStateWithLifecycle()
+            val context = LocalContext.current
             val backStack = rememberNavBackStack(AppDestination.PassList)
             val snackbarHostState = remember { SnackbarHostState() }
             val undoCategories = remember { mutableMapOf<String, String>() }
-            var pendingExportId by remember { mutableStateOf<String?>(null) }
-            val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                uri?.let { viewModel.onAction(AppAction.Import(it)) }
+            var expandedCodePassId by remember { mutableStateOf<String?>(null) }
+            val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+                if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
             }
-            val exportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("application/vnd.espass-espass+zip"),
-            ) { uri ->
-                val id = pendingExportId
-                if (uri != null && id != null) viewModel.onAction(AppAction.Export(id, uri))
-                pendingExportId = null
+            var hasCameraPermission by remember {
+                mutableStateOf(
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED,
+                )
             }
+            val cameraPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { granted -> hasCameraPermission = granted }
+            val flashlightController = remember(hasCameraPermission) {
+                if (hasCameraPermission) AndroidFlashlightController(context.applicationContext) else null
+            }
+            DisposableEffect(flashlightController) {
+                onDispose { flashlightController?.close() }
+            }
+            val flashlightFlow = remember(flashlightController) {
+                flashlightController?.state ?: MutableStateFlow(FlashlightState())
+            }
+            val flashlight by flashlightFlow.collectAsStateWithLifecycle()
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
             ) { granted -> viewModel.onAction(AppAction.SetRemindersEnabled(granted)) }
@@ -126,14 +135,13 @@ class MainActivity : ComponentActivity() {
                             viewModel.onAction(AppAction.MovePass(action.operation.passId, categoryId))
                         }
                     }
-                    HomeAction.CreatePass -> backStack.add(AppDestination.CreatePass)
                     HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
                     HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
                     HomeAction.OpenTimeline -> backStack.add(AppDestination.Timeline)
                 }
             }
 
-            fun handlePassDetailAction(passId: String, passDescription: String?, action: PassDetailAction) {
+            fun handlePassDetailAction(passId: String, action: PassDetailAction) {
                 when (action) {
                     PassDetailAction.Back -> backStack.removeLastOrNull()
                     PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(passId))
@@ -141,15 +149,16 @@ class MainActivity : ComponentActivity() {
                         viewModel.onAction(AppAction.DeletePass(passId))
                         backStack.removeLastOrNull()
                     }
-                    PassDetailAction.Export -> {
-                        pendingExportId = passId
-                        exportLauncher.launch("${passDescription ?: "pass"}.espass")
-                    }
                     PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(passId))
                     PassDetailAction.Print -> viewModel.onAction(AppAction.PrintPass(passId))
                     PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
-                    PassDetailAction.OpenCode -> backStack.add(AppDestination.PassCode(passId))
-                    PassDetailAction.UseForQuickCodeWidget -> viewModel.onAction(AppAction.SetQuickCodePass(passId))
+                    is PassDetailAction.SetFlashlightEnabled -> {
+                        if (action.enabled && !hasCameraPermission) {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        } else {
+                            flashlightController?.setEnabled(action.enabled)
+                        }
+                    }
                     PassDetailAction.ToggleReminder -> {
                         if (state.settings.remindersEnabled) {
                             viewModel.onAction(AppAction.TogglePassReminder(passId))
@@ -173,10 +182,8 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(requestedPass, state.passes) {
                 val request = requestedPass ?: return@LaunchedEffect
                 if (state.passes.any { it.id == request.passId }) {
-                    backStack.add(
-                        if (request.showCode) AppDestination.PassCode(request.passId)
-                        else AppDestination.PassDetail(request.passId),
-                    )
+                    if (request.showCode) expandedCodePassId = request.passId
+                    backStack.add(AppDestination.PassDetail(request.passId))
                     deepLinkRequest.value = null
                 }
             }
@@ -226,67 +233,18 @@ class MainActivity : ComponentActivity() {
                                         PassDetailScreen(
                                             pass = pass,
                                             categories = state.categories,
-                                            quickCodePassId = state.settings.quickCodePassId,
-                                            remindersEnabled = state.settings.remindersEnabled,
                                             passReminderEnabled = state.settings.remindersEnabled &&
                                                 selected.passId !in state.settings.reminderExcludedPassIds,
+                                            initialCodeExpanded = expandedCodePassId == selected.passId,
+                                            onInitialCodeShown = { expandedCodePassId = null },
+                                            flashlightAvailable = flashlight.isAvailable || !hasCameraPermission,
+                                            flashlightEnabled = flashlight.isEnabled,
                                             onAction = { action ->
-                                                handlePassDetailAction(selected.passId, pass?.description, action)
+                                                handlePassDetailAction(selected.passId, action)
                                             },
                                         )
                                     },
                                 )
-                            }
-                            entry<AppDestination.PassCode> { destination ->
-                                val pass = state.passes.firstOrNull { it.id == destination.passId }
-                                val context = LocalContext.current
-                                var hasCameraPermission by remember {
-                                    mutableStateOf(
-                                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                                            PackageManager.PERMISSION_GRANTED,
-                                    )
-                                }
-                                val permissionLauncher = rememberLauncherForActivityResult(
-                                    ActivityResultContracts.RequestPermission(),
-                                ) { granted -> hasCameraPermission = granted }
-                                val flashlightController = remember(hasCameraPermission) {
-                                    if (hasCameraPermission) AndroidFlashlightController(context.applicationContext) else null
-                                }
-                                DisposableEffect(flashlightController) {
-                                    onDispose { flashlightController?.close() }
-                                }
-                                val flashlightFlow = remember(flashlightController) {
-                                    flashlightController?.state ?: MutableStateFlow(FlashlightState())
-                                }
-                                val flashlight by flashlightFlow.collectAsStateWithLifecycle()
-                                var codeScale by rememberSaveable(destination.passId) { mutableFloatStateOf(0.82f) }
-                                if (pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
-                                    PassCodeScreen(
-                                        format = pass.barcodeFormat,
-                                        message = pass.barcodeMessage,
-                                        alternativeText = pass.barcodeAlternativeText,
-                                        codeScale = codeScale,
-                                        automaticBrightness = state.settings.automaticBrightness,
-                                        flashlightAvailable = flashlight.isAvailable || !hasCameraPermission,
-                                        flashlightEnabled = flashlight.isEnabled,
-                                        onAction = { action ->
-                                            when (action) {
-                                                CodeScreenAction.Back -> backStack.removeLastOrNull()
-                                                is CodeScreenAction.SetCodeScale -> codeScale = action.scale
-                                                CodeScreenAction.ResetCodeScale -> codeScale = 0.82f
-                                                is CodeScreenAction.SetFlashlightEnabled -> {
-                                                    if (action.enabled && !hasCameraPermission) {
-                                                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                                                    } else {
-                                                        flashlightController?.setEnabled(action.enabled)
-                                                    }
-                                                }
-                                            }
-                                        },
-                                    )
-                                } else {
-                                    LaunchedEffect(Unit) { backStack.removeLastOrNull() }
-                                }
                             }
                             entry<AppDestination.Timeline> {
                                 TimelineScreen(
@@ -329,21 +287,6 @@ class MainActivity : ComponentActivity() {
                                             EditPassAction.Back -> backStack.removeLastOrNull()
                                             is EditPassAction.Save -> {
                                                 viewModel.onAction(AppAction.SavePass(destination.passId, action.draft))
-                                                backStack.removeLastOrNull()
-                                            }
-                                        }
-                                    },
-                                )
-                            }
-                            entry<AppDestination.CreatePass> {
-                                EditPassScreen(
-                                    pass = null,
-                                    isNew = true,
-                                    onAction = { action ->
-                                        when (action) {
-                                            EditPassAction.Back -> backStack.removeLastOrNull()
-                                            is EditPassAction.Save -> {
-                                                viewModel.onAction(AppAction.CreatePass(action.draft))
                                                 backStack.removeLastOrNull()
                                             }
                                         }

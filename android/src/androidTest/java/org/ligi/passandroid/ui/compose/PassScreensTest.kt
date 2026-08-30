@@ -1,7 +1,6 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.DeviceConfigurationOverride
@@ -16,7 +15,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import org.junit.Rule
 import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
@@ -46,7 +44,7 @@ class PassScreensTest {
         composeRule.mainClock.advanceTimeBy(1_000)
 
         composeRule.onNodeWithText("Your passes live here").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Import pass").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Import passes").assertIsDisplayed()
     }
 
     @Test
@@ -111,17 +109,6 @@ class PassScreensTest {
         composeRule.onNodeWithText("Artwork").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Gate").assertIsDisplayed()
         composeRule.onNodeWithText("Add field").performScrollTo().assertIsDisplayed()
-    }
-
-    @Test
-    fun newPassEditorAcceptsADescription() {
-        composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { EditPassScreen(null, {}, isNew = true) }
-        }
-
-        composeRule.onNodeWithText("Create pass").assertIsDisplayed()
-        composeRule.onNodeWithText("Description").performTextInput("Museum ticket")
-        composeRule.onNodeWithText("Save").performScrollTo().assertIsEnabled()
     }
 
     @Test
