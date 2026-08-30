@@ -29,7 +29,11 @@ class PassPrintDocumentAdapterTest {
             fields = listOf(PrintableField("Seat", "12A")),
         )
         val adapter = PassPrintDocumentAdapter(context, pass, "Print test")
-        val attributes = PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build()
+        val attributes = PrintAttributes.Builder()
+            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .setResolution(PrintAttributes.Resolution("test", "Test", 300, 300))
+            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+            .build()
         val layoutCallback = mock(PrintDocumentAdapter.LayoutResultCallback::class.java)
         adapter.onLayout(attributes, attributes, CancellationSignal(), layoutCallback, Bundle())
 

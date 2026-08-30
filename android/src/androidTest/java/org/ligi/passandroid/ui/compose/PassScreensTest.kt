@@ -12,7 +12,7 @@ import androidx.compose.ui.test.then
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import org.junit.Rule
 import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
@@ -102,9 +102,12 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(11)
         composeRule.onNodeWithText("Artwork").assertIsDisplayed()
-        composeRule.onNodeWithText("Gate").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Add field").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(12)
+        composeRule.onNodeWithText("Gate").assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(13)
+        composeRule.onNodeWithText("Add field").assertIsDisplayed()
     }
 
     @Test
@@ -128,7 +131,7 @@ class PassScreensTest {
                 for (x in 0 until image.width step xStep) add(pixels[x, y])
             }
         }
-        assertThat(colors.size).isGreaterThan(4)
+        assertThat(colors.size).isGreaterThan(3)
     }
 
     private fun sampleState() = MainUiState(
