@@ -31,6 +31,16 @@ data class PassEvent(
     val temporalState: EventTemporalState,
 )
 
+data class NormalizedPassTimeSpan(val startsAt: Instant, val endsAt: Instant)
+
+fun PassSnapshot.normalizedTimeSpan(): NormalizedPassTimeSpan? {
+    val span = calendarTimeSpan ?: return null
+    val start = span.from ?: span.to?.minus(DefaultEventDuration) ?: return null
+    val rawEnd = span.to ?: start.plus(DefaultEventDuration)
+    val end = if (rawEnd.isBefore(start)) start else rawEnd
+    return NormalizedPassTimeSpan(start.toInstant(), end.toInstant())
+}
+
 data class TimelineDay(
     val date: LocalDate,
     val events: List<PassEvent>,
@@ -72,13 +82,9 @@ fun buildPassTimeline(
 }
 
 private fun PassSnapshot.toEvent(todayStart: Instant, tomorrowStart: Instant): PassEvent? {
-    val span = calendarTimeSpan ?: return null
-    val start = span.from ?: span.to?.minus(DefaultEventDuration) ?: return null
-    val rawEnd = span.to ?: start.plus(DefaultEventDuration)
-    // Invalid source intervals collapse to one instant so all consumers receive an ordered span.
-    val end = if (rawEnd.isBefore(start)) start else rawEnd
-    val startInstant = start.toInstant()
-    val endInstant = end.toInstant()
+    val span = normalizedTimeSpan() ?: return null
+    val startInstant = span.startsAt
+    val endInstant = span.endsAt
     val temporalState = when {
         !endInstant.isAfter(todayStart) -> EventTemporalState.PAST
         !startInstant.isBefore(tomorrowStart) -> EventTemporalState.UPCOMING

@@ -25,11 +25,12 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
+import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.items
 import androidx.glance.GlanceTheme
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -60,14 +61,21 @@ class PassOverviewWidgetReceiver : GlanceAppWidgetReceiver() {
 @Composable
 private fun PassOverviewContent(selection: WidgetPassSelection) {
     val large = LocalSize.current.width >= ListWidget.width && LocalSize.current.height >= ListWidget.height
+    val context = LocalContext.current
+    val baseModifier = GlanceModifier
+        .fillMaxSize()
+        .background(GlanceTheme.colors.widgetBackground)
+        .padding(if (large) 20.dp else 16.dp)
+    val containerModifier = if (!large && selection.currentOrNext != null) {
+        baseModifier.clickable(actionStartActivity(openPassIntent(context, selection.currentOrNext.id)))
+    } else {
+        baseModifier
+    }
     Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(GlanceTheme.colors.widgetBackground)
-            .padding(if (large) 20.dp else 16.dp),
+        modifier = containerModifier,
     ) {
         Text(
-            text = if (large && selection.today.isNotEmpty()) "Today" else "Next pass",
+            text = if (large) "Active passes" else "Next pass",
             style = TextStyle(
                 color = GlanceTheme.colors.primary,
                 fontSize = 14.sp,
@@ -75,11 +83,15 @@ private fun PassOverviewContent(selection: WidgetPassSelection) {
             ),
         )
         Spacer(GlanceModifier.height(10.dp))
-        if (large && selection.today.isNotEmpty()) {
-            selection.today.take(3).forEachIndexed { index, pass ->
-                PassRow(pass)
-                if (index < selection.today.lastIndex.coerceAtMost(2)) {
-                    Spacer(GlanceModifier.height(8.dp))
+        if (large) {
+            if (selection.active.isEmpty()) {
+                EmptyWidget("No active passes")
+            } else {
+                LazyColumn(GlanceModifier.fillMaxSize()) {
+                    items(selection.active, itemId = { it.id.hashCode().toLong() }) { pass ->
+                        PassRow(pass)
+                        Spacer(GlanceModifier.height(8.dp))
+                    }
                 }
             }
         } else {
@@ -92,7 +104,6 @@ private fun PassOverviewContent(selection: WidgetPassSelection) {
                         fontSize = if (large) 22.sp else 18.sp,
                         fontWeight = FontWeight.Bold,
                     ),
-                    modifier = GlanceModifier.clickable(actionStartActivity(openPassIntent(LocalContext.current, pass.id))),
                 )
                 pass.subtitle()?.let { subtitle ->
                     Spacer(GlanceModifier.height(6.dp))

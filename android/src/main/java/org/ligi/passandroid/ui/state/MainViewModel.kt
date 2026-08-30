@@ -99,7 +99,7 @@ class MainViewModel(
                         .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
                         .mapTo(mutableSetOf()) { it.id }
                     runCatching {
-                        widgetPublisher?.publish(currentPasses, widgetExcludedIds, null)
+                        widgetPublisher?.publish(currentPasses, widgetExcludedIds)
                     }
                 }
         }

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_pass_overview_description">Today and next passes</string>
-    <string name="widget_quick_code_description">Open a selected pass code</string>
+    <string name="widget_pass_overview_description">Active and upcoming passes</string>
 </resources>

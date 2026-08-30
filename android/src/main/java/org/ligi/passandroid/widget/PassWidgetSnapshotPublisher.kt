@@ -3,6 +3,7 @@ package org.ligi.passandroid.widget
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import org.ligi.passandroid.repository.PassSnapshot
+import org.ligi.passandroid.domain.timeline.normalizedTimeSpan
 import java.time.Clock
 
 class PassWidgetSnapshotPublisher(
@@ -13,32 +14,29 @@ class PassWidgetSnapshotPublisher(
     suspend fun publish(
         passes: List<PassSnapshot>,
         excludedCategoryIds: Set<String>,
-        quickCodePassId: String?,
     ) {
         val widgetPasses = passes.asSequence()
             .filterNot { it.categoryId in excludedCategoryIds }
             .map { pass ->
+                val span = pass.normalizedTimeSpan()
                 WidgetPass(
                     id = pass.id,
                     title = pass.description.ifBlank { "Pass" },
-                    startsAtEpochMillis = pass.calendarTimeSpan?.from?.toInstant()?.toEpochMilli(),
-                    endsAtEpochMillis = pass.calendarTimeSpan?.to?.toInstant()?.toEpochMilli(),
+                    startsAtEpochMillis = span?.startsAt?.toEpochMilli(),
+                    endsAtEpochMillis = span?.endsAt?.toEpochMilli(),
                     location = pass.locations.firstNotNullOfOrNull { it.name?.takeIf(String::isNotBlank) },
                     supportingText = pass.fields.firstNotNullOfOrNull { field ->
                         field.value.takeIf { !field.hidden && it.isNotBlank() }
                     },
-                    hasCode = !pass.barcodeMessage.isNullOrBlank(),
                 )
             }
             .toList()
-        store.replace(
-            PassWidgetSnapshot(
-                passes = widgetPasses,
-                quickCodePassId = quickCodePassId,
-                generatedAtEpochMillis = clock.millis(),
-            ),
+        val snapshot = PassWidgetSnapshot(
+            passes = widgetPasses,
+            generatedAtEpochMillis = clock.millis(),
         )
+        store.replace(snapshot)
         PassOverviewWidget().updateAll(context)
-        QuickCodeWidget().updateAll(context)
+        scheduleNextWidgetRefresh(context, snapshot)
     }
 }

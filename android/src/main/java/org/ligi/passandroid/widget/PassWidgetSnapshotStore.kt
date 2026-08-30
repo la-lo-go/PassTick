@@ -39,7 +39,6 @@ class PassWidgetSnapshotStore(
     private fun encode(snapshot: PassWidgetSnapshot) = JSONObject().apply {
         put("version", FORMAT_VERSION)
         put("generatedAt", snapshot.generatedAtEpochMillis)
-        put("quickCodePassId", snapshot.quickCodePassId)
         put("passes", JSONArray().apply {
             snapshot.passes.forEach { pass ->
                 put(JSONObject().apply {
@@ -49,7 +48,6 @@ class PassWidgetSnapshotStore(
                     put("endsAt", pass.endsAtEpochMillis)
                     put("location", pass.location)
                     put("supportingText", pass.supportingText)
-                    put("hasCode", pass.hasCode)
                 })
             }
         })
@@ -70,14 +68,12 @@ class PassWidgetSnapshotStore(
                         endsAtEpochMillis = pass.optionalLong("endsAt"),
                         location = pass.optionalString("location"),
                         supportingText = pass.optionalString("supportingText"),
-                        hasCode = pass.optBoolean("hasCode"),
                     ),
                 )
             }
         }
         return PassWidgetSnapshot(
             passes = passes,
-            quickCodePassId = json.optionalString("quickCodePassId"),
             generatedAtEpochMillis = json.optLong("generatedAt"),
         )
     }
@@ -90,6 +86,6 @@ class PassWidgetSnapshotStore(
 
     private companion object {
         const val FILE_NAME = "pass-widget-snapshot-v1.json"
-        const val FORMAT_VERSION = 1
+        const val FORMAT_VERSION = 2
     }
 }

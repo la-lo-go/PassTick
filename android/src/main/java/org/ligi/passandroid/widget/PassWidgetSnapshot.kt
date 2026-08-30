@@ -11,19 +11,17 @@ data class WidgetPass(
     val endsAtEpochMillis: Long?,
     val location: String?,
     val supportingText: String?,
-    val hasCode: Boolean,
 )
 
 data class PassWidgetSnapshot(
     val passes: List<WidgetPass> = emptyList(),
-    val quickCodePassId: String? = null,
     val generatedAtEpochMillis: Long = 0L,
 )
 
 data class WidgetPassSelection(
     val currentOrNext: WidgetPass?,
     val today: List<WidgetPass>,
-    val quickCode: WidgetPass?,
+    val active: List<WidgetPass>,
 )
 
 fun PassWidgetSnapshot.select(
@@ -48,11 +46,26 @@ fun PassWidgetSnapshot.select(
         .filter { pass -> (pass.endsAtEpochMillis ?: Long.MAX_VALUE) >= nowMillis }
         .take(todayLimit)
         .toList()
+    val active = ordered.filter { pass ->
+        val end = pass.endsAtEpochMillis ?: pass.startsAtEpochMillis
+        end == null || end >= nowMillis
+    }
     return WidgetPassSelection(
         currentOrNext = currentOrNext,
         today = today,
-        quickCode = quickCodePassId?.let { id -> passes.firstOrNull { it.id == id && it.hasCode } },
+        active = active,
     )
+}
+
+fun PassWidgetSnapshot.nextRefreshAt(now: Instant, zoneId: ZoneId): Instant {
+    val nowMillis = now.toEpochMilli()
+    val nextMidnight = now.atZone(zoneId).toLocalDate().plusDays(1).atStartOfDay(zoneId).toInstant()
+    val eventBoundary = passes.asSequence()
+        .flatMap { sequenceOf(it.startsAtEpochMillis, it.endsAtEpochMillis).filterNotNull() }
+        .filter { it > nowMillis }
+        .minOrNull()
+        ?.let { Instant.ofEpochMilli(it + 1) }
+    return listOfNotNull(nextMidnight, eventBoundary).minOrNull() ?: nextMidnight
 }
 
 private fun WidgetPass.occursOn(date: LocalDate, zoneId: ZoneId): Boolean {

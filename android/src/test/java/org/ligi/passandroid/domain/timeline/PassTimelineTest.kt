@@ -80,6 +80,28 @@ class PassTimelineTest {
         assertThat(next.location).isEqualTo("Platform 4")
     }
 
+    @Test
+    fun `normalizes an end-only event to the default duration`() {
+        val end = ZonedDateTime.parse("2026-08-30T12:00:00Z")
+        val snapshot = pass("end-only", "2026-08-30T10:00:00Z", "2026-08-30T12:00:00Z").copy(
+            calendarTimeSpan = PassTimeSpanSnapshot(from = null, to = end),
+        )
+
+        val normalized = snapshot.normalizedTimeSpan()
+
+        assertThat(normalized?.startsAt).isEqualTo(end.minusHours(2).toInstant())
+        assertThat(normalized?.endsAt).isEqualTo(end.toInstant())
+    }
+
+    @Test
+    fun `clamps an inverted event to its start`() {
+        val snapshot = pass("inverted", "2026-08-30T12:00:00Z", "2026-08-30T10:00:00Z")
+
+        val normalized = snapshot.normalizedTimeSpan()
+
+        assertThat(normalized?.endsAt).isEqualTo(normalized?.startsAt)
+    }
+
     private fun pass(id: String, start: String, end: String, location: String? = null) = PassSnapshot(
         id = id,
         description = "Event $id",
