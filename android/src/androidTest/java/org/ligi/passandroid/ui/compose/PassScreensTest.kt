@@ -2,6 +2,7 @@ package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.DarkMode
 import androidx.compose.ui.test.FontScale
@@ -16,6 +17,8 @@ import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.theme.PassTheme
@@ -30,7 +33,7 @@ class PassScreensTest {
     fun emptyListShowsImportAction() {
         composeRule.setContent {
             PassTheme(AppSettings().themeMode) {
-                PassListScreen(MainUiState(), {}, {}, {}, {}, {})
+                PassListScreen(MainUiState(), {})
             }
         }
         composeRule.mainClock.advanceTimeBy(1_000)
@@ -43,7 +46,7 @@ class PassScreensTest {
     fun settingsExposeThemeAndAccessibilityOptions() {
         composeRule.setContent {
             PassTheme(AppSettings().themeMode) {
-                SettingsScreen(AppSettings(), {}, {})
+                SettingsScreen(AppSettings(), {})
             }
         }
 
@@ -59,13 +62,12 @@ class PassScreensTest {
                     .then(DeviceConfigurationOverride.FontScale(1.3f))
                     .then(DeviceConfigurationOverride.DarkMode(false)),
             ) {
-                PassTheme(ThemeMode.SYSTEM) { PassListScreen(sampleState(), {}, {}, {}, {}, {}) }
+                PassTheme(ThemeMode.SYSTEM) { PassListScreen(sampleState(), {}) }
             }
         }
 
         val image = composeRule.onRoot().captureToImage()
-        assertThat(image.width).isGreaterThan(0)
-        assertThat(image.height).isGreaterThan(0)
+        assertVisualContent(image)
         composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
     }
 
@@ -77,15 +79,55 @@ class PassScreensTest {
                     .then(DeviceConfigurationOverride.FontScale(1.8f))
                     .then(DeviceConfigurationOverride.DarkMode(true)),
             ) {
-                PassTheme(ThemeMode.SYSTEM) { PassListScreen(sampleState(), {}, {}, {}, {}, {}) }
+                PassTheme(ThemeMode.SYSTEM) { PassListScreen(sampleState(), {}) }
             }
         }
 
         val image = composeRule.onRoot().captureToImage()
-        assertThat(image.width).isGreaterThan(0)
-        assertThat(image.height).isGreaterThan(0)
+        assertVisualContent(image)
         composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
         composeRule.onNodeWithText("Event ticket").assertIsDisplayed()
+    }
+
+    @Test
+    fun editorExposesPassFieldsBarcodeAndArtwork() {
+        val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
+            barcodeFormat = PassBarCodeFormat.QR_CODE,
+            barcodeMessage = "payload",
+            fields = listOf(PassFieldUiModel("gate", "Gate", "A12", false, null)),
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass, {}) }
+        }
+
+        composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
+        composeRule.onNodeWithText("Artwork").assertIsDisplayed()
+        composeRule.onNodeWithText("Gate").assertIsDisplayed()
+        composeRule.onNodeWithText("Add field").assertIsDisplayed()
+    }
+
+    @Test
+    fun passFinderUsesTheDocumentProvider() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { ScannerScreen({}) }
+        }
+
+        composeRule.onNodeWithText("Select pass files").assertIsDisplayed()
+        composeRule.onNodeWithText("Select one or more pass files from this device or a document provider.").assertIsDisplayed()
+    }
+
+    private fun assertVisualContent(image: androidx.compose.ui.graphics.ImageBitmap) {
+        assertThat(image.width).isGreaterThan(0)
+        assertThat(image.height).isGreaterThan(0)
+        val pixels = image.toPixelMap()
+        val colors = buildSet {
+            val xStep = maxOf(1, image.width / 20)
+            val yStep = maxOf(1, image.height / 20)
+            for (y in 0 until image.height step yStep) {
+                for (x in 0 until image.width step xStep) add(pixels[x, y])
+            }
+        }
+        assertThat(colors.size).isGreaterThan(4)
     }
 
     private fun sampleState() = MainUiState(
