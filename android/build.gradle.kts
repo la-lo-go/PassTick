@@ -85,6 +85,8 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.coroutines.android)
     implementation(libs.datastore.preferences)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
     implementation(libs.kotlinx.serialization.core)

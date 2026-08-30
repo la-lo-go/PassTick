@@ -12,6 +12,7 @@ sealed interface PassDetailAction {
     data object Print : PassDetailAction
     data object AddToCalendar : PassDetailAction
     data object OpenCode : PassDetailAction
+    data object UseForQuickCodeWidget : PassDetailAction
     data class OpenLocation(val index: Int) : PassDetailAction
     data class MoveToCategory(val categoryId: String) : PassDetailAction
 }

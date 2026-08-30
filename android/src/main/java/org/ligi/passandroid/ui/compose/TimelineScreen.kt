@@ -32,6 +32,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,7 +40,6 @@ import org.ligi.passandroid.domain.timeline.EventTemporalState
 import org.ligi.passandroid.domain.timeline.PassEvent
 import org.ligi.passandroid.domain.timeline.PassTimeline
 import org.threeten.bp.format.DateTimeFormatter
-import java.util.Locale
 
 @Immutable
 data class TimelineUiState(
@@ -96,6 +96,8 @@ private fun TimelineContent(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    val locale = LocalConfiguration.current.locales[0]
+    val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM", locale) }
     val nearestIndex = remember(state.timeline.days, state.timeline.nearestEventId) {
         state.timeline.nearestEventId?.let { nearestId ->
             var itemIndex = 0
@@ -121,7 +123,7 @@ private fun TimelineContent(
         state.timeline.days.forEach { day ->
             item(key = "day:${day.date}") {
                 Text(
-                    text = day.date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())),
+                    text = day.date.format(dayFormatter),
                     modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,

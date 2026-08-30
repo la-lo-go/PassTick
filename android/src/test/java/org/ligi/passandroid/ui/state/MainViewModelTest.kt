@@ -151,7 +151,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.categories.map { it.id }).contains("new", "archive")
-        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo("new")
+        assertThat(viewModel.uiState.value.selectedCategoryId).isNull()
 
         viewModel.onAction(AppAction.SelectCategory("archive"))
         viewModel.onAction(AppAction.MovePass("new-pass", "archive"))
@@ -261,4 +261,5 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setOfferCalendarAfterImport(value: Boolean) = Unit
     override suspend fun setRemindersEnabled(value: Boolean) = Unit
     override suspend fun setDefaultReminderMinutes(value: Int) = Unit
+    override suspend fun setQuickCodePassId(value: String?) = Unit
 }

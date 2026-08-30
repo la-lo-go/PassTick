@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -29,7 +30,8 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.ligi.passandroid.navigation.AppDestination
-import org.ligi.passandroid.navigation.passIdOrNull
+import org.ligi.passandroid.navigation.PassDeepLinkRequest
+import org.ligi.passandroid.navigation.passDeepLinkRequestOrNull
 import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
@@ -53,19 +55,20 @@ import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.platform.AndroidFlashlightController
 import org.ligi.passandroid.platform.FlashlightState
 import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.ui.adaptive.AdaptivePassListDetailShell
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModel()
-    private val deepLinkedPassId = MutableStateFlow<String?>(null)
+    private val deepLinkRequest = MutableStateFlow<PassDeepLinkRequest?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        deepLinkedPassId.value = intent.data?.passIdOrNull()
+        deepLinkRequest.value = intent.data?.passDeepLinkRequestOrNull()
         if (savedInstanceState == null) importFrom(intent)
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
-            val requestedPassId by deepLinkedPassId.collectAsStateWithLifecycle()
+            val requestedPass by deepLinkRequest.collectAsStateWithLifecycle()
             val backStack = rememberNavBackStack(AppDestination.PassList)
             val snackbarHostState = remember { SnackbarHostState() }
             val undoCategories = remember { mutableMapOf<String, String>() }
@@ -80,6 +83,79 @@ class MainActivity : ComponentActivity() {
                 if (uri != null && id != null) viewModel.onAction(AppAction.Export(id, uri))
                 pendingExportId = null
             }
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { granted -> viewModel.onAction(AppAction.SetRemindersEnabled(granted)) }
+
+            fun handleHomeAction(action: HomeAction) {
+                when (action) {
+                    is HomeAction.OpenPass -> backStack.add(AppDestination.PassDetail(action.id))
+                    is HomeAction.SelectCategory -> viewModel.onAction(AppAction.SelectCategory(action.categoryId))
+                    is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
+                    is HomeAction.Archive -> {
+                        state.passes.firstOrNull { it.id == action.id }?.let {
+                            undoCategories["archive:${action.id}"] = it.categoryId
+                        }
+                        state.categories.firstOrNull { it.role == PassCategoryRole.ARCHIVE }?.let {
+                            viewModel.onAction(AppAction.MovePass(action.id, it.id))
+                        }
+                    }
+                    is HomeAction.Restore -> {
+                        state.passes.firstOrNull { it.id == action.id }?.let {
+                            undoCategories["restore:${action.id}"] = it.categoryId
+                        }
+                        state.categories.firstOrNull { it.role == PassCategoryRole.INBOX }?.let {
+                            viewModel.onAction(AppAction.MovePass(action.id, it.id))
+                        }
+                    }
+                    is HomeAction.Delete -> {
+                        state.passes.firstOrNull { it.id == action.id }?.let {
+                            undoCategories["delete:${action.id}"] = it.categoryId
+                        }
+                        state.categories.firstOrNull { it.role == PassCategoryRole.TRASH }?.let {
+                            viewModel.onAction(AppAction.MovePass(action.id, it.id))
+                        }
+                    }
+                    is HomeAction.Undo -> {
+                        val key = when (action.operation) {
+                            is UndoOperation.Archive -> "archive:${action.operation.passId}"
+                            is UndoOperation.Restore -> "restore:${action.operation.passId}"
+                            is UndoOperation.Delete -> "delete:${action.operation.passId}"
+                        }
+                        undoCategories.remove(key)?.let { categoryId ->
+                            viewModel.onAction(AppAction.MovePass(action.operation.passId, categoryId))
+                        }
+                    }
+                    HomeAction.CreatePass -> backStack.add(AppDestination.CreatePass)
+                    HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
+                    HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
+                    HomeAction.OpenTimeline -> backStack.add(AppDestination.Timeline)
+                }
+            }
+
+            fun handlePassDetailAction(passId: String, passDescription: String?, action: PassDetailAction) {
+                when (action) {
+                    PassDetailAction.Back -> backStack.removeLastOrNull()
+                    PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(passId))
+                    PassDetailAction.Delete -> {
+                        viewModel.onAction(AppAction.DeletePass(passId))
+                        backStack.removeLastOrNull()
+                    }
+                    PassDetailAction.Export -> {
+                        pendingExportId = passId
+                        exportLauncher.launch("${passDescription ?: "pass"}.espass")
+                    }
+                    PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(passId))
+                    PassDetailAction.Print -> viewModel.onAction(AppAction.PrintPass(passId))
+                    PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
+                    PassDetailAction.OpenCode -> backStack.add(AppDestination.PassCode(passId))
+                    PassDetailAction.UseForQuickCodeWidget -> viewModel.onAction(AppAction.SetQuickCodePass(passId))
+                    is PassDetailAction.OpenLocation -> viewModel.onAction(AppAction.OpenLocation(passId, action.index))
+                    is PassDetailAction.MoveToCategory -> viewModel.onAction(
+                        AppAction.MovePass(passId, action.categoryId),
+                    )
+                }
+            }
 
             LaunchedEffect(state.message) {
                 state.message?.let {
@@ -87,11 +163,24 @@ class MainActivity : ComponentActivity() {
                     viewModel.onAction(AppAction.ClearMessage)
                 }
             }
-            LaunchedEffect(requestedPassId, state.passes) {
-                val passId = requestedPassId ?: return@LaunchedEffect
-                if (state.passes.any { it.id == passId }) {
-                    backStack.add(AppDestination.PassDetail(passId))
-                    deepLinkedPassId.value = null
+            LaunchedEffect(requestedPass, state.passes) {
+                val request = requestedPass ?: return@LaunchedEffect
+                if (state.passes.any { it.id == request.passId }) {
+                    backStack.add(
+                        if (request.showCode) AppDestination.PassCode(request.passId)
+                        else AppDestination.PassDetail(request.passId),
+                    )
+                    deepLinkRequest.value = null
+                }
+            }
+            LaunchedEffect(state.settings.remindersEnabled) {
+                if (
+                    state.settings.remindersEnabled &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    viewModel.onAction(AppAction.SetRemindersEnabled(false))
                 }
             }
 
@@ -105,83 +194,36 @@ class MainActivity : ComponentActivity() {
                                 PassHomeScreen(
                                     state = state,
                                     showTodayHero = state.settings.highlightTodayPasses,
-                                    onAction = { action ->
-                                        when (action) {
-                                            is HomeAction.OpenPass -> backStack.add(AppDestination.PassDetail(action.id))
-                                            is HomeAction.SelectCategory -> viewModel.onAction(
-                                                AppAction.SelectCategory(action.categoryId),
-                                            )
-                                            is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
-                                            is HomeAction.Archive -> {
-                                                state.passes.firstOrNull { it.id == action.id }?.let {
-                                                    undoCategories["archive:${action.id}"] = it.categoryId
-                                                }
-                                                state.categories.firstOrNull { it.role == PassCategoryRole.ARCHIVE }?.let {
-                                                    viewModel.onAction(AppAction.MovePass(action.id, it.id))
-                                                }
-                                            }
-                                            is HomeAction.Restore -> {
-                                                state.passes.firstOrNull { it.id == action.id }?.let {
-                                                    undoCategories["restore:${action.id}"] = it.categoryId
-                                                }
-                                                state.categories.firstOrNull { it.role == PassCategoryRole.INBOX }?.let {
-                                                    viewModel.onAction(AppAction.MovePass(action.id, it.id))
-                                                }
-                                            }
-                                            is HomeAction.Delete -> {
-                                                state.passes.firstOrNull { it.id == action.id }?.let {
-                                                    undoCategories["delete:${action.id}"] = it.categoryId
-                                                }
-                                                state.categories.firstOrNull { it.role == PassCategoryRole.TRASH }?.let {
-                                                    viewModel.onAction(AppAction.MovePass(action.id, it.id))
-                                                }
-                                            }
-                                            is HomeAction.Undo -> {
-                                                val key = when (action.operation) {
-                                                    is UndoOperation.Archive -> "archive:${action.operation.passId}"
-                                                    is UndoOperation.Restore -> "restore:${action.operation.passId}"
-                                                    is UndoOperation.Delete -> "delete:${action.operation.passId}"
-                                                }
-                                                undoCategories.remove(key)?.let { categoryId ->
-                                                    viewModel.onAction(AppAction.MovePass(action.operation.passId, categoryId))
-                                                }
-                                            }
-                                            HomeAction.CreatePass -> backStack.add(AppDestination.CreatePass)
-                                            HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
-                                            HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
-                                            HomeAction.OpenTimeline -> backStack.add(AppDestination.Timeline)
-                                        }
-                                    },
+                                    onAction = ::handleHomeAction,
                                 )
                             }
                             entry<AppDestination.PassDetail> { destination ->
-                                val pass = state.passes.firstOrNull { it.id == destination.passId }
-                                PassDetailScreen(
-                                    pass = pass,
-                                    categories = state.categories,
-                                    onAction = { action ->
-                                        when (action) {
-                                            PassDetailAction.Back -> backStack.removeLastOrNull()
-                                            PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(destination.passId))
-                                            PassDetailAction.Delete -> {
-                                                viewModel.onAction(AppAction.DeletePass(destination.passId))
-                                                backStack.removeLastOrNull()
-                                            }
-                                            PassDetailAction.Export -> {
-                                                pendingExportId = destination.passId
-                                                exportLauncher.launch("${pass?.description ?: "pass"}.espass")
-                                            }
-                                            PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(destination.passId))
-                                            PassDetailAction.Print -> viewModel.onAction(AppAction.PrintPass(destination.passId))
-                                            PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(destination.passId))
-                                            PassDetailAction.OpenCode -> backStack.add(AppDestination.PassCode(destination.passId))
-                                            is PassDetailAction.OpenLocation -> viewModel.onAction(
-                                                AppAction.OpenLocation(destination.passId, action.index),
-                                            )
-                                            is PassDetailAction.MoveToCategory -> viewModel.onAction(
-                                                AppAction.MovePass(destination.passId, action.categoryId),
-                                            )
-                                        }
+                                AdaptivePassListDetailShell(
+                                    selectedDestination = destination,
+                                    listPane = {
+                                        PassHomeScreen(
+                                            state = state,
+                                            showTodayHero = state.settings.highlightTodayPasses,
+                                            onAction = { action ->
+                                                if (action is HomeAction.OpenPass) {
+                                                    backStack.removeLastOrNull()
+                                                    backStack.add(AppDestination.PassDetail(action.id))
+                                                } else {
+                                                    handleHomeAction(action)
+                                                }
+                                            },
+                                        )
+                                    },
+                                    detailPane = { selected ->
+                                        val pass = state.passes.firstOrNull { it.id == selected.passId }
+                                        PassDetailScreen(
+                                            pass = pass,
+                                            categories = state.categories,
+                                            quickCodePassId = state.settings.quickCodePassId,
+                                            onAction = { action ->
+                                                handlePassDetailAction(selected.passId, pass?.description, action)
+                                            },
+                                        )
                                     },
                                 )
                             }
@@ -299,9 +341,21 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetOfferCalendarAfterImport -> viewModel.onAction(
                                             AppAction.SetOfferCalendarAfterImport(action.value),
                                         )
-                                        is SettingsAction.SetRemindersEnabled -> viewModel.onAction(
-                                            AppAction.SetRemindersEnabled(action.value),
-                                        )
+                                        is SettingsAction.SetRemindersEnabled -> {
+                                            if (!action.value) {
+                                                viewModel.onAction(AppAction.SetRemindersEnabled(false))
+                                            } else if (
+                                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                ContextCompat.checkSelfPermission(
+                                                    this@MainActivity,
+                                                    Manifest.permission.POST_NOTIFICATIONS,
+                                                ) != PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            } else {
+                                                viewModel.onAction(AppAction.SetRemindersEnabled(true))
+                                            }
+                                        }
                                         is SettingsAction.SetDefaultReminderMinutes -> viewModel.onAction(
                                             AppAction.SetDefaultReminderMinutes(action.value),
                                         )
@@ -335,7 +389,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        deepLinkedPassId.value = intent.data?.passIdOrNull()
+        deepLinkRequest.value = intent.data?.passDeepLinkRequestOrNull()
         importFrom(intent)
     }
 

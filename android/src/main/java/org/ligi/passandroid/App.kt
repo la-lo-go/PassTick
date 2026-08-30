@@ -18,6 +18,9 @@ import org.ligi.passandroid.repository.FilePassRepository
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.SettingsRepository
 import org.ligi.passandroid.ui.state.MainViewModel
+import org.ligi.passandroid.reminder.AndroidReminderScheduler
+import org.ligi.passandroid.reminder.ReminderScheduler
+import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
 
 open class App : Application() {
 
@@ -31,7 +34,9 @@ open class App : Application() {
             single<PassRepository> { FilePassRepository(this@App, get(), get()) }
             single<SettingsRepository> { DataStoreSettingsRepository(this@App) }
             single<PlatformActions> { AndroidPlatformActions(this@App) }
-            viewModel { MainViewModel(get(), get(), get()) }
+            single<ReminderScheduler> { AndroidReminderScheduler(this@App) }
+            single { PassWidgetSnapshotPublisher(this@App) }
+            viewModel { MainViewModel(get(), get(), get(), get(), get()) }
         }
     }
 

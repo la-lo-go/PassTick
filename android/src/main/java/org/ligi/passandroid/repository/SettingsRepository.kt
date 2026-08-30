@@ -42,6 +42,7 @@ data class AppSettings(
     val offerCalendarAfterImport: Boolean = false,
     val remindersEnabled: Boolean = false,
     val defaultReminderMinutes: Int = 60,
+    val quickCodePassId: String? = null,
 )
 
 interface SettingsRepository {
@@ -57,6 +58,7 @@ interface SettingsRepository {
     suspend fun setOfferCalendarAfterImport(value: Boolean)
     suspend fun setRemindersEnabled(value: Boolean)
     suspend fun setDefaultReminderMinutes(value: Int)
+    suspend fun setQuickCodePassId(value: String?)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -76,6 +78,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             offerCalendarAfterImport = preferences[OFFER_CALENDAR] ?: false,
             remindersEnabled = preferences[REMINDERS_ENABLED] ?: false,
             defaultReminderMinutes = (preferences[REMINDER_MINUTES] ?: 60).coerceIn(0, 10_080),
+            quickCodePassId = preferences[QUICK_CODE_PASS_ID],
         )
     }
 
@@ -92,6 +95,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setOfferCalendarAfterImport(value: Boolean) = update(OFFER_CALENDAR, value)
     override suspend fun setRemindersEnabled(value: Boolean) = update(REMINDERS_ENABLED, value)
     override suspend fun setDefaultReminderMinutes(value: Int) = update(REMINDER_MINUTES, value.coerceIn(0, 10_080))
+    override suspend fun setQuickCodePassId(value: String?) {
+        context.settingsDataStore.edit { preferences ->
+            if (value == null) preferences.remove(QUICK_CODE_PASS_ID) else preferences[QUICK_CODE_PASS_ID] = value
+        }
+    }
 
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
@@ -108,6 +116,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val OFFER_CALENDAR = booleanPreferencesKey("offer_calendar_after_import")
         val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
         val REMINDER_MINUTES = intPreferencesKey("default_reminder_minutes")
+        val QUICK_CODE_PASS_ID = stringPreferencesKey("quick_code_pass_id")
     }
 }
 

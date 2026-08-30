@@ -92,6 +92,7 @@ import java.util.UUID
 fun PassDetailScreen(
     pass: PassUiModel?,
     categories: List<PassCategory> = emptyList(),
+    quickCodePassId: String? = null,
     onAction: (PassDetailAction) -> Unit,
 ) {
     var moveMenuOpen by remember { mutableStateOf(false) }
@@ -153,6 +154,16 @@ fun PassDetailScreen(
                 }
                 pass.calendarEvent?.let {
                     item { Button(onClick = { onAction(PassDetailAction.AddToCalendar) }, Modifier.fillMaxWidth()) { Text("Add to calendar") } }
+                }
+                if (!pass.barcodeMessage.isNullOrBlank()) {
+                    item {
+                        FilledTonalButton(
+                            onClick = { onAction(PassDetailAction.UseForQuickCodeWidget) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (quickCodePassId == pass.id) "Quick code widget pass" else "Use in quick code widget")
+                        }
+                    }
                 }
                 items(pass.locations.size) { index ->
                     val location = pass.locations[index]

@@ -26,11 +26,16 @@ import org.threeten.bp.Instant
 import org.threeten.bp.ZoneId
 import org.ligi.passandroid.domain.timeline.EventTemporalState
 import org.ligi.passandroid.domain.timeline.buildPassTimeline
+import org.ligi.passandroid.reminder.ReminderScheduler
+import org.ligi.passandroid.reminder.buildPassReminders
+import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
 
 class MainViewModel(
     private val passRepository: PassRepository,
     private val settingsRepository: SettingsRepository,
     private val platformActions: PlatformActions,
+    private val reminderScheduler: ReminderScheduler = ReminderScheduler.None,
+    private val widgetPublisher: PassWidgetSnapshotPublisher? = null,
 ) : ViewModel() {
     private val busy = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
@@ -57,17 +62,37 @@ class MainViewModel(
         viewModelScope.launch {
             combine(passes, settingsRepository.settings) { currentPasses, settings -> currentPasses to settings }
                 .collectLatest { (currentPasses, settings) ->
-                    if (!settings.automaticallyMarkPast) return@collectLatest
-                    val pastCategoryId = settings.categories.firstOrNull { it.role == PassCategoryRole.PAST }?.id
-                        ?: return@collectLatest
-                    val excludedRoles = setOf(PassCategoryRole.PAST, PassCategoryRole.ARCHIVE, PassCategoryRole.TRASH)
-                    val excludedIds = settings.categories.filter { it.role in excludedRoles }.mapTo(mutableSetOf()) { it.id }
-                    val pastPassIds = buildPassTimeline(currentPasses, Instant.now(), ZoneId.systemDefault()).days
-                        .flatMap { it.events }
-                        .filter { it.temporalState == EventTemporalState.PAST }
-                        .mapTo(mutableSetOf()) { it.pass.passId }
-                    currentPasses.filter { it.id in pastPassIds && it.categoryId !in excludedIds }.forEach { pass ->
-                        passRepository.moveToCategory(pass.id, pastCategoryId)
+                    val now = Instant.now()
+                    val timeline = buildPassTimeline(currentPasses, now, ZoneId.systemDefault())
+                    if (settings.automaticallyMarkPast) {
+                        val pastCategoryId = settings.categories.firstOrNull { it.role == PassCategoryRole.PAST }?.id
+                        if (pastCategoryId != null) {
+                            val excludedRoles = setOf(
+                                PassCategoryRole.PAST,
+                                PassCategoryRole.ARCHIVE,
+                                PassCategoryRole.TRASH,
+                            )
+                            val excludedIds = settings.categories.filter { it.role in excludedRoles }
+                                .mapTo(mutableSetOf()) { it.id }
+                            val pastPassIds = timeline.days.flatMap { it.events }
+                                .filter { it.temporalState == EventTemporalState.PAST }
+                                .mapTo(mutableSetOf()) { it.pass.passId }
+                            currentPasses.filter { it.id in pastPassIds && it.categoryId !in excludedIds }
+                                .forEach { pass -> passRepository.moveToCategory(pass.id, pastCategoryId) }
+                        }
+                    }
+                    reminderScheduler.sync(
+                        if (settings.remindersEnabled) {
+                            buildPassReminders(timeline, now, settings.defaultReminderMinutes)
+                        } else {
+                            emptyList()
+                        },
+                    )
+                    val widgetExcludedIds = settings.categories
+                        .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
+                        .mapTo(mutableSetOf()) { it.id }
+                    runCatching {
+                        widgetPublisher?.publish(currentPasses, widgetExcludedIds, settings.quickCodePassId)
                     }
                 }
         }
@@ -155,6 +180,9 @@ class MainViewModel(
             }
             is AppAction.SetDefaultReminderMinutes -> viewModelScope.launch {
                 settingsRepository.setDefaultReminderMinutes(action.value)
+            }
+            is AppAction.SetQuickCodePass -> viewModelScope.launch {
+                settingsRepository.setQuickCodePassId(action.passId)
             }
             AppAction.ClearMessage -> message.value = null
         }
