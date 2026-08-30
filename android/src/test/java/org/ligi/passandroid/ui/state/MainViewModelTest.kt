@@ -262,4 +262,5 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setRemindersEnabled(value: Boolean) = Unit
     override suspend fun setDefaultReminderMinutes(value: Int) = Unit
     override suspend fun setQuickCodePassId(value: String?) = Unit
+    override suspend fun setReminderExcludedPassIds(value: Set<String>) = Unit
 }

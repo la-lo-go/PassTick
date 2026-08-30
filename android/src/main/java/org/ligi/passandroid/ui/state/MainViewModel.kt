@@ -84,6 +84,7 @@ class MainViewModel(
                     reminderScheduler.sync(
                         if (settings.remindersEnabled) {
                             buildPassReminders(timeline, now, settings.defaultReminderMinutes)
+                                .filterNot { it.passId in settings.reminderExcludedPassIds }
                         } else {
                             emptyList()
                         },
@@ -183,6 +184,11 @@ class MainViewModel(
             }
             is AppAction.SetQuickCodePass -> viewModelScope.launch {
                 settingsRepository.setQuickCodePassId(action.passId)
+            }
+            is AppAction.TogglePassReminder -> viewModelScope.launch {
+                val excluded = uiState.value.settings.reminderExcludedPassIds.toMutableSet()
+                if (!excluded.add(action.passId)) excluded.remove(action.passId)
+                settingsRepository.setReminderExcludedPassIds(excluded)
             }
             AppAction.ClearMessage -> message.value = null
         }

@@ -20,10 +20,20 @@ class DataStoreSettingsRepositoryTest {
             repository.setSortOrder(PassSortOrder.TYPE)
             val categories = defaultPassCategories + PassCategory("travel", "Travel", 0xFF006C4C)
             repository.setCategories(categories)
+            repository.setHighlightTodayPasses(false)
+            repository.setAutomaticallyMarkPast(true)
+            repository.setOfferCalendarAfterImport(true)
+            repository.setRemindersEnabled(true)
+            repository.setDefaultReminderMinutes(30)
+            repository.setQuickCodePassId("pass-1")
+            repository.setReminderExcludedPassIds(setOf("pass-2"))
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.condensedPasses && !it.automaticBrightness &&
-                    it.sortOrder == PassSortOrder.TYPE && it.categories == categories
+                    it.sortOrder == PassSortOrder.TYPE && it.categories == categories &&
+                    !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
+                    it.remindersEnabled && it.defaultReminderMinutes == 30 &&
+                    it.quickCodePassId == "pass-1" && it.reminderExcludedPassIds == setOf("pass-2")
             }
 
             assertThat(restored).isEqualTo(
@@ -33,6 +43,13 @@ class DataStoreSettingsRepositoryTest {
                     automaticBrightness = false,
                     sortOrder = PassSortOrder.TYPE,
                     categories = categories,
+                    highlightTodayPasses = false,
+                    automaticallyMarkPast = true,
+                    offerCalendarAfterImport = true,
+                    remindersEnabled = true,
+                    defaultReminderMinutes = 30,
+                    quickCodePassId = "pass-1",
+                    reminderExcludedPassIds = setOf("pass-2"),
                 ),
             )
         }

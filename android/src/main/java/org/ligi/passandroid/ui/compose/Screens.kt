@@ -93,6 +93,8 @@ fun PassDetailScreen(
     pass: PassUiModel?,
     categories: List<PassCategory> = emptyList(),
     quickCodePassId: String? = null,
+    remindersEnabled: Boolean = false,
+    passReminderEnabled: Boolean = false,
     onAction: (PassDetailAction) -> Unit,
 ) {
     var moveMenuOpen by remember { mutableStateOf(false) }
@@ -153,7 +155,26 @@ fun PassDetailScreen(
                     }
                 }
                 pass.calendarEvent?.let {
-                    item { Button(onClick = { onAction(PassDetailAction.AddToCalendar) }, Modifier.fillMaxWidth()) { Text("Add to calendar") } }
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { onAction(PassDetailAction.AddToCalendar) },
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Add to calendar") }
+                            FilledTonalButton(
+                                onClick = { onAction(PassDetailAction.ToggleReminder) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    when {
+                                        !remindersEnabled -> "Enable reminders"
+                                        passReminderEnabled -> "Reminder on"
+                                        else -> "Reminder off"
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
                 if (!pass.barcodeMessage.isNullOrBlank()) {
                     item {

@@ -139,5 +139,6 @@ sealed interface AppAction {
     data class SetRemindersEnabled(val value: Boolean) : AppAction
     data class SetDefaultReminderMinutes(val value: Int) : AppAction
     data class SetQuickCodePass(val passId: String?) : AppAction
+    data class TogglePassReminder(val passId: String) : AppAction
     data object ClearMessage : AppAction
 }

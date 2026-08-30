@@ -150,6 +150,13 @@ class MainActivity : ComponentActivity() {
                     PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
                     PassDetailAction.OpenCode -> backStack.add(AppDestination.PassCode(passId))
                     PassDetailAction.UseForQuickCodeWidget -> viewModel.onAction(AppAction.SetQuickCodePass(passId))
+                    PassDetailAction.ToggleReminder -> {
+                        if (state.settings.remindersEnabled) {
+                            viewModel.onAction(AppAction.TogglePassReminder(passId))
+                        } else {
+                            backStack.add(AppDestination.Settings)
+                        }
+                    }
                     is PassDetailAction.OpenLocation -> viewModel.onAction(AppAction.OpenLocation(passId, action.index))
                     is PassDetailAction.MoveToCategory -> viewModel.onAction(
                         AppAction.MovePass(passId, action.categoryId),
@@ -220,6 +227,9 @@ class MainActivity : ComponentActivity() {
                                             pass = pass,
                                             categories = state.categories,
                                             quickCodePassId = state.settings.quickCodePassId,
+                                            remindersEnabled = state.settings.remindersEnabled,
+                                            passReminderEnabled = state.settings.remindersEnabled &&
+                                                selected.passId !in state.settings.reminderExcludedPassIds,
                                             onAction = { action ->
                                                 handlePassDetailAction(selected.passId, pass?.description, action)
                                             },
@@ -280,7 +290,16 @@ class MainActivity : ComponentActivity() {
                             }
                             entry<AppDestination.Timeline> {
                                 TimelineScreen(
-                                    state = TimelineUiState(timeline = state.timeline),
+                                    state = TimelineUiState(
+                                        timeline = state.timeline,
+                                        reminderEventIds = if (state.settings.remindersEnabled) {
+                                            state.timeline.days.flatMap { it.events }
+                                                .filterNot { it.pass.passId in state.settings.reminderExcludedPassIds }
+                                                .mapTo(mutableSetOf()) { it.id }
+                                        } else {
+                                            emptySet()
+                                        },
+                                    ),
                                     onAction = { action ->
                                     when (action) {
                                         TimelineAction.Back -> backStack.removeLastOrNull()
@@ -289,7 +308,15 @@ class MainActivity : ComponentActivity() {
                                             .flatMap { it.events }
                                             .firstOrNull { it.id == action.eventId }
                                             ?.let { viewModel.onAction(AppAction.AddToCalendar(it.pass.passId)) }
-                                        is TimelineAction.ConfigureReminder -> backStack.add(AppDestination.Settings)
+                                        is TimelineAction.ConfigureReminder -> {
+                                            val event = state.timeline.days.flatMap { it.events }
+                                                .firstOrNull { it.id == action.eventId }
+                                            if (!state.settings.remindersEnabled) {
+                                                backStack.add(AppDestination.Settings)
+                                            } else if (event != null) {
+                                                viewModel.onAction(AppAction.TogglePassReminder(event.pass.passId))
+                                            }
+                                        }
                                     }
                                     },
                                 )

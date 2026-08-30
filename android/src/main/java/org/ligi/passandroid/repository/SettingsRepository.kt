@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -43,6 +44,7 @@ data class AppSettings(
     val remindersEnabled: Boolean = false,
     val defaultReminderMinutes: Int = 60,
     val quickCodePassId: String? = null,
+    val reminderExcludedPassIds: Set<String> = emptySet(),
 )
 
 interface SettingsRepository {
@@ -59,6 +61,7 @@ interface SettingsRepository {
     suspend fun setRemindersEnabled(value: Boolean)
     suspend fun setDefaultReminderMinutes(value: Int)
     suspend fun setQuickCodePassId(value: String?)
+    suspend fun setReminderExcludedPassIds(value: Set<String>)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -79,6 +82,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             remindersEnabled = preferences[REMINDERS_ENABLED] ?: false,
             defaultReminderMinutes = (preferences[REMINDER_MINUTES] ?: 60).coerceIn(0, 10_080),
             quickCodePassId = preferences[QUICK_CODE_PASS_ID],
+            reminderExcludedPassIds = preferences[REMINDER_EXCLUDED_PASS_IDS].orEmpty(),
         )
     }
 
@@ -100,6 +104,10 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             if (value == null) preferences.remove(QUICK_CODE_PASS_ID) else preferences[QUICK_CODE_PASS_ID] = value
         }
     }
+    override suspend fun setReminderExcludedPassIds(value: Set<String>) = update(
+        REMINDER_EXCLUDED_PASS_IDS,
+        value,
+    )
 
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
@@ -117,6 +125,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
         val REMINDER_MINUTES = intPreferencesKey("default_reminder_minutes")
         val QUICK_CODE_PASS_ID = stringPreferencesKey("quick_code_pass_id")
+        val REMINDER_EXCLUDED_PASS_IDS = stringSetPreferencesKey("reminder_excluded_pass_ids")
     }
 }
 

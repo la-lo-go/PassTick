@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -43,6 +44,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -67,6 +69,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,7 +107,7 @@ sealed interface UndoOperation {
     data class Delete(override val passId: String) : UndoOperation
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PassHomeScreen(
     state: MainUiState,
@@ -174,6 +177,13 @@ fun PassHomeScreen(
                             selectedId = state.selectedCategoryId,
                             onSelect = { onAction(HomeAction.SelectCategory(it)) },
                         )
+                    }
+                }
+                if (state.isBusy) {
+                    item(key = "loading") {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                            LoadingIndicator(Modifier.semantics { contentDescription = "Loading passes" })
+                        }
                     }
                 }
                 if (visiblePasses.isEmpty() && !state.isBusy) {
