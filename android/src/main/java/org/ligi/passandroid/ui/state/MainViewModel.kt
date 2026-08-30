@@ -12,6 +12,7 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.PassSnapshot
+import org.ligi.passandroid.repository.PassArtworkUpdate
 import org.ligi.passandroid.repository.SettingsRepository
 import org.threeten.bp.Duration
 import org.threeten.bp.LocalDateTime
@@ -87,6 +88,7 @@ class MainViewModel(
                         it.hint,
                     )
                 },
+                artworkUpdates = action.draft.artworkUpdates.map { PassArtworkUpdate(it.kind, it.uri) },
             ),
         )
     }

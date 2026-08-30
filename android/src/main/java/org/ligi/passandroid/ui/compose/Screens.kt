@@ -1,6 +1,7 @@
 package org.ligi.passandroid.ui.compose
 
 import android.net.Uri
+import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.LocalActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -72,9 +74,11 @@ import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
+import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassDraft
+import org.ligi.passandroid.ui.state.PassArtworkDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassUiModel
 
@@ -166,6 +170,7 @@ private fun PassCard(pass: PassUiModel, condensed: Boolean, modifier: Modifier, 
                 Spacer(Modifier.height(if (condensed) 2.dp else 8.dp))
                 Text(pass.type.name.replace('_', ' '), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
+            PassArtwork(pass, listOf(PassArtworkKind.LOGO, PassArtworkKind.THUMBNAIL), Modifier.size(88.dp))
         }
     }
 }
@@ -217,6 +222,13 @@ fun PassDetailScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                item {
+                    PassArtwork(
+                        pass,
+                        listOf(PassArtworkKind.STRIP, PassArtworkKind.LOGO, PassArtworkKind.THUMBNAIL),
+                        Modifier.fillMaxWidth().height(160.dp),
+                    )
+                }
                 item { BarcodeCard(pass) }
                 items(pass.fields.filterNot { it.hidden }) { field ->
                     ListItem(headlineContent = { Text(field.value) }, supportingContent = { Text(field.label) })
@@ -239,6 +251,16 @@ fun PassDetailScreen(
             }
         }
     }
+}
+
+@Composable
+private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>, modifier: Modifier) {
+    val artwork = preferredKinds.firstNotNullOfOrNull { kind -> pass.artwork.firstOrNull { it.kind == kind } }
+        ?: return
+    val bitmap = remember(artwork.bytes) {
+        BitmapFactory.decodeByteArray(artwork.bytes, 0, artwork.bytes.size)?.asImageBitmap()
+    } ?: return
+    Image(bitmap, "Pass artwork", modifier, contentScale = ContentScale.Fit)
 }
 
 @Composable
@@ -268,6 +290,15 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
     var fields by remember(pass?.id) { mutableStateOf(pass?.fields.orEmpty()) }
+    var artworkUpdates by remember(pass?.id) { mutableStateOf(emptyList<PassArtworkDraft>()) }
+    var pendingArtworkKind by remember { mutableStateOf<PassArtworkKind?>(null) }
+    val artworkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val kind = pendingArtworkKind
+        if (uri != null && kind != null) {
+            artworkUpdates = artworkUpdates.filterNot { it.kind == kind } + PassArtworkDraft(kind, uri)
+        }
+        pendingArtworkKind = null
+    }
     var typeMenuOpen by remember { mutableStateOf(false) }
     var barcodeMenuOpen by remember { mutableStateOf(false) }
     Scaffold(
@@ -307,6 +338,20 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
             }
             item { OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text("Barcode data") }, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text("Barcode text") }, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Text("Artwork", style = MaterialTheme.typography.titleMedium)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(PassArtworkKind.LOGO, PassArtworkKind.STRIP, PassArtworkKind.THUMBNAIL).forEach { kind ->
+                        OutlinedButton(
+                            onClick = {
+                                pendingArtworkKind = kind
+                                artworkLauncher.launch(arrayOf("image/*"))
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) { Text(kind.name.lowercase().replaceFirstChar(Char::uppercase)) }
+                    }
+                }
+            }
             items(fields.size) { index ->
                 val field = fields[index]
                 Card(Modifier.fillMaxWidth()) {
@@ -343,6 +388,7 @@ fun EditPassScreen(pass: PassUiModel?, onBack: () -> Unit, onSave: (PassDraft) -
                                 barcodeMessage,
                                 alternativeText,
                                 fields,
+                                artworkUpdates,
                             ),
                         )
                     },

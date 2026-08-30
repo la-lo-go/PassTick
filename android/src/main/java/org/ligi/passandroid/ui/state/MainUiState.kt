@@ -7,6 +7,7 @@ import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassSnapshot
+import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.functions.DEFAULT_EVENT_LENGTH_IN_HOURS
 import org.ligi.passandroid.platform.PlatformLocation
@@ -21,6 +22,8 @@ data class PassFieldUiModel(
     val hint: String?,
 )
 data class PassLocationUiModel(val name: String?, val latitude: Double, val longitude: Double)
+data class PassArtworkUiModel(val kind: PassArtworkKind, val bytes: ByteArray)
+data class PassArtworkDraft(val kind: PassArtworkKind, val uri: Uri)
 
 data class PassUiModel(
     val id: String,
@@ -34,6 +37,7 @@ data class PassUiModel(
     val fields: List<PassFieldUiModel>,
     val locations: List<PassLocationUiModel>,
     val calendarEvent: CalendarEvent?,
+    val artwork: List<PassArtworkUiModel> = emptyList(),
 ) {
     companion object {
         fun from(pass: PassSnapshot) = PassUiModel(
@@ -57,6 +61,7 @@ data class PassUiModel(
                     location = pass.locations.firstOrNull()?.name,
                 )
             },
+            artwork = pass.artwork.map { PassArtworkUiModel(it.kind, it.bytes) },
         )
     }
 
@@ -80,6 +85,7 @@ data class PassDraft(
     val barcodeMessage: String,
     val barcodeAlternativeText: String,
     val fields: List<PassFieldUiModel>,
+    val artworkUpdates: List<PassArtworkDraft> = emptyList(),
 )
 
 data class MainUiState(

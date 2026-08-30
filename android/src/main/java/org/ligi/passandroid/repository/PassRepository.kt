@@ -14,6 +14,7 @@ import org.ligi.passandroid.R
 import org.ligi.passandroid.Tracker
 import org.ligi.passandroid.functions.fromURI
 import org.ligi.passandroid.model.PassStore
+import org.ligi.passandroid.model.PassBitmapDefinitions
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
@@ -31,6 +32,15 @@ data class PassFieldSnapshot(
 )
 data class PassLocationSnapshot(val name: String?, val latitude: Double, val longitude: Double)
 data class PassTimeSpanSnapshot(val from: ZonedDateTime?, val to: ZonedDateTime?)
+enum class PassArtworkKind(val fileName: String) {
+    ICON(PassBitmapDefinitions.BITMAP_ICON),
+    LOGO(PassBitmapDefinitions.BITMAP_LOGO),
+    STRIP(PassBitmapDefinitions.BITMAP_STRIP),
+    THUMBNAIL(PassBitmapDefinitions.BITMAP_THUMBNAIL),
+    FOOTER(PassBitmapDefinitions.BITMAP_FOOTER),
+}
+data class PassArtworkSnapshot(val kind: PassArtworkKind, val bytes: ByteArray)
+data class PassArtworkUpdate(val kind: PassArtworkKind, val uri: Uri)
 
 data class PassSnapshot(
     val id: String,
@@ -44,6 +54,7 @@ data class PassSnapshot(
     val fields: List<PassFieldSnapshot>,
     val locations: List<PassLocationSnapshot>,
     val calendarTimeSpan: PassTimeSpanSnapshot?,
+    val artwork: List<PassArtworkSnapshot> = emptyList(),
 )
 
 data class PassUpdate(
@@ -55,6 +66,7 @@ data class PassUpdate(
     val barcodeMessage: String,
     val barcodeAlternativeText: String,
     val fields: List<PassFieldSnapshot>,
+    val artworkUpdates: List<PassArtworkUpdate> = emptyList(),
 )
 
 interface PassRepository {
@@ -107,7 +119,7 @@ class FilePassRepository(
             failure?.let { error(it) }
             val pass = requireNotNull(importedId?.let(passStore::getPassbookForId)) { "Imported pass is unreadable" }
             passStore.classifier.moveToTopic(pass, context.getString(R.string.topic_new))
-            pass.toSnapshot()
+            pass.toSnapshot(passStore.getPathForID(pass.id))
         }
     }
 
@@ -120,6 +132,14 @@ class FilePassRepository(
         pass.accentColor = update.accentColor
         pass.fields = update.fields.mapTo(mutableListOf()) {
             org.ligi.passandroid.model.pass.PassField(it.key, it.label, it.value, it.hidden, it.hint)
+        }
+        update.artworkUpdates.forEach { artwork ->
+            val target = File(passStore.getPathForID(id), artwork.kind.fileName + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES)
+            val bitmap = context.contentResolver.openInputStream(artwork.uri)?.use(android.graphics.BitmapFactory::decodeStream)
+                ?: error("Cannot decode the selected image")
+            target.outputStream().use { output ->
+                check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output))
+            }
         }
         pass.barCode = update.barcodeFormat?.let { format ->
             org.ligi.passandroid.model.pass.BarCode(format, update.barcodeMessage).apply {
@@ -161,10 +181,12 @@ class FilePassRepository(
         }
     }
 
-    private fun snapshot() = passStore.passMap.values.map(Pass::toSnapshot)
+    private fun snapshot() = passStore.passMap.values.map { pass ->
+        pass.toSnapshot(passStore.getPathForID(pass.id))
+    }
 }
 
-private fun Pass.toSnapshot() = PassSnapshot(
+private fun Pass.toSnapshot(path: File) = PassSnapshot(
     id = id,
     description = description.orEmpty(),
     creator = creator,
@@ -177,4 +199,10 @@ private fun Pass.toSnapshot() = PassSnapshot(
     locations = locations.map { PassLocationSnapshot(it.name, it.lat, it.lon) },
     calendarTimeSpan = calendarTimespan?.let { PassTimeSpanSnapshot(it.from, it.to) }
         ?: validTimespans?.firstOrNull()?.let { PassTimeSpanSnapshot(it.from, it.to) },
+    artwork = PassArtworkKind.entries.mapNotNull { kind ->
+        File(path, kind.fileName + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES)
+            .takeIf(File::isFile)
+            ?.readBytes()
+            ?.let { PassArtworkSnapshot(kind, it) }
+    },
 )
