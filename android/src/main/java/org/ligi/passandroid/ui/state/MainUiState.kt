@@ -16,6 +16,7 @@ import org.ligi.passandroid.platform.PlatformLocation
 import org.ligi.passandroid.platform.PrintableField
 import org.ligi.passandroid.platform.PrintablePass
 import org.threeten.bp.ZonedDateTime
+import org.ligi.passandroid.domain.timeline.PassTimeline
 
 data class PassFieldUiModel(
     val key: String?,
@@ -107,6 +108,7 @@ data class MainUiState(
     val message: String? = null,
     val categories: List<PassCategory> = emptyList(),
     val selectedCategoryId: String? = null,
+    val timeline: PassTimeline = PassTimeline.empty(),
 )
 
 sealed interface AppAction {
@@ -121,7 +123,7 @@ sealed interface AppAction {
     data class DeletePass(val id: String) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
     data class MovePass(val id: String, val categoryId: String) : AppAction
-    data class SelectCategory(val categoryId: String) : AppAction
+    data class SelectCategory(val categoryId: String?) : AppAction
     data class SaveCategory(val category: PassCategory) : AppAction
     data class DeleteCategory(val categoryId: String) : AppAction
     data class MoveCategory(val categoryId: String, val offset: Int) : AppAction
@@ -129,5 +131,10 @@ sealed interface AppAction {
     data class SetCondensedPasses(val value: Boolean) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
+    data class SetHighlightTodayPasses(val value: Boolean) : AppAction
+    data class SetAutomaticallyMarkPast(val value: Boolean) : AppAction
+    data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction
+    data class SetRemindersEnabled(val value: Boolean) : AppAction
+    data class SetDefaultReminderMinutes(val value: Int) : AppAction
     data object ClearMessage : AppAction
 }

@@ -2,7 +2,9 @@ package org.ligi.passandroid.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -10,6 +12,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.repository.ThemeMode
 
 private val LightColors = lightColorScheme(
@@ -22,6 +26,13 @@ private val DarkColors = darkColorScheme(
     primary = Color(0xFFB2C5FF),
     secondary = Color(0xFFB7C4EA),
     tertiary = Color(0xFFE7B9D9),
+)
+
+private val PassShapes = Shapes(
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp),
+    largeIncreased = RoundedCornerShape(36.dp),
 )
 
 @Composable
@@ -39,5 +50,10 @@ fun PassTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
     } else {
         LightColors
     }
-    MaterialTheme(colorScheme = colors, content = content)
+    MaterialExpressiveTheme(
+        colorScheme = colors,
+        motionScheme = MotionScheme.expressive(),
+        shapes = PassShapes,
+        content = content,
+    )
 }

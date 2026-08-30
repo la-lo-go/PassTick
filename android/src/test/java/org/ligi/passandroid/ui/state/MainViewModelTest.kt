@@ -256,4 +256,9 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setCategories(value: List<PassCategory>) {
         settings.value = settings.value.copy(categories = value)
     }
+    override suspend fun setHighlightTodayPasses(value: Boolean) = Unit
+    override suspend fun setAutomaticallyMarkPast(value: Boolean) = Unit
+    override suspend fun setOfferCalendarAfterImport(value: Boolean) = Unit
+    override suspend fun setRemindersEnabled(value: Boolean) = Unit
+    override suspend fun setDefaultReminderMinutes(value: Int) = Unit
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -36,6 +37,11 @@ data class AppSettings(
     val automaticBrightness: Boolean = true,
     val sortOrder: PassSortOrder = PassSortOrder.DATE_DESC,
     val categories: List<PassCategory> = defaultPassCategories,
+    val highlightTodayPasses: Boolean = true,
+    val automaticallyMarkPast: Boolean = false,
+    val offerCalendarAfterImport: Boolean = false,
+    val remindersEnabled: Boolean = false,
+    val defaultReminderMinutes: Int = 60,
 )
 
 interface SettingsRepository {
@@ -46,6 +52,11 @@ interface SettingsRepository {
     suspend fun setAutomaticBrightness(value: Boolean)
     suspend fun setSortOrder(value: PassSortOrder)
     suspend fun setCategories(value: List<PassCategory>)
+    suspend fun setHighlightTodayPasses(value: Boolean)
+    suspend fun setAutomaticallyMarkPast(value: Boolean)
+    suspend fun setOfferCalendarAfterImport(value: Boolean)
+    suspend fun setRemindersEnabled(value: Boolean)
+    suspend fun setDefaultReminderMinutes(value: Int)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -60,6 +71,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 ?: PassSortOrder.DATE_DESC,
             categories = preferences[CATEGORIES]?.let(::decodeCategories)?.let(::normalizeCategories)
                 ?: defaultPassCategories,
+            highlightTodayPasses = preferences[HIGHLIGHT_TODAY] ?: true,
+            automaticallyMarkPast = preferences[AUTO_MARK_PAST] ?: false,
+            offerCalendarAfterImport = preferences[OFFER_CALENDAR] ?: false,
+            remindersEnabled = preferences[REMINDERS_ENABLED] ?: false,
+            defaultReminderMinutes = (preferences[REMINDER_MINUTES] ?: 60).coerceIn(0, 10_080),
         )
     }
 
@@ -71,6 +87,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         CATEGORIES,
         encodeCategories(normalizeCategories(value)),
     )
+    override suspend fun setHighlightTodayPasses(value: Boolean) = update(HIGHLIGHT_TODAY, value)
+    override suspend fun setAutomaticallyMarkPast(value: Boolean) = update(AUTO_MARK_PAST, value)
+    override suspend fun setOfferCalendarAfterImport(value: Boolean) = update(OFFER_CALENDAR, value)
+    override suspend fun setRemindersEnabled(value: Boolean) = update(REMINDERS_ENABLED, value)
+    override suspend fun setDefaultReminderMinutes(value: Int) = update(REMINDER_MINUTES, value.coerceIn(0, 10_080))
 
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
@@ -82,6 +103,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val AUTOMATIC_BRIGHTNESS = booleanPreferencesKey("automatic_brightness")
         val SORT = stringPreferencesKey("sort_order")
         val CATEGORIES = stringPreferencesKey("categories")
+        val HIGHLIGHT_TODAY = booleanPreferencesKey("highlight_today_passes")
+        val AUTO_MARK_PAST = booleanPreferencesKey("automatically_mark_past")
+        val OFFER_CALENDAR = booleanPreferencesKey("offer_calendar_after_import")
+        val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
+        val REMINDER_MINUTES = intPreferencesKey("default_reminder_minutes")
     }
 }
 

@@ -13,6 +13,9 @@ The maintained application is a private, offline-first Android app for Android 1
 - Use JDK 17, Gradle 9.5, AGP 9.3, built-in Kotlin, `compileSdk` 37, `targetSdk` 36, and `minSdk` 29.
 - Use Kotlin DSL and the Gradle version catalog. Do not execute remote build scripts.
 - Use one Activity, Compose Material 3, Navigation 3, ViewModels, immutable UI state, explicit UI actions, `StateFlow`, and unidirectional data flow.
+- Keep Material 3 Expressive preview APIs behind the theme and design-system layer. Pin their exact version until the stable BOM includes them.
+- Treat homepage delete gestures as moves to Trash with undo. Reserve permanent deletion for an explicit confirmed action.
+- Derive the homepage Today section, timeline, calendar, and reminders from one temporal pass model with explicit time zones.
 - Keep Koin as the dependency injection framework.
 - Use app-private storage internally. Use `content://` URIs and the Storage Access Framework at process boundaries.
 - Open locations with a `geo:` intent. Do not embed a proprietary map SDK.

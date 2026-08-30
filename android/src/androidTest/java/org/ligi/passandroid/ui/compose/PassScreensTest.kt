@@ -114,16 +114,6 @@ class PassScreensTest {
     }
 
     @Test
-    fun passFinderUsesTheDocumentProvider() {
-        composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { ScannerScreen({}) }
-        }
-
-        composeRule.onNodeWithText("Select files").assertIsDisplayed()
-        composeRule.onNodeWithText("Select pass, image, or PDF files from this device or a document provider.").assertIsDisplayed()
-    }
-
-    @Test
     fun newPassEditorAcceptsADescription() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { EditPassScreen(null, {}, isNew = true) }

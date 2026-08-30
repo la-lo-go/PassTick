@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.ligi.passandroid.platform.PlatformActions
@@ -21,6 +22,10 @@ import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.SettingsRepository
 import org.threeten.bp.Duration
 import org.threeten.bp.LocalDateTime
+import org.threeten.bp.Instant
+import org.threeten.bp.ZoneId
+import org.ligi.passandroid.domain.timeline.EventTemporalState
+import org.ligi.passandroid.domain.timeline.buildPassTimeline
 
 class MainViewModel(
     private val passRepository: PassRepository,
@@ -29,21 +34,44 @@ class MainViewModel(
 ) : ViewModel() {
     private val busy = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
-    private val selectedCategoryId = MutableStateFlow(DEFAULT_PASS_CATEGORY_ID)
+    private val selectedCategoryId = MutableStateFlow<String?>(null)
+    private val passes = passRepository.observePasses()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val uiState = combine(passRepository.observePasses(), settingsRepository.settings, busy, message, selectedCategoryId) {
+    val uiState = combine(passes, settingsRepository.settings, busy, message, selectedCategoryId) {
             passes, settings, isBusy, currentMessage, requestedCategoryId ->
         val categories = settings.categories.withLegacyCategories(passes)
+        val timeline = buildPassTimeline(passes, Instant.now(), ZoneId.systemDefault())
         MainUiState(
             passes = passes.sortedWith(settings.sortOrder.snapshotComparator()).map(PassUiModel::from),
             settings = settings,
             isBusy = isBusy,
             message = currentMessage,
             categories = categories,
-            selectedCategoryId = requestedCategoryId.takeIf { requested -> categories.any { it.id == requested } }
-                ?: categories.firstOrNull()?.id,
+            selectedCategoryId = requestedCategoryId?.takeIf { requested -> categories.any { it.id == requested } },
+            timeline = timeline,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
+
+    init {
+        viewModelScope.launch {
+            combine(passes, settingsRepository.settings) { currentPasses, settings -> currentPasses to settings }
+                .collectLatest { (currentPasses, settings) ->
+                    if (!settings.automaticallyMarkPast) return@collectLatest
+                    val pastCategoryId = settings.categories.firstOrNull { it.role == PassCategoryRole.PAST }?.id
+                        ?: return@collectLatest
+                    val excludedRoles = setOf(PassCategoryRole.PAST, PassCategoryRole.ARCHIVE, PassCategoryRole.TRASH)
+                    val excludedIds = settings.categories.filter { it.role in excludedRoles }.mapTo(mutableSetOf()) { it.id }
+                    val pastPassIds = buildPassTimeline(currentPasses, Instant.now(), ZoneId.systemDefault()).days
+                        .flatMap { it.events }
+                        .filter { it.temporalState == EventTemporalState.PAST }
+                        .mapTo(mutableSetOf()) { it.pass.passId }
+                    currentPasses.filter { it.id in pastPassIds && it.categoryId !in excludedIds }.forEach { pass ->
+                        passRepository.moveToCategory(pass.id, pastCategoryId)
+                    }
+                }
+        }
+    }
 
     fun onAction(action: AppAction) {
         when (action) {
@@ -109,6 +137,21 @@ class MainViewModel(
                 settingsRepository.setAutomaticBrightness(action.value)
             }
             is AppAction.SetSortOrder -> viewModelScope.launch { settingsRepository.setSortOrder(action.value) }
+            is AppAction.SetHighlightTodayPasses -> viewModelScope.launch {
+                settingsRepository.setHighlightTodayPasses(action.value)
+            }
+            is AppAction.SetAutomaticallyMarkPast -> viewModelScope.launch {
+                settingsRepository.setAutomaticallyMarkPast(action.value)
+            }
+            is AppAction.SetOfferCalendarAfterImport -> viewModelScope.launch {
+                settingsRepository.setOfferCalendarAfterImport(action.value)
+            }
+            is AppAction.SetRemindersEnabled -> viewModelScope.launch {
+                settingsRepository.setRemindersEnabled(action.value)
+            }
+            is AppAction.SetDefaultReminderMinutes -> viewModelScope.launch {
+                settingsRepository.setDefaultReminderMinutes(action.value)
+            }
             AppAction.ClearMessage -> message.value = null
         }
     }

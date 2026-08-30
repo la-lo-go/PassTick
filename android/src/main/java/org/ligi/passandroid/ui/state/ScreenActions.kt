@@ -1,18 +1,7 @@
 package org.ligi.passandroid.ui.state
 
-import android.net.Uri
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.ThemeMode
-
-sealed interface PassListAction {
-    data class OpenPass(val id: String) : PassListAction
-    data class SelectCategory(val categoryId: String) : PassListAction
-    data object CreatePass : PassListAction
-    data object ImportPass : PassListAction
-    data object FindPassFiles : PassListAction
-    data object OpenSettings : PassListAction
-    data object OpenHelp : PassListAction
-}
 
 sealed interface PassDetailAction {
     data object Back : PassDetailAction
@@ -22,6 +11,7 @@ sealed interface PassDetailAction {
     data object Share : PassDetailAction
     data object Print : PassDetailAction
     data object AddToCalendar : PassDetailAction
+    data object OpenCode : PassDetailAction
     data class OpenLocation(val index: Int) : PassDetailAction
     data class MoveToCategory(val categoryId: String) : PassDetailAction
 }
@@ -31,11 +21,6 @@ sealed interface EditPassAction {
     data class Save(val draft: PassDraft) : EditPassAction
 }
 
-sealed interface PassFinderAction {
-    data object Back : PassFinderAction
-    data class Import(val uris: List<Uri>) : PassFinderAction
-}
-
 sealed interface SettingsAction {
     data object Back : SettingsAction
     data class SetTheme(val value: ThemeMode) : SettingsAction
@@ -43,6 +28,11 @@ sealed interface SettingsAction {
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction
+    data class SetHighlightTodayPasses(val value: Boolean) : SettingsAction
+    data class SetAutomaticallyMarkPast(val value: Boolean) : SettingsAction
+    data class SetOfferCalendarAfterImport(val value: Boolean) : SettingsAction
+    data class SetRemindersEnabled(val value: Boolean) : SettingsAction
+    data class SetDefaultReminderMinutes(val value: Int) : SettingsAction
 }
 
 sealed interface CategorySettingsAction {

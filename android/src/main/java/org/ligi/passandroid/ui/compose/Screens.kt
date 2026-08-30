@@ -20,31 +20,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
@@ -69,14 +64,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import org.ligi.passandroid.R
 import org.ligi.passandroid.model.comparator.PassSortOrder
-import org.ligi.passandroid.model.pass.BarCode
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
@@ -84,16 +76,12 @@ import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
-import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
-import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassDraft
 import org.ligi.passandroid.ui.state.PassArtworkDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
-import org.ligi.passandroid.ui.state.PassFinderAction
-import org.ligi.passandroid.ui.state.PassListAction
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
@@ -101,142 +89,12 @@ import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PassListScreen(
-    state: MainUiState,
-    onAction: (PassListAction) -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                actions = {
-                    IconButton(onClick = { onAction(PassListAction.FindPassFiles) }) { Icon(Icons.Default.FolderOpen, "Find pass files") }
-                    Box {
-                        IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "More") }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Create pass") },
-                                leadingIcon = { Icon(Icons.Default.Add, null) },
-                                onClick = { menuOpen = false; onAction(PassListAction.CreatePass) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Settings") },
-                                leadingIcon = { Icon(Icons.Default.Settings, null) },
-                                onClick = { menuOpen = false; onAction(PassListAction.OpenSettings) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Help") },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Help, null) },
-                                onClick = { menuOpen = false; onAction(PassListAction.OpenHelp) },
-                            )
-                        }
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { onAction(PassListAction.ImportPass) },
-                icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Import pass") },
-                modifier = Modifier.testTag("import_pass"),
-            )
-        },
-    ) { padding ->
-        val visiblePasses = state.selectedCategoryId?.let { categoryId ->
-            state.passes.filter { it.categoryId == categoryId }
-        }
-            ?: state.passes
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-            if (state.isBusy) CircularProgressIndicator(Modifier.align(Alignment.Center))
-            if (!state.isBusy && visiblePasses.isEmpty()) {
-                EmptyPassList(Modifier.align(Alignment.Center))
-            } else {
-                val columns = if (maxWidth >= 600.dp) 2 else 1
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    if (state.categories.size > 1) {
-                        item {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(state.categories, key = PassCategory::id) { category ->
-                                    FilterChip(
-                                        selected = category.id == state.selectedCategoryId,
-                                        onClick = { onAction(PassListAction.SelectCategory(category.id)) },
-                                        label = { Text(category.name) },
-                                        leadingIcon = {
-                                            Box(Modifier.size(10.dp).background(Color(category.colorArgb.toInt()), RoundedCornerShape(50)))
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    items(visiblePasses.chunked(columns), key = { row -> row.joinToString { it.id } }) { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            row.forEach { pass -> PassCard(pass, state.settings.condensedPasses, Modifier.weight(1f), onAction) }
-                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyPassList(modifier: Modifier = Modifier) {
-    Column(modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.Add, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(12.dp))
-        Text("No passes", style = MaterialTheme.typography.headlineSmall)
-        Text("Import a pass, image, or PDF file to begin.", style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun PassCard(pass: PassUiModel, condensed: Boolean, modifier: Modifier, onAction: (PassListAction) -> Unit) {
-    Card(modifier.clickable { onAction(PassListAction.OpenPass(pass.id)) }) {
-        Row(Modifier.fillMaxWidth()) {
-            Box(Modifier.size(10.dp, 104.dp).background(Color(pass.accentColor)))
-            Column(Modifier.padding(16.dp).weight(1f)) {
-                Text(pass.description, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (!condensed) pass.creator?.takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                Spacer(Modifier.height(if (condensed) 2.dp else 8.dp))
-                Text(pass.type.name.replace('_', ' '), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            }
-            PassArtwork(pass, listOf(PassArtworkKind.LOGO, PassArtworkKind.THUMBNAIL), Modifier.size(88.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun PassDetailScreen(
     pass: PassUiModel?,
-    automaticBrightness: Boolean,
     categories: List<PassCategory> = emptyList(),
     onAction: (PassDetailAction) -> Unit,
 ) {
-    val activity = LocalActivity.current
     var moveMenuOpen by remember { mutableStateOf(false) }
-    DisposableEffect(automaticBrightness, activity) {
-        val attributes = activity?.window?.attributes
-        val previous = attributes?.screenBrightness
-        if (automaticBrightness && attributes != null) {
-            attributes.screenBrightness = 1f
-            activity.window.attributes = attributes
-        }
-        onDispose {
-            if (automaticBrightness && attributes != null && previous != null) {
-                attributes.screenBrightness = previous
-                activity.window.attributes = attributes
-            }
-        }
-    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -265,7 +123,7 @@ fun PassDetailScreen(
                         Modifier.fillMaxWidth().height(160.dp),
                     )
                 }
-                item { BarcodeCard(pass) }
+                item { BarcodeCard(pass) { onAction(PassDetailAction.OpenCode) } }
                 items(pass.fields.filterNot { it.hidden }) { field ->
                     ListItem(headlineContent = { Text(field.value) }, supportingContent = { Text(field.label) })
                 }
@@ -318,16 +176,38 @@ private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>
 }
 
 @Composable
-private fun BarcodeCard(pass: PassUiModel) {
-    val resources = LocalContext.current.resources
-    val bitmap = remember(pass.barcodeFormat, pass.barcodeMessage) {
-        if (pass.barcodeFormat == null || pass.barcodeMessage.isNullOrBlank()) null
-        else BarCode(pass.barcodeFormat, pass.barcodeMessage).getBitmap(resources)?.bitmap
-    }
-    Card(Modifier.fillMaxWidth()) {
+private fun BarcodeCard(pass: PassUiModel, onOpen: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (bitmap != null) Image(bitmap.asImageBitmap(), "Pass barcode", Modifier.fillMaxWidth().height(180.dp))
-            else Text("No barcode", style = MaterialTheme.typography.titleMedium)
+            val format = pass.barcodeFormat
+            val message = pass.barcodeMessage
+            if (format != null && !message.isNullOrBlank()) {
+                BoxWithConstraints(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val bitmap = remember(format, message, constraints.maxWidth, constraints.maxHeight) {
+                        org.ligi.passandroid.ui.barcode.CrispBarcodeRenderer.renderBitmap(
+                            message,
+                            format,
+                            constraints.maxWidth,
+                            constraints.maxHeight,
+                        )
+                    }
+                    if (bitmap != null) {
+                        Image(
+                            bitmap.asImageBitmap(),
+                            "Pass barcode. Tap to enlarge",
+                            Modifier.size(
+                                with(density) { bitmap.width.toDp() },
+                                with(density) { bitmap.height.toDp() },
+                            ),
+                            contentScale = ContentScale.None,
+                            filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
+                        )
+                    } else {
+                        Text("Code cannot be displayed", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            } else Text("No barcode", style = MaterialTheme.typography.titleMedium)
             pass.barcodeAlternativeText?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
         }
     }
@@ -509,25 +389,11 @@ private fun parseColor(value: String, fallback: Int) =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScannerScreen(onAction: (PassFinderAction) -> Unit) {
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { onAction(PassFinderAction.Import(it)) }
-    Scaffold(topBar = { TopAppBar(title = { Text("Find pass files") }, navigationIcon = { IconButton(onClick = { onAction(PassFinderAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.FolderOpen, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(16.dp))
-            Text("Select pass, image, or PDF files from this device or a document provider.", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = { launcher.launch(supportedPassImportMimeTypes.toTypedArray()) }) { Text("Select files") }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-            item { Text("Theme", Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium) }
+            item { SettingsSectionTitle("Appearance") }
+            item { Text("Theme", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge) }
             items(ThemeMode.entries) { mode ->
                 ListItem(
                     headlineContent = { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) },
@@ -537,6 +403,19 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
             }
             item { SettingSwitch("Condensed pass list", settings.condensedPasses) { onAction(SettingsAction.SetCondensedPasses(it)) } }
             item { SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) } }
+            item { SettingsSectionTitle("Pass list") }
+            item {
+                SettingSwitch(
+                    "Show today's passes prominently",
+                    settings.highlightTodayPasses,
+                ) { onAction(SettingsAction.SetHighlightTodayPasses(it)) }
+            }
+            item {
+                SettingSwitch(
+                    "Automatically move past passes",
+                    settings.automaticallyMarkPast,
+                ) { onAction(SettingsAction.SetAutomaticallyMarkPast(it)) }
+            }
             item {
                 ListItem(
                     headlineContent = { Text("Categories") },
@@ -544,16 +423,54 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                     modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
                 )
             }
-            item { Text("Sort order", Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium) }
-            items(PassSortOrder.entries) { order ->
-                ListItem(
-                    headlineContent = { Text(order.name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)) },
-                    trailingContent = { androidx.compose.material3.RadioButton(order == settings.sortOrder, { onAction(SettingsAction.SetSortOrder(order)) }) },
-                    modifier = Modifier.clickable { onAction(SettingsAction.SetSortOrder(order)) },
-                )
+            item { SettingsSectionTitle("Calendar") }
+            item {
+                SettingSwitch(
+                    "Offer to add imported passes",
+                    settings.offerCalendarAfterImport,
+                ) { onAction(SettingsAction.SetOfferCalendarAfterImport(it)) }
+            }
+            item { SettingsSectionTitle("Notifications") }
+            item {
+                SettingSwitch("Pass reminders", settings.remindersEnabled) {
+                    onAction(SettingsAction.SetRemindersEnabled(it))
+                }
+            }
+            if (settings.remindersEnabled) {
+                item {
+                    Text(
+                        "Default reminder",
+                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                items(listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before")) { (minutes, label) ->
+                    ListItem(
+                        headlineContent = { Text(label) },
+                        trailingContent = {
+                            androidx.compose.material3.RadioButton(
+                                selected = minutes == settings.defaultReminderMinutes,
+                                onClick = { onAction(SettingsAction.SetDefaultReminderMinutes(minutes)) },
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            onAction(SettingsAction.SetDefaultReminderMinutes(minutes))
+                        },
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SettingsSectionTitle(text: String) {
+    Text(
+        text,
+        Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 8.dp),
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.titleMedium,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -685,16 +602,4 @@ private fun CategoryEditorDialog(
 @Composable
 private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     ListItem(headlineContent = { Text(label) }, trailingContent = { Switch(checked, onChange) }, modifier = Modifier.clickable { onChange(!checked) })
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HelpScreen(onBack: () -> Unit) {
-    Scaffold(topBar = { TopAppBar(title = { Text("Help") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("PassAndroid", style = MaterialTheme.typography.headlineMedium)
-            Text("Store and use Apple Wallet pass files on Android. Import .pkpass and .espass files, inspect their data, show barcodes, edit local copies, and export them through the system document picker.")
-            Text("This modernization keeps the original GPL-3.0 license and project attribution.")
-        }
-    }
 }
