@@ -153,6 +153,7 @@ fun PassHomeScreen(
                 }
                 ExtendedFloatingActionButton(
                     onClick = { onAction(HomeAction.ImportPass) },
+                    modifier = Modifier.semantics { contentDescription = "Import pass" },
                     icon = { Icon(Icons.Default.UploadFile, null) },
                     text = { Text("Import pass") },
                 )
