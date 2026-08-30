@@ -28,6 +28,7 @@ import org.ligi.passandroid.domain.timeline.EventTemporalState
 import org.ligi.passandroid.domain.timeline.buildPassTimeline
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.reminder.buildPassReminders
+import org.ligi.passandroid.reminder.PassReminderOverride
 import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
 
 class MainViewModel(
@@ -83,8 +84,13 @@ class MainViewModel(
                     }
                     reminderScheduler.sync(
                         if (settings.remindersEnabled) {
-                            buildPassReminders(timeline, now, settings.defaultReminderMinutes)
-                                .filterNot { it.passId in settings.reminderExcludedPassIds }
+                            val overrides = buildMap {
+                                settings.reminderExcludedPassIds.forEach { put(it, PassReminderOverride.Disabled) }
+                                settings.reminderLeadMinutesByPass.forEach { (passId, minutes) ->
+                                    put(passId, PassReminderOverride.LeadTime(minutes))
+                                }
+                            }
+                            buildPassReminders(timeline, now, settings.reminderMinutes, overrides)
                         } else {
                             emptyList()
                         },
@@ -93,7 +99,7 @@ class MainViewModel(
                         .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
                         .mapTo(mutableSetOf()) { it.id }
                     runCatching {
-                        widgetPublisher?.publish(currentPasses, widgetExcludedIds, settings.quickCodePassId)
+                        widgetPublisher?.publish(currentPasses, widgetExcludedIds, null)
                     }
                 }
         }
@@ -108,9 +114,6 @@ class MainViewModel(
             is AppAction.ImportFiles -> launchOperation("Passes imported") {
                 val imported = action.uris.map { passRepository.import(it).getOrThrow() }
                 openCalendarAfterImport(imported)
-            }
-            is AppAction.CreatePass -> launchOperation("Pass created") {
-                passRepository.create(action.draft.toPassUpdate())
             }
             is AppAction.Export -> launchOperation("Pass exported") {
                 passRepository.export(action.id, action.destination).getOrThrow()
@@ -162,7 +165,6 @@ class MainViewModel(
                 }
             }
             is AppAction.SetTheme -> viewModelScope.launch { settingsRepository.setThemeMode(action.value) }
-            is AppAction.SetCondensedPasses -> viewModelScope.launch { settingsRepository.setCondensedPasses(action.value) }
             is AppAction.SetAutomaticBrightness -> viewModelScope.launch {
                 settingsRepository.setAutomaticBrightness(action.value)
             }
@@ -179,11 +181,8 @@ class MainViewModel(
             is AppAction.SetRemindersEnabled -> viewModelScope.launch {
                 settingsRepository.setRemindersEnabled(action.value)
             }
-            is AppAction.SetDefaultReminderMinutes -> viewModelScope.launch {
-                settingsRepository.setDefaultReminderMinutes(action.value)
-            }
-            is AppAction.SetQuickCodePass -> viewModelScope.launch {
-                settingsRepository.setQuickCodePassId(action.passId)
+            is AppAction.SetReminderMinutes -> viewModelScope.launch {
+                settingsRepository.setReminderMinutes(action.value)
             }
             is AppAction.TogglePassReminder -> viewModelScope.launch {
                 val excluded = uiState.value.settings.reminderExcludedPassIds.toMutableSet()
@@ -269,7 +268,9 @@ private fun PassDraft.toTimeSpan(): PassTimeSpanSnapshot? {
     return if (from == null && to == null) null else PassTimeSpanSnapshot(from, to)
 }
 
-private fun PassDraft.toPassUpdate() = PassUpdate(
+private fun PassDraft.toPassUpdate(): PassUpdate {
+    org.ligi.passandroid.ui.compose.validatePassDraft(this)?.let(::error)
+    return PassUpdate(
     description = description,
     creator = creator,
     type = type,
@@ -285,11 +286,12 @@ private fun PassDraft.toPassUpdate() = PassUpdate(
     locations = locations.map { location ->
         PassLocationSnapshot(
             name = location.name.ifBlank { null },
-            latitude = location.latitude.toDoubleOrNull() ?: error("Invalid location latitude"),
-            longitude = location.longitude.toDoubleOrNull() ?: error("Invalid location longitude"),
+            latitude = location.latitude.toDoubleOrNull() ?: 0.0,
+            longitude = location.longitude.toDoubleOrNull() ?: 0.0,
         )
     },
-)
+    )
+}
 
 private fun <T : Comparable<T>> compareNullable(
     left: T?,

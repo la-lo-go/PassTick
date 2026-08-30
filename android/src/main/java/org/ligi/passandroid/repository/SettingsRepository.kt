@@ -34,7 +34,6 @@ val defaultPassCategories = listOf(
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val condensedPasses: Boolean = false,
     val automaticBrightness: Boolean = true,
     val sortOrder: PassSortOrder = PassSortOrder.DATE_DESC,
     val categories: List<PassCategory> = defaultPassCategories,
@@ -42,16 +41,15 @@ data class AppSettings(
     val automaticallyMarkPast: Boolean = false,
     val offerCalendarAfterImport: Boolean = false,
     val remindersEnabled: Boolean = false,
-    val defaultReminderMinutes: Int = 60,
-    val quickCodePassId: String? = null,
+    val reminderMinutes: Set<Int> = setOf(60),
     val reminderExcludedPassIds: Set<String> = emptySet(),
+    val reminderLeadMinutesByPass: Map<String, Int> = emptyMap(),
 )
 
 interface SettingsRepository {
     val settings: Flow<AppSettings>
 
     suspend fun setThemeMode(value: ThemeMode)
-    suspend fun setCondensedPasses(value: Boolean)
     suspend fun setAutomaticBrightness(value: Boolean)
     suspend fun setSortOrder(value: PassSortOrder)
     suspend fun setCategories(value: List<PassCategory>)
@@ -59,9 +57,9 @@ interface SettingsRepository {
     suspend fun setAutomaticallyMarkPast(value: Boolean)
     suspend fun setOfferCalendarAfterImport(value: Boolean)
     suspend fun setRemindersEnabled(value: Boolean)
-    suspend fun setDefaultReminderMinutes(value: Int)
-    suspend fun setQuickCodePassId(value: String?)
+    suspend fun setReminderMinutes(value: Set<Int>)
     suspend fun setReminderExcludedPassIds(value: Set<String>)
+    suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -70,7 +68,6 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override val settings = context.settingsDataStore.data.map { preferences ->
         AppSettings(
             themeMode = preferences[THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM,
-            condensedPasses = preferences[CONDENSED] ?: false,
             automaticBrightness = preferences[AUTOMATIC_BRIGHTNESS] ?: true,
             sortOrder = preferences[SORT]?.let { runCatching { PassSortOrder.valueOf(it) }.getOrNull() }
                 ?: PassSortOrder.DATE_DESC,
@@ -80,14 +77,16 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             automaticallyMarkPast = preferences[AUTO_MARK_PAST] ?: false,
             offerCalendarAfterImport = preferences[OFFER_CALENDAR] ?: false,
             remindersEnabled = preferences[REMINDERS_ENABLED] ?: false,
-            defaultReminderMinutes = (preferences[REMINDER_MINUTES] ?: 60).coerceIn(0, 10_080),
-            quickCodePassId = preferences[QUICK_CODE_PASS_ID],
+            reminderMinutes = preferences[REMINDER_MINUTES_SET]
+                ?.mapNotNull(String::toIntOrNull)
+                ?.mapTo(mutableSetOf()) { it.coerceIn(0, 10_080) }
+                ?: setOf((preferences[REMINDER_MINUTES] ?: 60).coerceIn(0, 10_080)),
             reminderExcludedPassIds = preferences[REMINDER_EXCLUDED_PASS_IDS].orEmpty(),
+            reminderLeadMinutesByPass = preferences[REMINDER_LEAD_BY_PASS]?.let(::decodeReminderLeads).orEmpty(),
         )
     }
 
     override suspend fun setThemeMode(value: ThemeMode) = update(THEME, value.name)
-    override suspend fun setCondensedPasses(value: Boolean) = update(CONDENSED, value)
     override suspend fun setAutomaticBrightness(value: Boolean) = update(AUTOMATIC_BRIGHTNESS, value)
     override suspend fun setSortOrder(value: PassSortOrder) = update(SORT, value.name)
     override suspend fun setCategories(value: List<PassCategory>) = update(
@@ -98,15 +97,17 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setAutomaticallyMarkPast(value: Boolean) = update(AUTO_MARK_PAST, value)
     override suspend fun setOfferCalendarAfterImport(value: Boolean) = update(OFFER_CALENDAR, value)
     override suspend fun setRemindersEnabled(value: Boolean) = update(REMINDERS_ENABLED, value)
-    override suspend fun setDefaultReminderMinutes(value: Int) = update(REMINDER_MINUTES, value.coerceIn(0, 10_080))
-    override suspend fun setQuickCodePassId(value: String?) {
-        context.settingsDataStore.edit { preferences ->
-            if (value == null) preferences.remove(QUICK_CODE_PASS_ID) else preferences[QUICK_CODE_PASS_ID] = value
-        }
-    }
+    override suspend fun setReminderMinutes(value: Set<Int>) = update(
+        REMINDER_MINUTES_SET,
+        value.mapTo(mutableSetOf()) { it.coerceIn(0, 10_080).toString() },
+    )
     override suspend fun setReminderExcludedPassIds(value: Set<String>) = update(
         REMINDER_EXCLUDED_PASS_IDS,
         value,
+    )
+    override suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>) = update(
+        REMINDER_LEAD_BY_PASS,
+        encodeReminderLeads(value),
     )
 
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
@@ -115,7 +116,6 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
 
     private companion object {
         val THEME = stringPreferencesKey("theme")
-        val CONDENSED = booleanPreferencesKey("condensed_passes")
         val AUTOMATIC_BRIGHTNESS = booleanPreferencesKey("automatic_brightness")
         val SORT = stringPreferencesKey("sort_order")
         val CATEGORIES = stringPreferencesKey("categories")
@@ -124,10 +124,24 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val OFFER_CALENDAR = booleanPreferencesKey("offer_calendar_after_import")
         val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
         val REMINDER_MINUTES = intPreferencesKey("default_reminder_minutes")
-        val QUICK_CODE_PASS_ID = stringPreferencesKey("quick_code_pass_id")
+        val REMINDER_MINUTES_SET = stringSetPreferencesKey("reminder_minutes")
         val REMINDER_EXCLUDED_PASS_IDS = stringSetPreferencesKey("reminder_excluded_pass_ids")
+        val REMINDER_LEAD_BY_PASS = stringPreferencesKey("reminder_lead_minutes_by_pass")
     }
 }
+
+private fun encodeReminderLeads(values: Map<String, Int>) = JSONObject().apply {
+    values.forEach { (passId, minutes) ->
+        if (passId.isNotBlank()) put(passId, minutes.coerceIn(0, 10_080))
+    }
+}.toString()
+
+private fun decodeReminderLeads(value: String): Map<String, Int> = runCatching {
+    val json = JSONObject(value)
+    buildMap {
+        json.keys().forEach { passId -> put(passId, json.getInt(passId).coerceIn(0, 10_080)) }
+    }
+}.getOrDefault(emptyMap())
 
 private fun encodeCategories(categories: List<PassCategory>) = JSONArray().apply {
     categories.forEach { category ->

@@ -116,29 +116,6 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `creates a local pass through the repository`() = runTest(dispatcher) {
-        val repository = FakePassRepository(emptyList())
-        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
-        val draft = PassDraft(
-            description = "Museum ticket",
-            creator = "City museum",
-            type = PassType.EVENT,
-            accentColor = 0xFF123456.toInt(),
-            barcodeFormat = null,
-            barcodeMessage = "",
-            barcodeAlternativeText = "",
-            fields = emptyList(),
-        )
-
-        viewModel.onAction(AppAction.CreatePass(draft))
-        advanceUntilIdle()
-
-        assertThat(repository.created.single().description).isEqualTo("Museum ticket")
-        assertThat(viewModel.uiState.value.passes.single().description).isEqualTo("Museum ticket")
-    }
-
-    @Test
     fun `selects categories and moves a pass between them`() = runTest(dispatcher) {
         val repository = FakePassRepository(
             listOf(
@@ -250,7 +227,6 @@ private class FakePlatformActions : PlatformActions {
 private class FakeSettingsRepository : SettingsRepository {
     override val settings = MutableStateFlow(AppSettings())
     override suspend fun setThemeMode(value: ThemeMode) = Unit
-    override suspend fun setCondensedPasses(value: Boolean) = Unit
     override suspend fun setAutomaticBrightness(value: Boolean) = Unit
     override suspend fun setSortOrder(value: PassSortOrder) = Unit
     override suspend fun setCategories(value: List<PassCategory>) {
@@ -260,7 +236,7 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setAutomaticallyMarkPast(value: Boolean) = Unit
     override suspend fun setOfferCalendarAfterImport(value: Boolean) = Unit
     override suspend fun setRemindersEnabled(value: Boolean) = Unit
-    override suspend fun setDefaultReminderMinutes(value: Int) = Unit
-    override suspend fun setQuickCodePassId(value: String?) = Unit
+    override suspend fun setReminderMinutes(value: Set<Int>) = Unit
     override suspend fun setReminderExcludedPassIds(value: Set<String>) = Unit
+    override suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>) = Unit
 }

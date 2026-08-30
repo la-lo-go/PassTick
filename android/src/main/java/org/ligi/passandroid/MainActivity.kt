@@ -298,7 +298,6 @@ class MainActivity : ComponentActivity() {
                                     when (action) {
                                         SettingsAction.Back -> backStack.removeLastOrNull()
                                         is SettingsAction.SetTheme -> viewModel.onAction(AppAction.SetTheme(action.value))
-                                        is SettingsAction.SetCondensedPasses -> viewModel.onAction(AppAction.SetCondensedPasses(action.value))
                                         is SettingsAction.SetAutomaticBrightness -> viewModel.onAction(AppAction.SetAutomaticBrightness(action.value))
                                         is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
                                         SettingsAction.OpenCategories -> backStack.add(AppDestination.CategorySettings)
@@ -326,8 +325,8 @@ class MainActivity : ComponentActivity() {
                                                 viewModel.onAction(AppAction.SetRemindersEnabled(true))
                                             }
                                         }
-                                        is SettingsAction.SetDefaultReminderMinutes -> viewModel.onAction(
-                                            AppAction.SetDefaultReminderMinutes(action.value),
+                                        is SettingsAction.SetReminderMinutes -> viewModel.onAction(
+                                            AppAction.SetReminderMinutes(action.value),
                                         )
                                     }
                                 }

@@ -2,6 +2,7 @@ package org.ligi.passandroid.ui.compose
 
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,10 +34,13 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,12 +51,15 @@ import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -64,6 +71,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,6 +104,7 @@ import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
 import java.util.UUID
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -296,49 +305,94 @@ private fun BarcodeCard(pass: PassUiModel, onHoldChanged: (Boolean) -> Unit, onP
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew: Boolean = false) {
+fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
     var description by remember(pass?.id) { mutableStateOf(pass?.description.orEmpty()) }
     var creator by remember(pass?.id) { mutableStateOf(pass?.creator.orEmpty()) }
     var passType by remember(pass?.id) { mutableStateOf(pass?.type ?: PassType.EVENT) }
-    var accentColor by remember(pass?.id) {
-        mutableStateOf(pass?.accentColor?.let(::formatColor) ?: formatColor(0xFF3D73E9.toInt()))
-    }
+    var accentColor by remember(pass?.id) { mutableStateOf(pass?.accentColor ?: 0xFF3D73E9.toInt()) }
     var barcodeFormat by remember(pass?.id) { mutableStateOf(pass?.barcodeFormat) }
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
     var fields by remember(pass?.id) { mutableStateOf(pass?.fields.orEmpty()) }
-    var calendarStart by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.from?.toString().orEmpty()) }
-    var calendarEnd by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.to?.toString().orEmpty()) }
+    var calendarStart by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.from) }
+    var calendarEnd by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.to) }
     var locations by remember(pass?.id) {
         mutableStateOf(
             pass?.locations.orEmpty().map {
-                PassLocationDraft(it.name.orEmpty(), it.latitude.toString(), it.longitude.toString())
+                val coordinatesAreAddressSentinel = it.latitude == 0.0 && it.longitude == 0.0 && !it.name.isNullOrBlank()
+                PassLocationDraft(
+                    it.name.orEmpty(),
+                    if (coordinatesAreAddressSentinel) "" else it.latitude.toString(),
+                    if (coordinatesAreAddressSentinel) "" else it.longitude.toString(),
+                )
             },
         )
     }
     var artworkUpdates by remember(pass?.id) { mutableStateOf(emptyList<PassArtworkDraft>()) }
     var pendingArtworkKind by remember { mutableStateOf<PassArtworkKind?>(null) }
-    val artworkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val kind = pendingArtworkKind
-        if (uri != null && kind != null) {
-            artworkUpdates = artworkUpdates.filterNot { it.kind == kind } + PassArtworkDraft(kind, uri)
-        }
-        pendingArtworkKind = null
-    }
     var typeMenuOpen by remember { mutableStateOf(false) }
     var barcodeMenuOpen by remember { mutableStateOf(false) }
+    var editorMenuOpen by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val artworkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val kind = pendingArtworkKind
+        if (uri != null && kind != null) artworkUpdates = artworkUpdates.filterNot { it.kind == kind } + PassArtworkDraft(kind, uri)
+        pendingArtworkKind = null
+    }
+
+    fun currentDraft() = PassDraft(
+        description = description,
+        creator = creator,
+        type = passType,
+        accentColor = accentColor,
+        barcodeFormat = barcodeFormat,
+        barcodeMessage = barcodeMessage,
+        barcodeAlternativeText = alternativeText,
+        fields = fields,
+        artworkUpdates = artworkUpdates,
+        calendarStart = calendarStart?.toString().orEmpty(),
+        calendarEnd = calendarEnd?.toString().orEmpty(),
+        locations = locations,
+    )
+
+    fun saveAndClose() {
+        val draft = currentDraft()
+        val error = validatePassDraft(draft)
+        if (error == null) {
+            onAction(EditPassAction.Save(draft))
+        } else {
+            scope.launch { snackbarHostState.showSnackbar(error, withDismissAction = true) }
+        }
+    }
+
+    BackHandler(onBack = ::saveAndClose)
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(if (isNew) "Create pass" else "Edit pass") },
-                navigationIcon = { IconButton(onClick = { onAction(EditPassAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                title = { Text("Edit pass") },
+                navigationIcon = {
+                    IconButton(onClick = ::saveAndClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Save and go back") }
+                },
+                actions = {
+                    Box {
+                        IconButton(onClick = { editorMenuOpen = true }) { Icon(Icons.Default.MoreVert, "Editor actions") }
+                        DropdownMenu(editorMenuOpen, { editorMenuOpen = false }) {
+                            DropdownMenuItem(text = { Text("Discard changes") }, onClick = {
+                                editorMenuOpen = false
+                                onAction(EditPassAction.Back)
+                            })
+                        }
+                    }
+                },
             )
         },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding).testTag("edit_pass_list"),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
                 EditorSection("Pass") {
@@ -352,7 +406,7 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew
                             }
                         }
                     }
-                    OutlinedTextField(accentColor, { accentColor = it }, label = { Text("Accent color (#AARRGGBB)") }, modifier = Modifier.fillMaxWidth())
+                    ColorPickerField("Accent color", accentColor, { accentColor = it }, Modifier.fillMaxWidth())
                 }
             }
             item {
@@ -374,57 +428,81 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew
             }
             item {
                 EditorSection("Calendar") {
-                    OutlinedTextField(calendarStart, { calendarStart = it }, label = { Text("Start (ISO 8601)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(calendarEnd, { calendarEnd = it }, label = { Text("End (ISO 8601)") }, modifier = Modifier.fillMaxWidth())
+                    DatePickerField("Start date", calendarStart, {
+                        calendarStart = it
+                        if (it != null && calendarEnd == null) calendarEnd = it.plusHours(2)
+                    }, Modifier.fillMaxWidth())
+                    DatePickerField("End date", calendarEnd, { calendarEnd = it }, Modifier.fillMaxWidth())
                 }
             }
             item {
                 EditorSection("Locations") {
                     locations.forEachIndexed { index, location ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Location ${index + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                            IconButton(onClick = { locations = locations.toMutableList().also { it.removeAt(index) } }) {
-                                Icon(Icons.Default.Delete, "Delete location")
+                        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    OutlinedTextField(
+                                        location.name,
+                                        { value -> locations = locations.replace(index, location.copy(name = value)) },
+                                        label = { Text("Address or place") },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    IconButton(onClick = { locations = locations.toMutableList().also { it.removeAt(index) } }) {
+                                        Icon(Icons.Default.Delete, "Delete location")
+                                    }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(location.latitude, { value -> locations = locations.replace(index, location.copy(latitude = value)) }, label = { Text("Latitude (optional)") }, modifier = Modifier.weight(1f))
+                                    OutlinedTextField(location.longitude, { value -> locations = locations.replace(index, location.copy(longitude = value)) }, label = { Text("Longitude (optional)") }, modifier = Modifier.weight(1f))
+                                }
                             }
                         }
-                        OutlinedTextField(location.name, { value -> locations = locations.replace(index, location.copy(name = value)) }, label = { Text("Location name") }, modifier = Modifier.fillMaxWidth())
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(location.latitude, { value -> locations = locations.replace(index, location.copy(latitude = value)) }, label = { Text("Latitude") }, modifier = Modifier.weight(1f))
-                            OutlinedTextField(location.longitude, { value -> locations = locations.replace(index, location.copy(longitude = value)) }, label = { Text("Longitude") }, modifier = Modifier.weight(1f))
-                        }
                     }
-                    OutlinedButton(
-                        onClick = { locations = locations + PassLocationDraft("", "", "") },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Add location") }
+                    OutlinedButton(onClick = { locations = locations + PassLocationDraft("", "", "") }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Add location")
+                    }
                 }
             }
             item {
                 EditorSection("Artwork") {
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(PassArtworkKind.LOGO, PassArtworkKind.STRIP, PassArtworkKind.THUMBNAIL).forEach { kind ->
-                        OutlinedButton(
-                            onClick = {
+                        listOf(PassArtworkKind.LOGO, PassArtworkKind.STRIP, PassArtworkKind.THUMBNAIL).forEach { kind ->
+                            OutlinedButton(onClick = {
                                 pendingArtworkKind = kind
                                 artworkLauncher.launch(arrayOf("image/*"))
-                            },
-                        ) { Text(kind.name.lowercase().replaceFirstChar(Char::uppercase)) }
-                    }
+                            }) { Text(kind.name.lowercase().replaceFirstChar(Char::uppercase)) }
+                        }
                     }
                 }
             }
             item {
                 EditorSection("Fields") {
                     fields.forEachIndexed { index, field ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Field ${index + 1}", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                            IconButton(onClick = { fields = fields.toMutableList().also { it.removeAt(index) } }) {
-                                Icon(Icons.Default.Delete, "Delete field")
+                        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    OutlinedTextField(
+                                        field.label,
+                                        { value -> fields = fields.replace(index, field.copy(label = value)) },
+                                        label = { Text("Label") },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    IconToggleButton(
+                                        checked = field.hidden,
+                                        onCheckedChange = { hidden -> fields = fields.replace(index, field.copy(hidden = hidden)) },
+                                    ) {
+                                        Icon(
+                                            if (field.hidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            if (field.hidden) "Show field" else "Hide field",
+                                        )
+                                    }
+                                    IconButton(onClick = { fields = fields.toMutableList().also { it.removeAt(index) } }) {
+                                        Icon(Icons.Default.Delete, "Delete field")
+                                    }
+                                }
+                                OutlinedTextField(field.value, { value -> fields = fields.replace(index, field.copy(value = value)) }, label = { Text("Value") }, modifier = Modifier.fillMaxWidth())
                             }
                         }
-                        OutlinedTextField(field.label, { value -> fields = fields.replace(index, field.copy(label = value)) }, label = { Text("Label") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(field.value, { value -> fields = fields.replace(index, field.copy(value = value)) }, label = { Text("Value") }, modifier = Modifier.fillMaxWidth())
-                        SettingSwitch("Hide field", field.hidden) { value -> fields = fields.replace(index, field.copy(hidden = value)) }
                     }
                     OutlinedButton(
                         onClick = { fields = fields + PassFieldUiModel("local-${fields.size + 1}", "", "", false, null) },
@@ -433,31 +511,35 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit, isNew
                 }
             }
             item {
-                Button(
-                    enabled = (isNew || pass != null) && description.isNotBlank(),
-                    onClick = {
-                        onAction(EditPassAction.Save(
-                            PassDraft(
-                                description,
-                                creator,
-                                passType,
-                                parseColor(accentColor, pass?.accentColor ?: 0),
-                                barcodeFormat,
-                                barcodeMessage,
-                                alternativeText,
-                                fields,
-                                artworkUpdates,
-                                calendarStart,
-                                calendarEnd,
-                                locations,
-                            ),
-                        ))
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Save") }
+                Button(onClick = ::saveAndClose, enabled = pass != null, modifier = Modifier.fillMaxWidth()) {
+                    Text("Save and close")
+                }
             }
         }
     }
+}
+
+internal fun validatePassDraft(draft: PassDraft): String? {
+    if (draft.description.isBlank()) return "Add a description before leaving."
+    if (draft.barcodeFormat != null && draft.barcodeMessage.isBlank()) return "Add barcode data or remove the barcode."
+    val start = draft.calendarStart.takeIf(String::isNotBlank)?.let { runCatching { org.threeten.bp.ZonedDateTime.parse(it) }.getOrNull() }
+    val end = draft.calendarEnd.takeIf(String::isNotBlank)?.let { runCatching { org.threeten.bp.ZonedDateTime.parse(it) }.getOrNull() }
+    if (draft.calendarStart.isNotBlank() && start == null) return "Select a valid start date or clear it."
+    if (draft.calendarEnd.isNotBlank() && end == null) return "Select a valid end date or clear it."
+    if (start != null && end != null && end.isBefore(start)) return "The end date must be after the start date."
+    draft.locations.forEach { location ->
+        val hasLatitude = location.latitude.isNotBlank()
+        val hasLongitude = location.longitude.isNotBlank()
+        if (hasLatitude != hasLongitude) return "Enter both coordinates or clear both."
+        val latitude = location.latitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
+        val longitude = location.longitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
+        if (hasLatitude && (latitude == null || longitude == null)) return "Fix the location coordinates or clear them."
+        if (latitude != null && latitude !in -90.0..90.0) return "Latitude must be between -90 and 90."
+        if (longitude != null && longitude !in -180.0..180.0) return "Longitude must be between -180 and 180."
+        if (location.name.isBlank() && !hasLatitude) return "Add an address or delete the empty location."
+    }
+    if (draft.fields.any { it.label.isBlank() && it.value.isBlank() }) return "Complete or delete the empty field."
+    return null
 }
 
 @Composable
@@ -473,11 +555,6 @@ private fun EditorSection(title: String, content: @Composable ColumnScope.() -> 
 private fun <T> List<T>.replace(index: Int, value: T) = toMutableList().also { it[index] = value }
 
 private fun PassType.displayName() = name.lowercase().replaceFirstChar(Char::uppercase)
-
-private fun formatColor(color: Int) = "#%08X".format(java.util.Locale.ROOT, color)
-
-private fun parseColor(value: String, fallback: Int) =
-    runCatching { android.graphics.Color.parseColor(value) }.getOrDefault(fallback)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -499,7 +576,6 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                             ) { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) }
                         }
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                        SettingSwitch("Condensed pass list", settings.condensedPasses) { onAction(SettingsAction.SetCondensedPasses(it)) }
                         SettingSwitch("Automatic barcode brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
                     }
                 }
@@ -529,18 +605,29 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                         SettingSwitch("Pass reminders", settings.remindersEnabled) {
                             onAction(SettingsAction.SetRemindersEnabled(it))
                         }
-                        if (settings.remindersEnabled) {
-                            Text("Default reminder", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-                            listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before").forEach { (minutes, label) ->
-                                ListItem(
-                                    trailingContent = {
-                                        androidx.compose.material3.RadioButton(
-                                            selected = minutes == settings.defaultReminderMinutes,
-                                            onClick = { onAction(SettingsAction.SetDefaultReminderMinutes(minutes)) },
-                                        )
-                                    },
-                                    modifier = Modifier.clickable { onAction(SettingsAction.SetDefaultReminderMinutes(minutes)) },
-                                ) { Text(label) }
+                        Text("Reminder times", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+                        listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before").forEach { (minutes, label) ->
+                            val selected = minutes in settings.reminderMinutes
+                            fun toggle() {
+                                val updated = settings.reminderMinutes.toMutableSet()
+                                if (!updated.add(minutes)) updated.remove(minutes)
+                                onAction(SettingsAction.SetReminderMinutes(updated))
+                            }
+                            ListItem(
+                                trailingContent = {
+                                    Checkbox(
+                                        checked = selected,
+                                        enabled = settings.remindersEnabled,
+                                        onCheckedChange = { toggle() },
+                                    )
+                                },
+                                modifier = Modifier.clickable(enabled = settings.remindersEnabled, onClick = ::toggle),
+                            ) {
+                                Text(
+                                    label,
+                                    color = if (settings.remindersEnabled) Color.Unspecified
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                )
                             }
                         }
                     }
@@ -671,22 +758,21 @@ private fun CategoryEditorDialog(
     onSave: (PassCategory) -> Unit,
 ) {
     var name by remember(category.id) { mutableStateOf(category.name) }
-    var color by remember(category.id) { mutableStateOf(formatColor(category.colorArgb.toInt())) }
+    var color by remember(category.id) { mutableStateOf(category.colorArgb.toInt()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (category.name.isBlank()) "Add category" else "Edit category") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
-                OutlinedTextField(color, { color = it }, label = { Text("Color (#AARRGGBB)") }, singleLine = true)
+                ColorPickerField("Category color", color, { color = it }, Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             TextButton(
                 enabled = name.isNotBlank(),
                 onClick = {
-                    val parsedColor = parseColor(color, category.colorArgb.toInt()).toUInt().toLong()
-                    onSave(category.copy(name = name.trim(), colorArgb = parsedColor))
+                    onSave(category.copy(name = name.trim(), colorArgb = color.toUInt().toLong()))
                 },
             ) { Text("Save") }
         },

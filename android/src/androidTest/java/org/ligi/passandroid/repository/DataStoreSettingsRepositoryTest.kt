@@ -15,7 +15,6 @@ class DataStoreSettingsRepositoryTest {
                 InstrumentationRegistry.getInstrumentation().targetContext,
             )
             repository.setThemeMode(ThemeMode.DARK)
-            repository.setCondensedPasses(true)
             repository.setAutomaticBrightness(false)
             repository.setSortOrder(PassSortOrder.TYPE)
             val categories = defaultPassCategories + PassCategory("travel", "Travel", 0xFF006C4C)
@@ -24,22 +23,22 @@ class DataStoreSettingsRepositoryTest {
             repository.setAutomaticallyMarkPast(true)
             repository.setOfferCalendarAfterImport(true)
             repository.setRemindersEnabled(true)
-            repository.setDefaultReminderMinutes(30)
-            repository.setQuickCodePassId("pass-1")
+            repository.setReminderMinutes(setOf(15, 30))
             repository.setReminderExcludedPassIds(setOf("pass-2"))
+            repository.setReminderLeadMinutesByPass(mapOf("pass-3" to 45))
 
             val restored = repository.settings.first {
-                it.themeMode == ThemeMode.DARK && it.condensedPasses && !it.automaticBrightness &&
+                it.themeMode == ThemeMode.DARK && !it.automaticBrightness &&
                     it.sortOrder == PassSortOrder.TYPE && it.categories == categories &&
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
-                    it.remindersEnabled && it.defaultReminderMinutes == 30 &&
-                    it.quickCodePassId == "pass-1" && it.reminderExcludedPassIds == setOf("pass-2")
+                    it.remindersEnabled && it.reminderMinutes == setOf(15, 30) &&
+                    it.reminderExcludedPassIds == setOf("pass-2") &&
+                    it.reminderLeadMinutesByPass == mapOf("pass-3" to 45)
             }
 
             assertThat(restored).isEqualTo(
                 AppSettings(
                     ThemeMode.DARK,
-                    condensedPasses = true,
                     automaticBrightness = false,
                     sortOrder = PassSortOrder.TYPE,
                     categories = categories,
@@ -47,9 +46,9 @@ class DataStoreSettingsRepositoryTest {
                     automaticallyMarkPast = true,
                     offerCalendarAfterImport = true,
                     remindersEnabled = true,
-                    defaultReminderMinutes = 30,
-                    quickCodePassId = "pass-1",
+                    reminderMinutes = setOf(15, 30),
                     reminderExcludedPassIds = setOf("pass-2"),
+                    reminderLeadMinutesByPass = mapOf("pass-3" to 45),
                 ),
             )
         }

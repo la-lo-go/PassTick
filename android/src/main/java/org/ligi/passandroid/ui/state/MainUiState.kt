@@ -86,7 +86,11 @@ data class PassUiModel(
     )
 }
 
-fun PassLocationUiModel.toPlatformLocation() = PlatformLocation(latitude, longitude)
+fun PassLocationUiModel.toPlatformLocation() = PlatformLocation(
+    address = name,
+    latitude = latitude.takeUnless { it == 0.0 && longitude == 0.0 && !name.isNullOrBlank() },
+    longitude = longitude.takeUnless { latitude == 0.0 && it == 0.0 && !name.isNullOrBlank() },
+)
 
 data class PassDraft(
     val description: String,
@@ -116,7 +120,6 @@ data class MainUiState(
 sealed interface AppAction {
     data class Import(val uri: Uri) : AppAction
     data class ImportFiles(val uris: List<Uri>) : AppAction
-    data class CreatePass(val draft: PassDraft) : AppAction
     data class Export(val id: String, val destination: Uri) : AppAction
     data class SharePass(val id: String) : AppAction
     data class PrintPass(val id: String) : AppAction
@@ -130,15 +133,13 @@ sealed interface AppAction {
     data class DeleteCategory(val categoryId: String) : AppAction
     data class MoveCategory(val categoryId: String, val offset: Int) : AppAction
     data class SetTheme(val value: ThemeMode) : AppAction
-    data class SetCondensedPasses(val value: Boolean) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
     data class SetHighlightTodayPasses(val value: Boolean) : AppAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : AppAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction
     data class SetRemindersEnabled(val value: Boolean) : AppAction
-    data class SetDefaultReminderMinutes(val value: Int) : AppAction
-    data class SetQuickCodePass(val passId: String?) : AppAction
+    data class SetReminderMinutes(val value: Set<Int>) : AppAction
     data class TogglePassReminder(val passId: String) : AppAction
     data object ClearMessage : AppAction
 }

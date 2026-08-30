@@ -6,12 +6,15 @@ import android.net.Uri
 import androidx.annotation.VisibleForTesting
 import org.ligi.passandroid.functions.createIntent
 import org.ligi.passandroid.functions.CalendarEvent
-import org.ligi.passandroid.maps.geoUri
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.printing.doPrint
 import androidx.core.net.toUri
 
-data class PlatformLocation(val latitude: Double, val longitude: Double)
+data class PlatformLocation(
+    val address: String?,
+    val latitude: Double?,
+    val longitude: Double?,
+)
 data class PrintableField(val label: String, val value: String)
 data class PrintablePass(
     val description: String,
@@ -41,7 +44,23 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
     override fun print(pass: PrintablePass) = doPrint(context, pass)
 
     override fun openLocation(location: PlatformLocation) {
-        context.startActivity(Intent(Intent.ACTION_VIEW, geoUri(location.latitude, location.longitude).toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, geoUri(location.address, location.latitude, location.longitude).toUri())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
+@VisibleForTesting
+internal fun geoUri(address: String?, latitude: Double?, longitude: Double?): String {
+    val query = java.net.URLEncoder.encode(
+        address?.takeIf(String::isNotBlank) ?: listOfNotNull(latitude, longitude).joinToString(","),
+        java.nio.charset.StandardCharsets.UTF_8.name(),
+    ).replace("+", "%20")
+    return if (latitude != null && longitude != null) {
+        "geo:$latitude,$longitude?q=$query"
+    } else {
+        "geo:0,0?q=$query"
     }
 }
 

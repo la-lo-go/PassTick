@@ -24,7 +24,6 @@ sealed interface EditPassAction {
 sealed interface SettingsAction {
     data object Back : SettingsAction
     data class SetTheme(val value: ThemeMode) : SettingsAction
-    data class SetCondensedPasses(val value: Boolean) : SettingsAction
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction
@@ -32,7 +31,7 @@ sealed interface SettingsAction {
     data class SetAutomaticallyMarkPast(val value: Boolean) : SettingsAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : SettingsAction
     data class SetRemindersEnabled(val value: Boolean) : SettingsAction
-    data class SetDefaultReminderMinutes(val value: Int) : SettingsAction
+    data class SetReminderMinutes(val value: Set<Int>) : SettingsAction
 }
 
 sealed interface CategorySettingsAction {
