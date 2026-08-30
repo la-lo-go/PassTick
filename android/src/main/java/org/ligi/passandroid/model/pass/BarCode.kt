@@ -18,7 +18,6 @@ class BarCode(val format: PassBarCodeFormat?, val message: String? = UUID.random
 
     fun getBitmap(resources: Resources): BitmapDrawable? {
         if (message == null) {
-            // no message -> no barcode
             tracker.trackException("No Barcode in pass - strange", false)
             return null
         }
@@ -41,11 +40,6 @@ class BarCode(val format: PassBarCodeFormat?, val message: String? = UUID.random
                 format.uppercase(Locale.ENGLISH).contains("AZTEC") -> return PassBarCodeFormat.AZTEC
                 format.uppercase(Locale.ENGLISH).contains("128") -> return PassBarCodeFormat.CODE_128
                 format.uppercase(Locale.ENGLISH).contains("39") -> return PassBarCodeFormat.CODE_39
-
-                 /*
-                 requested but not supported by xing (yet)   https://github.com/ligi/PassAndroid/issues/43
-                 format.toUpperCase(Locale.ENGLISH).contains("93")->return BarcodeFormat.CODE_93;
-                 */
 
                 else -> PassBarCodeFormat.QR_CODE
 

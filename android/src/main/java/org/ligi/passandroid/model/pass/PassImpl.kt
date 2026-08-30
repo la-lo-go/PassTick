@@ -37,15 +37,7 @@ class PassImpl(
     override var barCode: BarCode? = null
 
     override var description: String? = null
-        get() {
-            if (field == null) {
-                return "" // better way of returning no description - so we can avoid optional / null checks and it is kind of the same thing
-                // an navigation_drawer_header description - we can do kind of all String operations safely this way and do not have to care about the existence of a real description
-                // if we want to know if one is there we can check length for being 0 still ( which we would have to do anyway for navigation_drawer_header descriptions )
-                // See no way at the moment where we would have to distinguish between an navigation_drawer_header and an missing description
-            }
-            return field
-        }
+        get() = field.orEmpty()
 
     @JsonClass(generateAdapter = false)
     class TimeRepeat(val offset: Int, val count: Int)
