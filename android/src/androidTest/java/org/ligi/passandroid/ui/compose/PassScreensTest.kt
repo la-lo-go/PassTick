@@ -1,7 +1,6 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.DeviceConfigurationOverride
