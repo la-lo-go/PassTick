@@ -64,7 +64,7 @@ fun PassCodePreview(
                     }
                     @Suppress("UNREACHABLE_CODE")
                     false
-                } ?: null
+                }
                 if (gestureResult == true) {
                     onPin()
                 } else if (gestureResult == null) {
