@@ -284,7 +284,9 @@ fun PassDetailScreen(
                 val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.STRIP }
                     ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
                     ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
-                val visibleFields = pass.fields.filterNot { it.hidden }
+                val visibleFields = pass.fields.filterNot { field ->
+                    field.hidden || (pass.calendarEvent != null && field.value.containsDateAndTime())
+                }
                 passDetailSectionOrder
                     .filterNot(hiddenPassDetailSections::contains)
                     .forEach { section ->
@@ -865,6 +867,12 @@ private fun PassUiModel.dateTimeLabel(): String {
         else -> "Date and time"
     }
 }
+
+private fun String.containsDateAndTime(): Boolean = DATE_AND_TIME_PATTERN.containsMatchIn(this)
+
+private val DATE_AND_TIME_PATTERN = Regex(
+    "\\d{1,4}[-/.]\\d{1,2}[-/.]\\d{1,4}.*?\\d{1,2}:\\d{2}",
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
