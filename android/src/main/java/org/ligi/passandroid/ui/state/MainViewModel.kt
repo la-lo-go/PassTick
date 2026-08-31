@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassUpdate
@@ -39,6 +41,10 @@ class MainViewModel(
     private val reminderScheduler: ReminderScheduler = ReminderScheduler.None,
     private val widgetPublisher: PassWidgetSnapshotPublisher? = null,
 ) : ViewModel() {
+    suspend fun isCalendarEventPresent(pass: PassUiModel): Boolean = withContext(Dispatchers.IO) {
+        pass.calendarEvent?.let(platformActions::isCalendarEventPresent) == true
+    }
+
     private val busy = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
     private val selectedCategoryId = MutableStateFlow<String?>(null)

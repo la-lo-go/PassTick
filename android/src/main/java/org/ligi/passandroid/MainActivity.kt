@@ -331,6 +331,10 @@ class MainActivity : ComponentActivity() {
                                     },
                                     detailPane = { selected ->
                                         val pass = state.passes.firstOrNull { it.id == selected.passId }
+                                        var calendarEventPresent by remember(selected.passId) { mutableStateOf(false) }
+                                        LaunchedEffect(pass?.calendarEvent) {
+                                            calendarEventPresent = pass?.let { viewModel.isCalendarEventPresent(it) } == true
+                                        }
                                         PassDetailScreen(
                                             pass = pass,
                                             categories = state.categories,
@@ -343,6 +347,7 @@ class MainActivity : ComponentActivity() {
                                             flashlightAvailable = flashlight.isAvailable || !hasCameraPermission,
                                             flashlightEnabled = flashlight.isEnabled,
                                             enhanceCodeBrightness = state.settings.automaticBrightness,
+                                            calendarEventPresent = calendarEventPresent,
                                             onAction = { action ->
                                                 handlePassDetailAction(selected.passId, action)
                                             },

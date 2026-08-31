@@ -2,6 +2,7 @@ package org.ligi.passandroid.platform
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.net.Uri
 import android.provider.CalendarContract
@@ -11,6 +12,7 @@ import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.printing.doPrint
 import androidx.core.net.toUri
+import androidx.core.content.ContextCompat
 import java.util.TimeZone
 
 data class PlatformLocation(
@@ -30,6 +32,7 @@ data class PrintablePass(
 interface PlatformActions {
     fun addToCalendar(event: CalendarEvent)
     fun addToCalendarAutomatically(event: CalendarEvent): Boolean
+    fun isCalendarEventPresent(event: CalendarEvent): Boolean = false
     fun share(uri: Uri, mimeType: String)
     fun print(pass: PrintablePass)
     fun openLocation(location: PlatformLocation)
@@ -52,6 +55,17 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
             put(CalendarContract.Events.DESCRIPTION, event.description)
         }
         return context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values) != null
+    }
+
+    override fun isCalendarEventPresent(event: CalendarEvent): Boolean {
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED) return false
+        return context.contentResolver.query(
+            CalendarContract.Events.CONTENT_URI,
+            arrayOf(CalendarContract.Events._ID),
+            "${CalendarContract.Events.DESCRIPTION} = ? AND ${CalendarContract.Events.DTSTART} = ?",
+            arrayOf(event.description, event.beginTimeMillis.toString()),
+            null,
+        )?.use { it.moveToFirst() } == true
     }
 
     private fun findWritableCalendarId(): Long? = context.contentResolver.query(

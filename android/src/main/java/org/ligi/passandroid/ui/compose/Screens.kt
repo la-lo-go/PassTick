@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Share
@@ -117,6 +119,7 @@ fun PassDetailScreen(
     flashlightAvailable: Boolean = false,
     flashlightEnabled: Boolean = false,
     enhanceCodeBrightness: Boolean = true,
+    calendarEventPresent: Boolean = false,
     onAction: (PassDetailAction) -> Unit,
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
@@ -340,8 +343,13 @@ fun PassDetailScreen(
                 }
                 pass.calendarEvent?.let {
                     item {
-                        Button(onClick = { onAction(PassDetailAction.AddToCalendar) }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Add to calendar")
+                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                            ListItem(
+                                leadingContent = { Icon(if (calendarEventPresent) Icons.Default.CheckCircle else Icons.Default.CalendarMonth, null) },
+                                supportingContent = { Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar") },
+                                modifier = Modifier.clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            ) { Text("Date and time") }
                         }
                     }
                 }
