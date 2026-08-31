@@ -31,7 +31,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.ZeroCornerSize
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
@@ -352,11 +353,17 @@ private fun HomeSortSelector(selectedSort: PassSortOrder, onSort: (PassSortOrder
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             val ascending = selectedSort == PassSortOrder.DATE_ASC
+            val label = if (ascending) "Oldest first" else "Newest first"
             FilterChip(
                 selected = selectedSort == PassSortOrder.DATE_ASC || selectedSort == PassSortOrder.DATE_DESC,
                 onClick = { onSort(if (ascending) PassSortOrder.DATE_DESC else PassSortOrder.DATE_ASC) },
-                label = { Text(if (ascending) "Date ascending" else "Date descending") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) },
+                label = { Text(label) },
+                leadingIcon = {
+                    Icon(
+                        if (ascending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                        label,
+                    )
+                },
             )
         }
         item {
