@@ -580,6 +580,7 @@ private fun TicketRow(
                             if (held) {
                                 onPreviewChanged(true)
                                 var opening = false
+                                var releasedAfterPreview = false
                                 try {
                                     while (true) {
                                         val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
@@ -587,17 +588,21 @@ private fun TicketRow(
                                             opening = true
                                             interactionSource.tryEmit(PressInteraction.Cancel(press))
                                             onPreviewOpeningChanged(true)
-                                            scope.launch {
-                                                delay(180)
-                                                onPreviewChanged(false)
-                                                onOpen(pass.id)
-                                            }
                                         }
                                         change?.consume()
-                                        if (change == null || !change.pressed) break
+                                        if (change == null || !change.pressed) {
+                                            releasedAfterPreview = change != null
+                                            break
+                                        }
                                     }
                                 } finally {
-                                    if (!opening) {
+                                    if (opening && releasedAfterPreview) {
+                                        scope.launch {
+                                            delay(180)
+                                            onPreviewChanged(false)
+                                            onOpen(pass.id)
+                                        }
+                                    } else {
                                         interactionSource.tryEmit(PressInteraction.Release(press))
                                         onPreviewChanged(false)
                                     }
@@ -609,20 +614,22 @@ private fun TicketRow(
                                 interactionSource.tryEmit(PressInteraction.Cancel(press))
                             }
                         }
-                    },
+                },
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
-            PassThumbnail(pass, Modifier.size(if (hero) 88.dp else 64.dp))
+            PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     pass.description,
-                    style = if (hero) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+                    style = if (hero) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = if (hero) 3 else 2,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                pass.homeCardDetail()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                pass.homeCardDetail()?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 pass.dateLabel(compactForToday = hero)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 pass.creator?.takeIf(String::isNotBlank)?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -706,6 +713,7 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
             accentColor = pass.accentColor,
             contentDescription = "Pass artwork",
             modifier = modifier,
+            cropNearlySquare = true,
         )
     } else {
         Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {

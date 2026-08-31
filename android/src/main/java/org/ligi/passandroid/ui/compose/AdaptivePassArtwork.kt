@@ -26,8 +26,12 @@ internal fun AdaptivePassArtwork(
     contentDescription: String,
     modifier: Modifier,
     contentPadding: Dp = 8.dp,
+    cropNearlySquare: Boolean = false,
 ) {
     val bitmap = remember(bytes) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) } ?: return
+    val isNearlySquare = remember(bitmap) {
+        minOf(bitmap.width, bitmap.height).toFloat() / maxOf(bitmap.width, bitmap.height) >= 0.9f
+    }
     val luminance = remember(bitmap) { bitmap.averageVisibleLuminance() }
     val accent = Color(accentColor)
     val accentLuminance = accent.luminance()
@@ -49,8 +53,8 @@ internal fun AdaptivePassArtwork(
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = contentDescription,
-                modifier = Modifier.fillMaxSize().padding(contentPadding),
-                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(if (cropNearlySquare && isNearlySquare) 0.dp else contentPadding),
+                contentScale = if (cropNearlySquare && isNearlySquare) ContentScale.Crop else ContentScale.Fit,
             )
         }
     }
