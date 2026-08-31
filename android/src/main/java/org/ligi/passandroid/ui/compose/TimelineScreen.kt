@@ -97,7 +97,7 @@ private fun TimelineContent(
 ) {
     val listState = rememberLazyListState()
     val locale = LocalConfiguration.current.locales[0]
-    val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM", locale) }
+    val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", locale) }
     val nearestIndex = remember(state.timeline.days, state.timeline.nearestEventId) {
         state.timeline.nearestEventId?.let { nearestId ->
             var itemIndex = 0
@@ -189,7 +189,7 @@ private fun EventSummary(
     zoneId: org.threeten.bp.ZoneId,
     modifier: Modifier = Modifier,
 ) {
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy · HH:mm") }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = event.temporalState.label,

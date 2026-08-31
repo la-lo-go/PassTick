@@ -36,12 +36,15 @@ private val PassShapes = Shapes(
 )
 
 @Composable
-fun PassTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
+fun PassTheme(
+    themeMode: ThemeMode,
+    amoledBlackBackground: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     val dark = when (themeMode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
-        ThemeMode.AMOLED -> true
     }
     val context = LocalContext.current
     val baseColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -51,16 +54,9 @@ fun PassTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
     } else {
         LightColors
     }
-    val colors = if (themeMode == ThemeMode.AMOLED) {
+    val colors = if (dark && amoledBlackBackground) {
         baseColors.copy(
             background = Color.Black,
-            surface = Color.Black,
-            surfaceDim = Color.Black,
-            surfaceContainerLowest = Color.Black,
-            surfaceContainerLow = Color(0xFF030303),
-            surfaceContainer = Color(0xFF050505),
-            surfaceContainerHigh = Color(0xFF080808),
-            surfaceContainerHighest = Color(0xFF0B0B0B),
         )
     } else {
         baseColors

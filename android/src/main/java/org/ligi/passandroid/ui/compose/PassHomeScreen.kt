@@ -41,8 +41,7 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -51,6 +50,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -62,6 +64,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,6 +99,7 @@ import org.ligi.passandroid.ui.barcode.PassCodeImage
 import org.threeten.bp.LocalDate
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
@@ -130,6 +134,7 @@ fun PassHomeScreen(
     val scope = rememberCoroutineScope()
     var undoSnackbarJob by remember { mutableStateOf<Job?>(null) }
     var previewPassId by remember { mutableStateOf<String?>(null) }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
     val previewPass = state.passes.firstOrNull { it.id == previewPassId }
     var previewContent by remember { mutableStateOf<PassUiModel?>(null) }
     LaunchedEffect(previewPass) { if (previewPass != null) previewContent = previewPass }
@@ -168,25 +173,40 @@ fun PassHomeScreen(
         }
     }
 
+    val visibleCategories = remember(state.categories, state.passes) {
+        state.categories.filter { category -> state.passes.any { it.categoryId == category.id } }
+    }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                NavigationDrawerItem(
+                    label = { Text("Timeline") },
+                    selected = false,
+                    icon = { Icon(Icons.Default.Timeline, null) },
+                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenTimeline) },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Settings") },
+                    selected = false,
+                    icon = { Icon(Icons.Default.Settings, null) },
+                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenSettings) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+        },
+    ) {
     Scaffold(
         topBar = {
             HomeToolbar(
-                categories = state.categories,
+                categories = visibleCategories,
                 selectedCategoryId = state.selectedCategoryId,
                 onSelectCategory = { onAction(HomeAction.SelectCategory(it)) },
-                onTimeline = { onAction(HomeAction.OpenTimeline) },
-                onSettings = { onAction(HomeAction.OpenSettings) },
+                onOpenDrawer = { scope.launch { drawerState.open() } },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            LargeFloatingActionButton(
-                onClick = { onAction(HomeAction.ImportPass) },
-                modifier = Modifier.semantics { contentDescription = "Import passes" },
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(36.dp))
-            }
-        },
     ) { scaffoldPadding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(scaffoldPadding)) {
             val expanded = maxWidth >= 840.dp
@@ -252,6 +272,19 @@ fun PassHomeScreen(
                     }
                 }
             }
+            LargeFloatingActionButton(
+                onClick = { onAction(HomeAction.ImportPass) },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                    .semantics { contentDescription = "Import passes" },
+            ) {
+                Icon(Icons.Default.Add, null, Modifier.size(36.dp))
+            }
+            if (previewPass != null) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.48f))
+                        .semantics { contentDescription = "Pass preview scrim" },
+                )
+            }
             AnimatedVisibility(
                 visible = previewPass != null,
                 modifier = if (expanded) Modifier.align(Alignment.CenterEnd) else Modifier.align(Alignment.BottomCenter),
@@ -271,6 +304,7 @@ fun PassHomeScreen(
             }
         }
     }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -279,35 +313,14 @@ private fun HomeToolbar(
     categories: List<PassCategory>,
     selectedCategoryId: String?,
     onSelectCategory: (String?) -> Unit,
-    onTimeline: () -> Unit,
-    onSettings: () -> Unit,
+    onOpenDrawer: () -> Unit,
 ) {
-    var navigationMenuOpen by remember { mutableStateOf(false) }
     TopAppBar(
         title = {
-            CategorySelector(
-                categories = categories,
-                selectedId = selectedCategoryId,
-                onSelect = onSelectCategory,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (categories.isNotEmpty()) CategorySelector(categories, selectedCategoryId, onSelectCategory, Modifier.fillMaxWidth())
         },
         navigationIcon = {
-            Box {
-                IconButton(onClick = { navigationMenuOpen = true }) { Icon(Icons.Default.Menu, "Navigation menu") }
-                DropdownMenu(navigationMenuOpen, { navigationMenuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Timeline") },
-                        leadingIcon = { Icon(Icons.Default.Timeline, null) },
-                        onClick = { navigationMenuOpen = false; onTimeline() },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Settings") },
-                        leadingIcon = { Icon(Icons.Default.Settings, null) },
-                        onClick = { navigationMenuOpen = false; onSettings() },
-                    )
-                }
-            }
+            IconButton(onClick = onOpenDrawer) { Icon(Icons.Default.Menu, "Navigation menu") }
         },
     )
 }
@@ -487,46 +500,47 @@ private fun TicketRow(
     onPreviewChanged: (Boolean) -> Unit,
 ) {
     var dragOffset by remember(pass.id) { mutableFloatStateOf(0f) }
+    var pendingReorder by remember(pass.id) { mutableStateOf(0) }
     Surface(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(ZeroCornerSize),
-        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer { translationY = dragOffset }
-            .pointerInput(pass.id) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val held = withTimeoutOrNull(1_000) {
-                        while (true) {
-                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
-                            if (change == null || !change.pressed) return@withTimeoutOrNull false
-                            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                                return@withTimeoutOrNull false
-                            }
-                        }
-                        @Suppress("UNREACHABLE_CODE")
-                        false
-                    } ?: true
-                    if (held) {
-                        onPreviewChanged(true)
-                        try {
-                            while (true) {
-                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
-                                change?.consume()
-                                if (change == null || !change.pressed) break
-                            }
-                        } finally {
-                            onPreviewChanged(false)
-                        }
-                    }
-                }
-            }
-            .clickable { onOpen(pass.id) },
+        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer { translationY = dragOffset },
     ) {
         Row(
             Modifier.fillMaxWidth().padding(if (hero) 20.dp else 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Row(
+                Modifier.weight(1f).pointerInput(pass.id) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val held = withTimeoutOrNull(750) {
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                                if (change == null || !change.pressed) return@withTimeoutOrNull false
+                                if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                    return@withTimeoutOrNull false
+                                }
+                            }
+                            @Suppress("UNREACHABLE_CODE") false
+                        } ?: true
+                        if (held) {
+                            onPreviewChanged(true)
+                            try {
+                                while (true) {
+                                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                                    change?.consume()
+                                    if (change == null || !change.pressed) break
+                                }
+                            } finally { onPreviewChanged(false) }
+                        }
+                    }
+                }.clickable { onOpen(pass.id) },
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
             PassThumbnail(pass, Modifier.size(if (hero) 88.dp else 64.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (hero) {
@@ -551,20 +565,23 @@ private fun TicketRow(
                     Text(pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase), style = MaterialTheme.typography.labelMedium)
                 }
             }
+            }
             Icon(
                 Icons.Default.DragHandle,
                 "Reorder ${pass.description}",
                 Modifier.size(40.dp).pointerInput(pass.id) {
                     detectDragGesturesAfterLongPress(
-                        onDragEnd = { dragOffset = 0f },
-                        onDragCancel = { dragOffset = 0f },
+                        onDragEnd = {
+                            val offset = pendingReorder
+                            dragOffset = 0f
+                            pendingReorder = 0
+                            if (offset != 0) onReorder(offset)
+                        },
+                        onDragCancel = { dragOffset = 0f; pendingReorder = 0 },
                         onDrag = { change, amount ->
                             change.consume()
-                            dragOffset += amount.y
-                            when {
-                                dragOffset > 56.dp.toPx() -> { onReorder(1); dragOffset = 0f }
-                                dragOffset < -56.dp.toPx() -> { onReorder(-1); dragOffset = 0f }
-                            }
+                            dragOffset = (dragOffset + amount.y).coerceIn(-224.dp.toPx(), 224.dp.toPx())
+                            pendingReorder = (dragOffset / 72.dp.toPx()).roundToInt()
                         },
                     )
                 }.padding(8.dp),
@@ -610,9 +627,9 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
     if (artwork != null) {
         AdaptivePassArtwork(
             bytes = artwork.bytes,
+            accentColor = pass.accentColor,
             contentDescription = "Pass artwork",
             modifier = modifier,
-            cornerRadius = 18.dp,
         )
     } else {
         Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {

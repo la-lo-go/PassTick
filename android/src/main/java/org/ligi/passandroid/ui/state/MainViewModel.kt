@@ -172,6 +172,9 @@ class MainViewModel(
                 }
             }
             is AppAction.SetTheme -> viewModelScope.launch { settingsRepository.setThemeMode(action.value) }
+            is AppAction.SetAmoledBlackBackground -> viewModelScope.launch {
+                settingsRepository.setAmoledBlackBackground(action.value)
+            }
             is AppAction.SetAutomaticBrightness -> viewModelScope.launch {
                 settingsRepository.setAutomaticBrightness(action.value)
             }

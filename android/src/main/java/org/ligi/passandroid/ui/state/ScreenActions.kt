@@ -25,6 +25,7 @@ sealed interface EditPassAction {
 sealed interface SettingsAction {
     data object Back : SettingsAction
     data class SetTheme(val value: ThemeMode) : SettingsAction
+    data class SetAmoledBlackBackground(val value: Boolean) : SettingsAction
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction

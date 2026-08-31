@@ -50,14 +50,15 @@ class PassScreensTest {
 
     @Test
     fun settingsExposeThemeAndAccessibilityOptions() {
+        val settings = AppSettings(themeMode = ThemeMode.DARK)
         composeRule.setContent {
-            PassTheme(AppSettings().themeMode) {
-                SettingsScreen(AppSettings(), {})
+            PassTheme(settings.themeMode, settings.amoledBlackBackground) {
+                SettingsScreen(settings, {})
             }
         }
 
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
-        composeRule.onNodeWithText("Amoled").assertIsDisplayed()
+        composeRule.onNodeWithText("Use AMOLED black background").assertIsDisplayed()
         composeRule.onNodeWithText("Use HDR and maximum code brightness").assertIsDisplayed()
     }
 

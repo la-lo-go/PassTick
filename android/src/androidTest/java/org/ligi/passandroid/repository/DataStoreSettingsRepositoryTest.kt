@@ -14,7 +14,8 @@ class DataStoreSettingsRepositoryTest {
             val repository = DataStoreSettingsRepository(
                 InstrumentationRegistry.getInstrumentation().targetContext,
             )
-            repository.setThemeMode(ThemeMode.AMOLED)
+            repository.setThemeMode(ThemeMode.DARK)
+            repository.setAmoledBlackBackground(true)
             repository.setAutomaticBrightness(false)
             repository.setSortOrder(PassSortOrder.TYPE)
             repository.setPassOrder(listOf("pass-3", "pass-1"))
@@ -29,7 +30,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setReminderLeadMinutesByPass(mapOf("pass-3" to 45))
 
             val restored = repository.settings.first {
-                it.themeMode == ThemeMode.AMOLED && !it.automaticBrightness &&
+                it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
                     it.sortOrder == PassSortOrder.TYPE && it.passOrder == listOf("pass-3", "pass-1") &&
                     it.categories == categories &&
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
@@ -40,7 +41,8 @@ class DataStoreSettingsRepositoryTest {
 
             assertThat(restored).isEqualTo(
                 AppSettings(
-                    ThemeMode.AMOLED,
+                    ThemeMode.DARK,
+                    amoledBlackBackground = true,
                     automaticBrightness = false,
                     sortOrder = PassSortOrder.TYPE,
                     passOrder = listOf("pass-3", "pass-1"),

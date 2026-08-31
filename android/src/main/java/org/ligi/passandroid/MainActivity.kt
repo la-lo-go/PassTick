@@ -252,7 +252,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            PassTheme(state.settings.themeMode) {
+            PassTheme(state.settings.themeMode, state.settings.amoledBlackBackground) {
                 if (showCalendarPermissionWarning) {
                     AlertDialog(
                         onDismissRequest = { showCalendarPermissionWarning = false },
@@ -391,6 +391,9 @@ class MainActivity : ComponentActivity() {
                                     when (action) {
                                         SettingsAction.Back -> backStack.removeLastOrNull()
                                         is SettingsAction.SetTheme -> viewModel.onAction(AppAction.SetTheme(action.value))
+                                        is SettingsAction.SetAmoledBlackBackground -> viewModel.onAction(
+                                            AppAction.SetAmoledBlackBackground(action.value),
+                                        )
                                         is SettingsAction.SetAutomaticBrightness -> viewModel.onAction(AppAction.SetAutomaticBrightness(action.value))
                                         is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
                                         SettingsAction.OpenCategories -> backStack.add(AppDestination.CategorySettings)

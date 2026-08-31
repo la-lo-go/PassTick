@@ -133,6 +133,7 @@ sealed interface AppAction {
     data class DeleteCategory(val categoryId: String) : AppAction
     data class MoveCategory(val categoryId: String, val offset: Int) : AppAction
     data class SetTheme(val value: ThemeMode) : AppAction
+    data class SetAmoledBlackBackground(val value: Boolean) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
     data class ReorderPass(val passId: String, val offset: Int) : AppAction

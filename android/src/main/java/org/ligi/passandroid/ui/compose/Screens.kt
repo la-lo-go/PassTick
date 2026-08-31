@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -125,6 +124,7 @@ fun PassDetailScreen(
     var configureReminder by remember { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
+    var showArtwork by remember(pass?.id) { mutableStateOf(true) }
     val codeExpanded = codeHeld || codePinned
     LaunchedEffect(initialCodeExpanded) {
         if (initialCodeExpanded) onInitialCodeShown()
@@ -273,19 +273,35 @@ fun PassDetailScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 136.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                item {
-                    PassArtwork(
-                        pass,
-                        listOf(PassArtworkKind.STRIP, PassArtworkKind.LOGO, PassArtworkKind.THUMBNAIL),
-                        Modifier.fillMaxWidth().height(160.dp),
-                    )
+                val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.STRIP }
+                    ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
+                    ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
+                if (artwork != null && showArtwork) {
+                    item {
+                        Box(Modifier.fillMaxWidth().height(160.dp)) {
+                            PassArtwork(pass, listOf(artwork.kind), Modifier.fillMaxSize())
+                            IconButton(
+                                onClick = { showArtwork = false },
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                            ) { Icon(Icons.Default.VisibilityOff, "Hide photo") }
+                        }
+                    }
                 }
                 item {
                     BarcodeCard(
                         pass = pass,
+                        emphasized = artwork == null || !showArtwork,
                         onHoldChanged = { codeHeld = it },
                         onPin = { codePinned = true },
                     )
+                }
+                if (artwork != null && !showArtwork) {
+                    item {
+                        OutlinedButton(onClick = { showArtwork = true }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Visibility, null)
+                            Text("Show photo", Modifier.padding(start = 8.dp))
+                        }
+                    }
                 }
                 val visibleFields = pass.fields.filterNot { it.hidden }
                 if (visibleFields.isNotEmpty()) {
@@ -350,21 +366,31 @@ private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>
         ?: return
     AdaptivePassArtwork(
         bytes = artwork.bytes,
+        accentColor = pass.accentColor,
         contentDescription = "Pass artwork",
         modifier = modifier,
-        cornerRadius = 24.dp,
     )
 }
 
 @Composable
-private fun BarcodeCard(pass: PassUiModel, onHoldChanged: (Boolean) -> Unit, onPin: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun BarcodeCard(
+    pass: PassUiModel,
+    emphasized: Boolean,
+    onHoldChanged: (Boolean) -> Unit,
+    onPin: () -> Unit,
+) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.White, contentColor = Color.Black) {
         Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             val format = pass.barcodeFormat
             val message = pass.barcodeMessage
             if (format != null && !message.isNullOrBlank()) {
-                BoxWithConstraints(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                    PassCodePreview(format, message, onHoldChanged, onPin, Modifier.fillMaxSize())
+                BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val height = if (format.isQuadratic()) {
+                        maxWidth.coerceAtMost(if (emphasized) 460.dp else 360.dp)
+                    } else {
+                        (maxWidth / 2.6f).coerceIn(144.dp, if (emphasized) 280.dp else 220.dp)
+                    }
+                    PassCodePreview(format, message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
                 }
             } else Text("No barcode", style = MaterialTheme.typography.titleMedium)
         }
@@ -672,6 +698,11 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                                 modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             ) { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) }
+                        }
+                        if (settings.themeMode == ThemeMode.DARK) {
+                            SettingSwitch("Use AMOLED black background", settings.amoledBlackBackground) {
+                                onAction(SettingsAction.SetAmoledBlackBackground(it))
+                            }
                         }
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                         SettingSwitch("Use HDR and maximum code brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) }

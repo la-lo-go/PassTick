@@ -283,6 +283,7 @@ private class FakePlatformActions : PlatformActions {
 private class FakeSettingsRepository : SettingsRepository {
     override val settings = MutableStateFlow(AppSettings())
     override suspend fun setThemeMode(value: ThemeMode) = Unit
+    override suspend fun setAmoledBlackBackground(value: Boolean) = Unit
     override suspend fun setAutomaticBrightness(value: Boolean) = Unit
     override suspend fun setSortOrder(value: PassSortOrder) {
         settings.value = settings.value.copy(sortOrder = value)
