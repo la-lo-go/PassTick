@@ -355,4 +355,45 @@ private class FakeSettingsRepository : SettingsRepository {
     ) {
         settings.value = settings.value.copy(homeCardSectionOrder = order, hiddenHomeCardSections = hidden)
     }
+    override suspend fun movePassDetailSection(
+        section: org.ligi.passandroid.repository.PassDetailSection,
+        offset: Int,
+    ) {
+        settings.value = settings.value.copy(
+            passDetailSectionOrder = settings.value.passDetailSectionOrder.moveForTest(section, offset),
+        )
+    }
+    override suspend fun setPassDetailSectionVisible(
+        section: org.ligi.passandroid.repository.PassDetailSection,
+        visible: Boolean,
+    ) {
+        settings.value = settings.value.copy(
+            hiddenPassDetailSections = settings.value.hiddenPassDetailSections.withVisibilityForTest(section, visible),
+        )
+    }
+    override suspend fun moveHomeCardSection(
+        section: org.ligi.passandroid.repository.HomeCardSection,
+        offset: Int,
+    ) {
+        settings.value = settings.value.copy(
+            homeCardSectionOrder = settings.value.homeCardSectionOrder.moveForTest(section, offset),
+        )
+    }
+    override suspend fun setHomeCardSectionVisible(
+        section: org.ligi.passandroid.repository.HomeCardSection,
+        visible: Boolean,
+    ) {
+        settings.value = settings.value.copy(
+            hiddenHomeCardSections = settings.value.hiddenHomeCardSections.withVisibilityForTest(section, visible),
+        )
+    }
 }
+
+private fun <T> List<T>.moveForTest(item: T, offset: Int): List<T> {
+    val from = indexOf(item)
+    val to = (from + offset).coerceIn(indices)
+    return toMutableList().apply { add(to, removeAt(from)) }
+}
+
+private fun <T> Set<T>.withVisibilityForTest(item: T, visible: Boolean): Set<T> =
+    toMutableSet().apply { if (visible) remove(item) else add(item) }

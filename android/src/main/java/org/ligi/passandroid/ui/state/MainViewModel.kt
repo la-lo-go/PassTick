@@ -212,32 +212,16 @@ class MainViewModel(
                 settingsRepository.setReminderMinutes(action.value)
             }
             is AppAction.MovePassDetailSection -> viewModelScope.launch {
-                val settings = uiState.value.settings
-                settingsRepository.setPassDetailLayout(
-                    settings.passDetailSectionOrder.move(action.section, action.offset),
-                    settings.hiddenPassDetailSections,
-                )
+                settingsRepository.movePassDetailSection(action.section, action.offset)
             }
             is AppAction.SetPassDetailSectionVisible -> viewModelScope.launch {
-                val settings = uiState.value.settings
-                settingsRepository.setPassDetailLayout(
-                    settings.passDetailSectionOrder,
-                    settings.hiddenPassDetailSections.withVisibility(action.section, action.visible),
-                )
+                settingsRepository.setPassDetailSectionVisible(action.section, action.visible)
             }
             is AppAction.MoveHomeCardSection -> viewModelScope.launch {
-                val settings = uiState.value.settings
-                settingsRepository.setHomeCardLayout(
-                    settings.homeCardSectionOrder.move(action.section, action.offset),
-                    settings.hiddenHomeCardSections,
-                )
+                settingsRepository.moveHomeCardSection(action.section, action.offset)
             }
             is AppAction.SetHomeCardSectionVisible -> viewModelScope.launch {
-                val settings = uiState.value.settings
-                settingsRepository.setHomeCardLayout(
-                    settings.homeCardSectionOrder,
-                    settings.hiddenHomeCardSections.withVisibility(action.section, action.visible),
-                )
+                settingsRepository.setHomeCardSectionVisible(action.section, action.visible)
             }
             is AppAction.TogglePassReminder -> viewModelScope.launch {
                 val excluded = uiState.value.settings.reminderExcludedPassIds.toMutableSet()
@@ -374,17 +358,6 @@ private fun PassDraft.toPassUpdate(): PassUpdate {
     },
     )
 }
-
-private fun <T> List<T>.move(item: T, offset: Int): List<T> {
-    val from = indexOf(item)
-    if (from < 0 || size < 2) return this
-    val to = (from + offset).coerceIn(indices)
-    if (from == to) return this
-    return toMutableList().apply { add(to, removeAt(from)) }
-}
-
-private fun <T> Set<T>.withVisibility(item: T, visible: Boolean): Set<T> =
-    toMutableSet().apply { if (visible) remove(item) else add(item) }
 
 private fun <T : Comparable<T>> compareNullable(
     left: T?,

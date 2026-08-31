@@ -47,6 +47,17 @@ val defaultPassDetailSectionOrder = PassDetailSection.entries
 fun normalizePassDetailSectionOrder(sections: List<PassDetailSection>): List<PassDetailSection> =
     (sections.distinct() + defaultPassDetailSectionOrder).distinct()
 
+private fun <T> List<T>.move(item: T, offset: Int): List<T> {
+    val from = indexOf(item)
+    if (from < 0 || size < 2) return this
+    val to = (from + offset).coerceIn(indices)
+    if (from == to) return this
+    return toMutableList().apply { add(to, removeAt(from)) }
+}
+
+private fun <T> Set<T>.withVisibility(item: T, visible: Boolean): Set<T> =
+    toMutableSet().apply { if (visible) remove(item) else add(item) }
+
 data class PassCategory(
     val id: String,
     val name: String,
@@ -100,6 +111,10 @@ interface SettingsRepository {
     suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>)
     suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>)
     suspend fun setHomeCardLayout(order: List<HomeCardSection>, hidden: Set<HomeCardSection>)
+    suspend fun movePassDetailSection(section: PassDetailSection, offset: Int)
+    suspend fun setPassDetailSectionVisible(section: PassDetailSection, visible: Boolean)
+    suspend fun moveHomeCardSection(section: HomeCardSection, offset: Int)
+    suspend fun setHomeCardSectionVisible(section: HomeCardSection, visible: Boolean)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -180,6 +195,39 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         context.settingsDataStore.edit {
             it[HOME_CARD_SECTION_ORDER] = encodeHomeCardSectionOrder(order)
             it[HIDDEN_HOME_CARD_SECTIONS] = hidden.mapTo(mutableSetOf()) { section -> section.name }
+        }
+    }
+
+    override suspend fun movePassDetailSection(section: PassDetailSection, offset: Int) {
+        context.settingsDataStore.edit { preferences ->
+            val order = preferences[PASS_DETAIL_SECTION_ORDER]
+                ?.let(::decodePassDetailSectionOrder)
+                ?: defaultPassDetailSectionOrder
+            preferences[PASS_DETAIL_SECTION_ORDER] = encodePassDetailSectionOrder(order.move(section, offset))
+        }
+    }
+
+    override suspend fun setPassDetailSectionVisible(section: PassDetailSection, visible: Boolean) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[HIDDEN_PASS_DETAIL_SECTIONS] = preferences[HIDDEN_PASS_DETAIL_SECTIONS]
+                .orEmpty()
+                .withVisibility(section.name, visible)
+        }
+    }
+
+    override suspend fun moveHomeCardSection(section: HomeCardSection, offset: Int) {
+        context.settingsDataStore.edit { preferences ->
+            val order = preferences[HOME_CARD_SECTION_ORDER]
+                ?.let(::decodeHomeCardSectionOrder)
+                ?: defaultHomeCardSectionOrder
+            preferences[HOME_CARD_SECTION_ORDER] = encodeHomeCardSectionOrder(order.move(section, offset))
+        }
+    }
+
+    override suspend fun setHomeCardSectionVisible(section: HomeCardSection, visible: Boolean) {
+        context.settingsDataStore.edit { preferences ->
+            val hidden = preferences[HIDDEN_HOME_CARD_SECTIONS] ?: defaultHiddenHomeCardSections.mapTo(mutableSetOf()) { it.name }
+            preferences[HIDDEN_HOME_CARD_SECTIONS] = hidden.withVisibility(section.name, visible)
         }
     }
 
