@@ -207,7 +207,7 @@ class MainViewModelTest {
             org.ligi.passandroid.repository.HomeCardSection.TITLE,
             org.ligi.passandroid.repository.HomeCardSection.DATE,
             org.ligi.passandroid.repository.HomeCardSection.PRIMARY_FIELD,
-        ).inOrder()
+        )
         assertThat(settings.settings.value.hiddenHomeCardSections)
             .doesNotContain(org.ligi.passandroid.repository.HomeCardSection.CREATOR)
     }
