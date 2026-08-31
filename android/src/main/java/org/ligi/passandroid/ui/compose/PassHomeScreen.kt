@@ -1,13 +1,18 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -135,6 +140,7 @@ fun PassHomeScreen(
     val scope = rememberCoroutineScope()
     var undoSnackbarJob by remember { mutableStateOf<Job?>(null) }
     var previewPassId by remember { mutableStateOf<String?>(null) }
+    var previewOpeningPassId by remember { mutableStateOf<String?>(null) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val previewPass = state.passes.firstOrNull { it.id == previewPassId }
     var previewContent by remember { mutableStateOf<PassUiModel?>(null) }
@@ -247,7 +253,11 @@ fun PassHomeScreen(
                             },
                             onDelete = { id -> dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id), "Pass deleted") },
                             onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
-                            onPreviewChanged = { previewPassId = it },
+                            onPreviewChanged = {
+                                previewPassId = it
+                                if (it == null) previewOpeningPassId = null
+                            },
+                            onPreviewOpeningChanged = { previewOpeningPassId = it },
                         )
                     }
                 }
@@ -268,7 +278,11 @@ fun PassHomeScreen(
                             },
                             onDelete = { id -> dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id), "Pass deleted") },
                             onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
-                            onPreviewChanged = { previewPassId = it },
+                            onPreviewChanged = {
+                                previewPassId = it
+                                if (it == null) previewOpeningPassId = null
+                            },
+                            onPreviewOpeningChanged = { previewOpeningPassId = it },
                         )
                     }
                 }
@@ -295,6 +309,7 @@ fun PassHomeScreen(
                 previewContent?.let { pass ->
                     PassHoldPreview(
                         pass = pass,
+                        opening = previewOpeningPassId == pass.id,
                         modifier = if (expanded) {
                             Modifier.fillMaxHeight().widthIn(max = 440.dp).padding(16.dp)
                         } else {
@@ -397,6 +412,7 @@ private fun TicketFeed(
     onDelete: (String) -> Unit,
     onReorder: (String, Int) -> Unit,
     onPreviewChanged: (String?) -> Unit,
+    onPreviewOpeningChanged: (String?) -> Unit,
 ) {
     val feeds = remember(passes, columns) {
         List(columns) { column -> passes.filterIndexed { index, _ -> index % columns == column } }
@@ -422,6 +438,7 @@ private fun TicketFeed(
                                 onDelete = onDelete,
                                 onReorder = onReorder,
                                 onPreviewChanged = onPreviewChanged,
+                                onPreviewOpeningChanged = onPreviewOpeningChanged,
                             )
                             if (index < feed.lastIndex) {
                                 HorizontalDivider(Modifier.padding(horizontal = if (hero) 20.dp else 16.dp))
@@ -448,6 +465,7 @@ private fun TicketSwipeContainer(
     onDelete: (String) -> Unit,
     onReorder: (String, Int) -> Unit,
     onPreviewChanged: (String?) -> Unit,
+    onPreviewOpeningChanged: (String?) -> Unit,
 ) {
     val restoring = category?.role == PassCategoryRole.ARCHIVE
     val archiveLabel = if (restoring) "Restore" else "Archive"
@@ -491,6 +509,7 @@ private fun TicketSwipeContainer(
                 onOpen = onOpen,
                 onReorder = { offset -> onReorder(pass.id, offset) },
                 onPreviewChanged = { visible -> onPreviewChanged(pass.id.takeIf { visible }) },
+                onPreviewOpeningChanged = { opening -> onPreviewOpeningChanged(pass.id.takeIf { opening }) },
             )
         },
     )
@@ -505,6 +524,7 @@ private fun TicketRow(
     onOpen: (String) -> Unit,
     onReorder: (Int) -> Unit,
     onPreviewChanged: (Boolean) -> Unit,
+    onPreviewOpeningChanged: (Boolean) -> Unit,
 ) {
     var dragOffset by remember(pass.id) { mutableFloatStateOf(0f) }
     var pendingReorder by remember(pass.id) { mutableStateOf(0) }
@@ -519,32 +539,65 @@ private fun TicketRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val interactionSource = remember(pass.id) { MutableInteractionSource() }
+            val scope = rememberCoroutineScope()
             Row(
-                Modifier.weight(1f).pointerInput(pass.id) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val held = withTimeoutOrNull(750) {
-                            while (true) {
-                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
-                                if (change == null || !change.pressed) return@withTimeoutOrNull false
-                                if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                                    return@withTimeoutOrNull false
-                                }
-                            }
-                            @Suppress("UNREACHABLE_CODE") false
-                        } ?: true
-                        if (held) {
-                            onPreviewChanged(true)
-                            try {
+                Modifier.weight(1f)
+                    .indication(interactionSource, LocalIndication.current)
+                    .pointerInput(pass.id) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val press = PressInteraction.Press(down.position)
+                            interactionSource.tryEmit(press)
+                            var releasedBeforeLongPress = false
+                            var movedBeforeLongPress = false
+                            val held = withTimeoutOrNull(750) {
                                 while (true) {
                                     val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
-                                    change?.consume()
-                                    if (change == null || !change.pressed) break
+                                    if (change == null || !change.pressed) {
+                                        releasedBeforeLongPress = true
+                                        return@withTimeoutOrNull false
+                                    }
+                                    if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                        movedBeforeLongPress = true
+                                        return@withTimeoutOrNull false
+                                    }
                                 }
-                            } finally { onPreviewChanged(false) }
+                                @Suppress("UNREACHABLE_CODE") false
+                            } ?: true
+                            if (held) {
+                                onPreviewChanged(true)
+                                var opening = false
+                                try {
+                                    while (true) {
+                                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                                        if (!opening && change != null && down.position.y - change.position.y > 72.dp.toPx()) {
+                                            opening = true
+                                            interactionSource.tryEmit(PressInteraction.Cancel(press))
+                                            onPreviewOpeningChanged(true)
+                                            scope.launch {
+                                                delay(180)
+                                                onPreviewChanged(false)
+                                                onOpen(pass.id)
+                                            }
+                                        }
+                                        change?.consume()
+                                        if (change == null || !change.pressed) break
+                                    }
+                                } finally {
+                                    if (!opening) {
+                                        interactionSource.tryEmit(PressInteraction.Release(press))
+                                        onPreviewChanged(false)
+                                    }
+                                }
+                            } else if (releasedBeforeLongPress && !movedBeforeLongPress) {
+                                interactionSource.tryEmit(PressInteraction.Release(press))
+                                onOpen(pass.id)
+                            } else {
+                                interactionSource.tryEmit(PressInteraction.Cancel(press))
+                            }
                         }
-                    }
-                }.clickable { onOpen(pass.id) },
+                    },
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -558,7 +611,7 @@ private fun TicketRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 pass.homeCardDetail()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                pass.dateLabel()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                pass.dateLabel(compactForToday = hero)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 pass.creator?.takeIf(String::isNotBlank)?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -593,9 +646,18 @@ private fun TicketRow(
 }
 
 @Composable
-private fun PassHoldPreview(pass: PassUiModel, modifier: Modifier) {
+private fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modifier) {
+    val openingProgress by animateFloatAsState(
+        targetValue = if (opening) 1f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "passPreviewOpening",
+    )
     Surface(
-        modifier = modifier,
+        modifier = modifier.graphicsLayer {
+            translationY = -96.dp.toPx() * openingProgress
+            scaleX = 1f + (0.04f * openingProgress)
+            scaleY = 1f + (0.04f * openingProgress)
+        },
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shadowElevation = 12.dp,
@@ -690,7 +752,10 @@ private fun PassUiModel.occursToday(): Boolean {
     }
 }
 
-private fun PassUiModel.dateLabel(): String? {
+private fun PassUiModel.dateLabel(compactForToday: Boolean = false): String? {
     val value = calendarTimeSpan?.from ?: calendarTimeSpan?.to ?: return null
+    if (compactForToday && occursToday()) {
+        return value.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+    }
     return value.format(DateTimeFormatter.ofPattern("EEE, MMM d · HH:mm", Locale.getDefault()))
 }
