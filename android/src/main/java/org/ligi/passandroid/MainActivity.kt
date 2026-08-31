@@ -34,6 +34,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import androidx.navigation3.runtime.entryProvider
@@ -336,6 +339,18 @@ class MainActivity : ComponentActivity() {
                                         var calendarEventPresent by remember(selected.passId) { mutableStateOf(false) }
                                         LaunchedEffect(pass?.calendarEvent) {
                                             calendarEventPresent = pass?.let { viewModel.isCalendarEventPresent(it) } == true
+                                        }
+                                        val lifecycleOwner = LocalLifecycleOwner.current
+                                        DisposableEffect(lifecycleOwner, pass?.id, pass?.calendarEvent) {
+                                            val observer = LifecycleEventObserver { _, event ->
+                                                if (event == Lifecycle.Event.ON_RESUME && pass != null) {
+                                                    coroutineScope.launch {
+                                                        calendarEventPresent = viewModel.isCalendarEventPresent(pass)
+                                                    }
+                                                }
+                                            }
+                                            lifecycleOwner.lifecycle.addObserver(observer)
+                                            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                                         }
                                         PassDetailScreen(
                                             pass = pass,

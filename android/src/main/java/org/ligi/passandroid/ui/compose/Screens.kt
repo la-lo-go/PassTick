@@ -323,7 +323,7 @@ fun PassDetailScreen(
                                             ListItem(
                                                 leadingContent = { Icon(Icons.Default.LocationOn, null) },
                                                 supportingContent = { Text("Open in Maps") },
-                                                modifier = Modifier.clickable {
+                                                modifier = Modifier.fillMaxWidth().clickable {
                                                     onAction(PassDetailAction.OpenLocation(index))
                                                 },
                                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -338,7 +338,7 @@ fun PassDetailScreen(
                                         ListItem(
                                             leadingContent = { Icon(if (calendarEventPresent) Icons.Default.CheckCircle else Icons.Default.CalendarMonth, null) },
                                             supportingContent = { Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar") },
-                                            modifier = Modifier.clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
+                                            modifier = Modifier.fillMaxWidth().clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
                                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                         ) { Text(pass.dateTimeLabel()) }
                                     }
