@@ -50,6 +50,7 @@ import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
+import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.PassDetailScreen
 import org.ligi.passandroid.ui.compose.PassHomeScreen
@@ -65,6 +66,7 @@ import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction
+import org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.platform.AndroidFlashlightController
 import org.ligi.passandroid.platform.FlashlightState
@@ -433,6 +435,7 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
                                         SettingsAction.OpenCategories -> backStack.add(AppDestination.CategorySettings)
                                         SettingsAction.OpenPassDetailLayout -> backStack.add(AppDestination.PassDetailLayoutSettings)
+                                        SettingsAction.OpenHomeCardLayout -> backStack.add(AppDestination.HomeCardLayoutSettings)
                                         is SettingsAction.SetHighlightTodayPasses -> viewModel.onAction(
                                             AppAction.SetHighlightTodayPasses(action.value),
                                         )
@@ -518,6 +521,32 @@ class MainActivity : ComponentActivity() {
                                                 if (action.visible) remove(action.section) else add(action.section)
                                             }
                                             viewModel.onAction(AppAction.SetPassDetailLayout(order, updated))
+                                        }
+                                    }
+                                }
+                            }
+                            entry<AppDestination.HomeCardLayoutSettings> {
+                                HomeCardLayoutSettingsScreen(
+                                    order = state.settings.homeCardSectionOrder,
+                                    hidden = state.settings.hiddenHomeCardSections,
+                                ) { action ->
+                                    val order = state.settings.homeCardSectionOrder
+                                    val hidden = state.settings.hiddenHomeCardSections
+                                    when (action) {
+                                        HomeCardLayoutSettingsAction.Back -> backStack.removeLastOrNull()
+                                        is HomeCardLayoutSettingsAction.Move -> {
+                                            val from = order.indexOf(action.section)
+                                            val to = (from + action.offset).coerceIn(order.indices)
+                                            if (from >= 0 && from != to) {
+                                                val updated = order.toMutableList().apply { add(to, removeAt(from)) }
+                                                viewModel.onAction(AppAction.SetHomeCardLayout(updated, hidden))
+                                            }
+                                        }
+                                        is HomeCardLayoutSettingsAction.SetVisible -> {
+                                            val updated = hidden.toMutableSet().apply {
+                                                if (action.visible) remove(action.section) else add(action.section)
+                                            }
+                                            viewModel.onAction(AppAction.SetHomeCardLayout(order, updated))
                                         }
                                     }
                                 }

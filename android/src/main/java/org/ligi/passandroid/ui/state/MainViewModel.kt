@@ -214,6 +214,9 @@ class MainViewModel(
             is AppAction.SetPassDetailLayout -> viewModelScope.launch {
                 settingsRepository.setPassDetailLayout(action.order, action.hidden)
             }
+            is AppAction.SetHomeCardLayout -> viewModelScope.launch {
+                settingsRepository.setHomeCardLayout(action.order, action.hidden)
+            }
             is AppAction.TogglePassReminder -> viewModelScope.launch {
                 val excluded = uiState.value.settings.reminderExcludedPassIds.toMutableSet()
                 if (!excluded.add(action.passId)) excluded.remove(action.passId)

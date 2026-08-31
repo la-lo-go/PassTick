@@ -10,5 +10,6 @@ sealed interface AppDestination : NavKey {
     @Serializable data object Settings : AppDestination
     @Serializable data object CategorySettings : AppDestination
     @Serializable data object PassDetailLayoutSettings : AppDestination
+    @Serializable data object HomeCardLayoutSettings : AppDestination
     @Serializable data object Timeline : AppDestination
 }

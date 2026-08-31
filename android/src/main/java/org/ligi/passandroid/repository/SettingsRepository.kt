@@ -25,6 +25,22 @@ enum class PassDetailSection {
     CALENDAR,
 }
 
+enum class HomeCardSection {
+    ARTWORK,
+    TITLE,
+    PRIMARY_FIELD,
+    DATE,
+    CREATOR,
+    CATEGORY,
+    PASS_TYPE,
+}
+
+val defaultHomeCardSectionOrder = HomeCardSection.entries
+val defaultHiddenHomeCardSections = setOf(HomeCardSection.CREATOR)
+
+fun normalizeHomeCardSectionOrder(sections: List<HomeCardSection>): List<HomeCardSection> =
+    (sections.distinct() + defaultHomeCardSectionOrder).distinct()
+
 val defaultPassDetailSectionOrder = PassDetailSection.entries
 
 fun normalizePassDetailSectionOrder(sections: List<PassDetailSection>): List<PassDetailSection> =
@@ -61,6 +77,8 @@ data class AppSettings(
     val reminderLeadMinutesByPass: Map<String, Int> = emptyMap(),
     val passDetailSectionOrder: List<PassDetailSection> = defaultPassDetailSectionOrder,
     val hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
+    val homeCardSectionOrder: List<HomeCardSection> = defaultHomeCardSectionOrder,
+    val hiddenHomeCardSections: Set<HomeCardSection> = defaultHiddenHomeCardSections,
 )
 
 interface SettingsRepository {
@@ -80,6 +98,7 @@ interface SettingsRepository {
     suspend fun setReminderExcludedPassIds(value: Set<String>)
     suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>)
     suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>)
+    suspend fun setHomeCardLayout(order: List<HomeCardSection>, hidden: Set<HomeCardSection>)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -114,6 +133,13 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 ?.mapNotNull { value -> runCatching { PassDetailSection.valueOf(value) }.getOrNull() }
                 ?.toSet()
                 .orEmpty(),
+            homeCardSectionOrder = preferences[HOME_CARD_SECTION_ORDER]
+                ?.let(::decodeHomeCardSectionOrder)
+                ?: defaultHomeCardSectionOrder,
+            hiddenHomeCardSections = preferences[HIDDEN_HOME_CARD_SECTIONS]
+                ?.mapNotNull { value -> runCatching { HomeCardSection.valueOf(value) }.getOrNull() }
+                ?.toSet()
+                ?: defaultHiddenHomeCardSections,
         )
     }
 
@@ -149,6 +175,13 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         }
     }
 
+    override suspend fun setHomeCardLayout(order: List<HomeCardSection>, hidden: Set<HomeCardSection>) {
+        context.settingsDataStore.edit {
+            it[HOME_CARD_SECTION_ORDER] = encodeHomeCardSectionOrder(order)
+            it[HIDDEN_HOME_CARD_SECTIONS] = hidden.mapTo(mutableSetOf()) { section -> section.name }
+        }
+    }
+
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
     }
@@ -170,6 +203,8 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val REMINDER_LEAD_BY_PASS = stringPreferencesKey("reminder_lead_minutes_by_pass")
         val PASS_DETAIL_SECTION_ORDER = stringPreferencesKey("pass_detail_section_order")
         val HIDDEN_PASS_DETAIL_SECTIONS = stringSetPreferencesKey("hidden_pass_detail_sections")
+        val HOME_CARD_SECTION_ORDER = stringPreferencesKey("home_card_section_order")
+        val HIDDEN_HOME_CARD_SECTIONS = stringSetPreferencesKey("hidden_home_card_sections")
     }
 }
 
@@ -193,6 +228,20 @@ private fun decodePassDetailSectionOrder(value: String): List<PassDetailSection>
         },
     )
 }.getOrDefault(defaultPassDetailSectionOrder)
+
+private fun encodeHomeCardSectionOrder(values: List<HomeCardSection>) =
+    JSONArray(normalizeHomeCardSectionOrder(values).map(HomeCardSection::name)).toString()
+
+private fun decodeHomeCardSectionOrder(value: String): List<HomeCardSection> = runCatching {
+    val json = JSONArray(value)
+    normalizeHomeCardSectionOrder(
+        buildList {
+            repeat(json.length()) { index ->
+                runCatching { HomeCardSection.valueOf(json.getString(index)) }.getOrNull()?.let(::add)
+            }
+        },
+    )
+}.getOrDefault(defaultHomeCardSectionOrder)
 
 private fun encodeReminderLeads(values: Map<String, Int>) = JSONObject().apply {
     values.forEach { (passId, minutes) ->

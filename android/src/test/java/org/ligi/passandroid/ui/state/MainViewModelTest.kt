@@ -326,4 +326,10 @@ private class FakeSettingsRepository : SettingsRepository {
     ) {
         settings.value = settings.value.copy(passDetailSectionOrder = order, hiddenPassDetailSections = hidden)
     }
+    override suspend fun setHomeCardLayout(
+        order: List<org.ligi.passandroid.repository.HomeCardSection>,
+        hidden: Set<org.ligi.passandroid.repository.HomeCardSection>,
+    ) {
+        settings.value = settings.value.copy(homeCardSectionOrder = order, hiddenHomeCardSections = hidden)
+    }
 }
