@@ -21,10 +21,11 @@ class PassSearchTest {
             calendarEvent = null,
         )
 
-        val document = pass.searchDocument()
+        val document = pass.searchDocument("Viajes")
 
         assertThat("AVION malaga 12a".searchTerms().all(document::contains)).isTrue()
         assertThat("boarding".searchTerms().all(document::contains)).isTrue()
+        assertThat("viajes".searchTerms().all(document::contains)).isTrue()
         assertThat("tren".searchTerms().all(document::contains)).isFalse()
     }
 

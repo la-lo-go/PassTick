@@ -164,7 +164,10 @@ fun PassHomeScreen(
                 state.passes.filterNot { it.categoryId in hiddenCategoryIds }
             }
     }
-    val searchDocuments = remember(state.passes) { state.passes.associate { it.id to it.searchDocument() } }
+    val categoryNames = remember(state.categories) { state.categories.associate { it.id to it.name } }
+    val searchDocuments = remember(state.passes, categoryNames) {
+        state.passes.associate { pass -> pass.id to pass.searchDocument(categoryNames[pass.categoryId]) }
+    }
     val searchTerms = remember(searchQuery) { searchQuery.searchTerms() }
     val visiblePasses = remember(categoryPasses, searchDocuments, searchTerms) {
         if (searchTerms.isEmpty()) categoryPasses
@@ -674,7 +677,7 @@ private fun TicketRow(
                         HomeCardSection.ARTWORK -> Unit
                         HomeCardSection.TITLE -> Text(
                             pass.description,
-                            style = if (hero) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,

@@ -3,12 +3,15 @@ package org.ligi.passandroid.ui.state
 import java.text.Normalizer
 import java.util.Locale
 
-internal fun PassUiModel.searchDocument(): String = buildString {
+internal fun PassUiModel.searchDocument(categoryName: String? = null): String = buildString {
     append(description).append(' ')
     append(creator.orEmpty()).append(' ')
     append(type.name).append(' ')
     append(barcodeAlternativeText.orEmpty()).append(' ')
     append(barcodeMessage.orEmpty()).append(' ')
+    append(categoryName.orEmpty()).append(' ')
+    append(calendarTimeSpan?.from?.toString().orEmpty()).append(' ')
+    append(calendarTimeSpan?.to?.toString().orEmpty()).append(' ')
     fields.forEach { field ->
         append(field.label).append(' ')
         append(field.value).append(' ')
