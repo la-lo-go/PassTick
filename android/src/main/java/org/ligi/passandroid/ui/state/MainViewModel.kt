@@ -41,6 +41,7 @@ class MainViewModel(
 ) : ViewModel() {
     private val busy = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
+    val importInspection = MutableStateFlow(ImportInspectionState())
     private val selectedCategoryId = MutableStateFlow<String?>(null)
     private val categoryMoves = Channel<AppAction.MovePass>(Channel.UNLIMITED)
     private val passes = passRepository.observePasses()
@@ -59,7 +60,9 @@ class MainViewModel(
             selectedCategoryId = requestedCategoryId?.takeIf { requested -> categories.any { it.id == requested } },
             timeline = timeline,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
+    }.combine(importInspection) { state, currentImportInspection ->
+        state.copy(importInspection = currentImportInspection)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, MainUiState())
 
     init {
         viewModelScope.launch {
@@ -116,13 +119,10 @@ class MainViewModel(
 
     fun onAction(action: AppAction) {
         when (action) {
-            is AppAction.Import -> launchOperation("Pass imported") {
-                val imported = passRepository.import(action.uri).getOrThrow()
-                addCalendarEventsAfterImport(listOf(imported))
-            }
-            is AppAction.ImportFiles -> launchOperation("Passes imported") {
-                val imported = action.uris.map { passRepository.import(it).getOrThrow() }
-                addCalendarEventsAfterImport(imported)
+            is AppAction.Import -> importFiles(listOf(action.uri))
+            is AppAction.ImportFiles -> importFiles(action.uris)
+            AppAction.DismissImportInspection -> if (!importInspection.value.isImporting) {
+                importInspection.value = ImportInspectionState()
             }
             is AppAction.Export -> launchOperation("Pass exported") {
                 passRepository.export(action.id, action.destination).getOrThrow()
@@ -231,6 +231,52 @@ class MainViewModel(
 
     private suspend fun save(action: AppAction.SavePass) {
         passRepository.update(action.id, action.draft.toPassUpdate())
+    }
+
+    private fun importFiles(uris: List<android.net.Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            busy.value = true
+            importInspection.value = ImportInspectionState(
+                entries = uris.map { uri ->
+                    ImportInspectionEntry(uri = uri, displayName = uri.lastPathSegment ?: "Selected pass")
+                },
+                isImporting = true,
+            )
+            val imported = mutableListOf<PassSnapshot>()
+            uris.forEach { uri ->
+                updateImportEntry(uri) { it.copy(status = ImportEntryStatus.READING) }
+                passRepository.import(uri).fold(
+                    onSuccess = { snapshot ->
+                        imported += snapshot
+                        updateImportEntry(uri) { it.copy(status = ImportEntryStatus.IMPORTED, pass = snapshot) }
+                    },
+                    onFailure = { error ->
+                        updateImportEntry(uri) { it.copy(status = ImportEntryStatus.FAILED, error = error.message ?: "Unreadable pass") }
+                    },
+                )
+            }
+            runCatching { addCalendarEventsAfterImport(imported) }
+                .onFailure { message.value = it.message ?: "Calendar event failed" }
+            importInspection.value = importInspection.value.copy(isImporting = false)
+            message.value = when {
+                imported.isEmpty() -> "No passes imported"
+                imported.size == uris.size -> "${imported.size} passes imported"
+                else -> "${imported.size} of ${uris.size} passes imported"
+            }
+            busy.value = false
+        }
+    }
+
+    private fun updateImportEntry(
+        uri: android.net.Uri,
+        transform: (ImportInspectionEntry) -> ImportInspectionEntry,
+    ) {
+        importInspection.value = importInspection.value.copy(
+            entries = importInspection.value.entries.map { entry ->
+                if (entry.uri == uri) transform(entry) else entry
+            },
+        )
     }
 
     private fun addCalendarEventsAfterImport(imported: List<PassSnapshot>) {

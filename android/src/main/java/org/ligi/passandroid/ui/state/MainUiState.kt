@@ -32,6 +32,24 @@ data class PassTimeSpanUiModel(val from: ZonedDateTime?, val to: ZonedDateTime?)
 data class PassArtworkUiModel(val kind: PassArtworkKind, val bytes: ByteArray)
 data class PassArtworkDraft(val kind: PassArtworkKind, val uri: Uri)
 
+enum class ImportEntryStatus { WAITING, READING, IMPORTED, FAILED }
+
+data class ImportInspectionEntry(
+    val uri: Uri,
+    val displayName: String,
+    val status: ImportEntryStatus = ImportEntryStatus.WAITING,
+    val pass: PassSnapshot? = null,
+    val error: String? = null,
+)
+
+data class ImportInspectionState(
+    val entries: List<ImportInspectionEntry> = emptyList(),
+    val isImporting: Boolean = false,
+) {
+    val isVisible get() = entries.isNotEmpty()
+    val importedCount get() = entries.count { it.status == ImportEntryStatus.IMPORTED }
+}
+
 data class PassUiModel(
     val id: String,
     val description: String,
@@ -115,11 +133,13 @@ data class MainUiState(
     val categories: List<PassCategory> = emptyList(),
     val selectedCategoryId: String? = null,
     val timeline: PassTimeline = PassTimeline.empty(),
+    val importInspection: ImportInspectionState = ImportInspectionState(),
 )
 
 sealed interface AppAction {
     data class Import(val uri: Uri) : AppAction
     data class ImportFiles(val uris: List<Uri>) : AppAction
+    data object DismissImportInspection : AppAction
     data class Export(val id: String, val destination: Uri) : AppAction
     data class SharePass(val id: String) : AppAction
     data class PrintPass(val id: String) : AppAction
