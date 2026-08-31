@@ -118,7 +118,7 @@ fun ExpandedPassCodeDialog(
     enhanceBrightness: Boolean,
     onDismiss: () -> Unit,
 ) {
-    if (enhanceBrightness) MaxBrightnessAndHdrEffect()
+    if (enhanceBrightness) PassCodeBrightnessEffect()
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = true),
@@ -191,7 +191,7 @@ private fun CrispPassCode(
 }
 
 @Composable
-private fun MaxBrightnessAndHdrEffect() {
+fun PassCodeBrightnessEffect() {
     val activity = LocalActivity.current
     DisposableEffect(activity) {
         val window = activity?.window

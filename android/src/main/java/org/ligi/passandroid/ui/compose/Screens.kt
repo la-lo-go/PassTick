@@ -1,8 +1,6 @@
 package org.ligi.passandroid.ui.compose
 
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,13 +12,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,6 +33,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Share
@@ -93,18 +94,20 @@ import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.PassDetailSection
+import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.defaultPassDetailSectionOrder
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassDraft
-import org.ligi.passandroid.ui.state.PassArtworkDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
-import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
+import org.ligi.passandroid.ui.barcode.PassCodeBrightnessEffect
 import org.ligi.passandroid.ui.barcode.PassCodePreview
+import org.threeten.bp.Instant
+import org.threeten.bp.ZoneId
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -136,18 +139,7 @@ fun PassDetailScreen(
     LaunchedEffect(initialCodeExpanded) {
         if (initialCodeExpanded) onInitialCodeShown()
     }
-    if (codeExpanded && pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
-        ExpandedPassCodeDialog(
-            format = pass.barcodeFormat,
-            message = pass.barcodeMessage,
-            alternativeText = pass.barcodeAlternativeText,
-            enhanceBrightness = enhanceCodeBrightness,
-            onDismiss = {
-                codeHeld = false
-                codePinned = false
-            },
-        )
-    }
+    if (codeExpanded && enhanceCodeBrightness) PassCodeBrightnessEffect()
     DisposableEffect(Unit) {
         onDispose { onAction(PassDetailAction.SetFlashlightEnabled(false)) }
     }
@@ -212,12 +204,17 @@ fun PassDetailScreen(
                             Icon(Icons.Default.MoreVert, "Pass actions")
                         }
                         DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
-                            DropdownMenuItem(text = { Text("Print") }, onClick = {
+                            DropdownMenuItem(
+                                text = { Text("Print") },
+                                leadingIcon = { Icon(Icons.Default.Print, null) },
+                                onClick = {
                                 overflowOpen = false
                                 onAction(PassDetailAction.Print)
-                            })
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Configure reminder") },
+                                leadingIcon = { Icon(Icons.Default.Notifications, null) },
                                 enabled = pass?.calendarEvent != null,
                                 onClick = {
                                     overflowOpen = false
@@ -229,15 +226,23 @@ fun PassDetailScreen(
                                 },
                             )
                             categories.forEach { category ->
-                                DropdownMenuItem(text = { Text("Move to ${category.name}") }, onClick = {
+                                DropdownMenuItem(
+                                    text = { Text("Move to ${category.name}") },
+                                    leadingIcon = { Icon(Icons.Default.DriveFileMove, null) },
+                                    onClick = {
                                     overflowOpen = false
                                     onAction(PassDetailAction.MoveToCategory(category.id))
-                                })
+                                    },
+                                )
                             }
-                            DropdownMenuItem(text = { Text("Delete permanently") }, onClick = {
+                            DropdownMenuItem(
+                                text = { Text("Delete permanently") },
+                                leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                onClick = {
                                 overflowOpen = false
                                 confirmDelete = true
-                            })
+                                },
+                            )
                         }
                     }
                 },
@@ -300,8 +305,9 @@ fun PassDetailScreen(
                                 BarcodeCard(
                                     pass = pass,
                                     emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenPassDetailSections,
+                                    expanded = codeExpanded,
                                     onHoldChanged = { codeHeld = it },
-                                    onPin = { codePinned = true },
+                                    onPin = { codePinned = !codePinned },
                                 )
                             }
                             PassDetailSection.FIELDS -> if (visibleFields.isNotEmpty()) item {
@@ -339,10 +345,16 @@ fun PassDetailScreen(
                                     Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                                         ListItem(
                                             leadingContent = { Icon(if (calendarEventPresent) Icons.Default.CheckCircle else Icons.Default.CalendarMonth, null) },
-                                            supportingContent = { Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar") },
+                                            headlineContent = { Text("Date and time") },
+                                            supportingContent = {
+                                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                    pass.calendarDateTimeLines().forEach { Text(it) }
+                                                    Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar")
+                                                }
+                                            },
                                             modifier = Modifier.fillMaxWidth().clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
                                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                        ) { Text(pass.dateTimeLabel()) }
+                                        )
                                     }
                                 }
                             }
@@ -379,19 +391,31 @@ private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>
 private fun BarcodeCard(
     pass: PassUiModel,
     emphasized: Boolean,
+    expanded: Boolean,
     onHoldChanged: (Boolean) -> Unit,
     onPin: () -> Unit,
 ) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.White, contentColor = Color.Black) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             val format = pass.barcodeFormat
             val message = pass.barcodeMessage
             if (format != null && !message.isNullOrBlank()) {
                 BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val height = if (format.isQuadratic()) {
-                        (maxWidth * 0.72f).coerceIn(180.dp, if (emphasized) 300.dp else 240.dp)
+                        if (expanded) {
+                            (maxWidth * 0.86f).coerceIn(220.dp, 420.dp)
+                        } else {
+                            (maxWidth * 0.58f).coerceIn(152.dp, if (emphasized) 240.dp else 208.dp)
+                        }
                     } else {
-                        (maxWidth / 2.6f).coerceIn(144.dp, if (emphasized) 280.dp else 220.dp)
+                        if (expanded) {
+                            (maxWidth / 2.2f).coerceIn(164.dp, 300.dp)
+                        } else {
+                            (maxWidth / 2.8f).coerceIn(132.dp, if (emphasized) 240.dp else 200.dp)
+                        }
                     }
                     PassCodePreview(format, message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
                 }
@@ -425,19 +449,11 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
             },
         )
     }
-    var artworkUpdates by remember(pass?.id) { mutableStateOf(emptyList<PassArtworkDraft>()) }
-    var pendingArtworkKind by remember { mutableStateOf<PassArtworkKind?>(null) }
     var typeMenuOpen by remember { mutableStateOf(false) }
     var barcodeMenuOpen by remember { mutableStateOf(false) }
     var editorMenuOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val artworkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val kind = pendingArtworkKind
-        if (uri != null && kind != null) artworkUpdates = artworkUpdates.filterNot { it.kind == kind } + PassArtworkDraft(kind, uri)
-        pendingArtworkKind = null
-    }
-
     fun currentDraft() = PassDraft(
         description = description,
         creator = creator,
@@ -447,7 +463,6 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
         barcodeMessage = barcodeMessage,
         barcodeAlternativeText = alternativeText,
         fields = fields,
-        artworkUpdates = artworkUpdates,
         calendarStart = calendarStart?.toString().orEmpty(),
         calendarEnd = calendarEnd?.toString().orEmpty(),
         locations = locations,
@@ -565,18 +580,6 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
                     }
                     OutlinedButton(onClick = { locations = locations + PassLocationDraft("", "", "") }, modifier = Modifier.fillMaxWidth()) {
                         Text("Add location")
-                    }
-                }
-            }
-            item {
-                EditorSection("Artwork") {
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(PassArtworkKind.LOGO, PassArtworkKind.STRIP, PassArtworkKind.THUMBNAIL).forEach { kind ->
-                            OutlinedButton(onClick = {
-                                pendingArtworkKind = kind
-                                artworkLauncher.launch(arrayOf("image/*"))
-                            }) { Text(kind.name.lowercase().replaceFirstChar(Char::uppercase)) }
-                        }
                     }
                 }
             }
@@ -729,6 +732,11 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                             modifier = Modifier.clickable { onAction(SettingsAction.OpenPassDetailLayout) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         ) { Text("Pass view") }
+                        ListItem(
+                            supportingContent = { Text("Choose the content and order of pass cards") },
+                            modifier = Modifier.clickable { onAction(SettingsAction.OpenHomeCardLayout) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        ) { Text("Home cards") }
                     }
                 }
                 item {
@@ -820,18 +828,24 @@ fun PassDetailLayoutSettingsScreen(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
-            items(order, key = PassDetailSection::name) { section ->
-                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+            itemsIndexed(order, key = { _, section -> section.name }) { index, section ->
+                Surface(
+                    modifier = Modifier.animateItem(),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                ) {
                     ListItem(
                         supportingContent = { Text(if (section in hidden) "Hidden" else "Shown") },
                         trailingContent = {
                             Row {
-                                IconButton(onClick = {
-                                    onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, -1))
-                                }) { Icon(Icons.Default.ArrowUpward, "Move ${section.displayName()} up") }
-                                IconButton(onClick = {
-                                    onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, 1))
-                                }) { Icon(Icons.Default.ArrowDownward, "Move ${section.displayName()} down") }
+                                IconButton(
+                                    enabled = index > 0,
+                                    onClick = { onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, -1)) },
+                                ) { Icon(Icons.Default.ArrowUpward, "Move ${section.displayName()} up") }
+                                IconButton(
+                                    enabled = index < order.lastIndex,
+                                    onClick = { onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, 1)) },
+                                ) { Icon(Icons.Default.ArrowDownward, "Move ${section.displayName()} down") }
                                 Switch(
                                     checked = section !in hidden,
                                     onCheckedChange = { visible ->
@@ -856,16 +870,85 @@ private fun PassDetailSection.displayName() = when (this) {
     PassDetailSection.CALENDAR -> "Date and time"
 }
 
-private fun PassUiModel.dateTimeLabel(): String {
-    val formatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm")
-    val from = calendarTimeSpan?.from
-    val to = calendarTimeSpan?.to
-    return when {
-        from != null && to != null -> "${from.format(formatter)} – ${to.format(formatter)}"
-        from != null -> from.format(formatter)
-        to != null -> to.format(formatter)
-        else -> "Date and time"
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeCardLayoutSettingsScreen(
+    order: List<HomeCardSection>,
+    hidden: Set<HomeCardSection>,
+    onAction: (org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction) -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Home cards") },
+                navigationIcon = {
+                    IconButton(onClick = { onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Back) }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                Text(
+                    "Show or hide card content, then arrange its order. Creator is hidden by default.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+            items(order, key = HomeCardSection::name) { section ->
+                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                    ListItem(
+                        supportingContent = { Text(if (section in hidden) "Hidden" else "Shown") },
+                        trailingContent = {
+                            Row {
+                                IconButton(onClick = {
+                                    onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Move(section, -1))
+                                }) { Icon(Icons.Default.ArrowUpward, "Move ${section.displayName()} up") }
+                                IconButton(onClick = {
+                                    onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Move(section, 1))
+                                }) { Icon(Icons.Default.ArrowDownward, "Move ${section.displayName()} down") }
+                                Switch(
+                                    checked = section !in hidden,
+                                    onCheckedChange = { visible ->
+                                        onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.SetVisible(section, visible))
+                                    },
+                                )
+                            }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    ) { Text(section.displayName()) }
+                }
+            }
+        }
     }
+}
+
+private fun HomeCardSection.displayName() = when (this) {
+    HomeCardSection.ARTWORK -> "Pass image"
+    HomeCardSection.TITLE -> "Title"
+    HomeCardSection.PRIMARY_FIELD -> "Primary field"
+    HomeCardSection.DATE -> "Date and time"
+    HomeCardSection.CREATOR -> "Creator"
+    HomeCardSection.CATEGORY -> "Category"
+    HomeCardSection.PASS_TYPE -> "Pass type"
+}
+
+private fun PassUiModel.calendarDateTimeLines(): List<String> {
+    val formatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm z")
+    val event = calendarEvent ?: return emptyList()
+    val zone = calendarTimeSpan?.from?.zone ?: calendarTimeSpan?.to?.zone ?: ZoneId.systemDefault()
+    val starts = Instant.ofEpochMilli(event.beginTimeMillis).atZone(zone)
+    val ends = Instant.ofEpochMilli(event.endTimeMillis).atZone(zone)
+    return listOf(
+        "Starts: ${starts.format(formatter)}",
+        "Ends: ${ends.format(formatter)}",
+    )
 }
 
 private fun String.containsDateAndTime(): Boolean = DATE_AND_TIME_PATTERN.containsMatchIn(this)
