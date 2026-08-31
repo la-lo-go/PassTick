@@ -204,11 +204,11 @@ class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
         val DAY_FIRST_HINTS = setOf("fecha", "date", "datum", "jour", "data", "dd/mm", "day/month")
         val MONTH_FORMATTERS = listOf(
             Locale.ENGLISH,
-            Locale("es"),
+            Locale.forLanguageTag("es"),
             Locale.FRENCH,
             Locale.GERMAN,
             Locale.ITALIAN,
-            Locale("pt"),
+            Locale.forLanguageTag("pt"),
         ).flatMap { locale ->
             listOf("MMM", "MMMM").map { pattern ->
                 DateTimeFormatterBuilder().parseCaseInsensitive().appendPattern(pattern).toFormatter(locale)
