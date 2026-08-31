@@ -5,9 +5,11 @@ import org.ligi.passandroid.model.pass.PassImpl
 import org.threeten.bp.LocalDate
 import org.threeten.bp.LocalDateTime
 import org.threeten.bp.LocalTime
+import org.threeten.bp.Month
 import org.threeten.bp.ZoneId
 import org.threeten.bp.ZonedDateTime
 import org.threeten.bp.format.DateTimeFormatter
+import org.threeten.bp.format.DateTimeFormatterBuilder
 import java.util.Locale
 
 class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
@@ -143,7 +145,12 @@ class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
 
     private fun String.containsAny(words: Set<String>) = words.any(::contains)
 
-    private fun monthNumber(name: String): Int? = MONTHS[name.lowercase(Locale.ROOT).trimEnd('.')]
+    private fun monthNumber(name: String): Int? {
+        val candidate = name.trim().trimEnd('.')
+        return MONTH_FORMATTERS.firstNotNullOfOrNull { formatter ->
+            runCatching { Month.from(formatter.parse(candidate)).value }.getOrNull()
+        }
+    }
 
     private fun correctWestbahnDescription(pass: PassImpl) {
         if (pass.calendarTimespan != null || pass.creator != "WESTbahn") return
@@ -195,19 +202,17 @@ class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
         val TIME_HINTS = setOf("time", "hora", "uhrzeit", "heure", "start time", "departure time")
         val MONTH_FIRST_HINTS = setOf("en-us", "english", "us date", "month/day", "month first")
         val DAY_FIRST_HINTS = setOf("fecha", "date", "datum", "jour", "data", "dd/mm", "day/month")
-        val MONTHS = mapOf(
-            "jan" to 1, "january" to 1, "enero" to 1,
-            "feb" to 2, "february" to 2, "febrero" to 2,
-            "mar" to 3, "march" to 3, "marzo" to 3,
-            "apr" to 4, "april" to 4, "abril" to 4,
-            "may" to 5, "mayo" to 5,
-            "jun" to 6, "june" to 6, "junio" to 6,
-            "jul" to 7, "july" to 7, "julio" to 7,
-            "aug" to 8, "august" to 8, "agosto" to 8,
-            "sep" to 9, "sept" to 9, "september" to 9, "septiembre" to 9, "setiembre" to 9,
-            "oct" to 10, "october" to 10, "octubre" to 10,
-            "nov" to 11, "november" to 11, "noviembre" to 11,
-            "dec" to 12, "december" to 12, "diciembre" to 12,
-        )
+        val MONTH_FORMATTERS = listOf(
+            Locale.ENGLISH,
+            Locale("es"),
+            Locale.FRENCH,
+            Locale.GERMAN,
+            Locale.ITALIAN,
+            Locale("pt"),
+        ).flatMap { locale ->
+            listOf("MMM", "MMMM").map { pattern ->
+                DateTimeFormatterBuilder().parseCaseInsensitive().appendPattern(pattern).toFormatter(locale)
+            }
+        }
     }
 }

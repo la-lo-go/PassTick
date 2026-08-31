@@ -113,6 +113,19 @@ class TheAppleStyleQuirkCorrector {
     }
 
     @Test
+    fun `recovers a localized French month name`() {
+        val pass = PassImpl(UUID.randomUUID().toString()).apply {
+            fields = mutableListOf(
+                PassField("event", "Date et heure", "15 février 2026, 18:45", false),
+            )
+        }
+
+        tested.correctQuirks(pass)
+
+        assertThat(pass.calendarTimespan!!.from!!.toLocalDateTime().toString()).isEqualTo("2026-02-15T18:45")
+    }
+
+    @Test
     fun `combines labelled date and time fields`() {
         val pass = PassImpl(UUID.randomUUID().toString()).apply {
             fields = mutableListOf(
