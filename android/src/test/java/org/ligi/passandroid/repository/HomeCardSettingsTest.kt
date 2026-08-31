@@ -13,9 +13,9 @@ class HomeCardSettingsTest {
     fun `normalization preserves custom order and appends new sections`() {
         assertThat(normalizeHomeCardSectionOrder(listOf(HomeCardSection.DATE, HomeCardSection.TITLE)))
             .containsExactly(
+                HomeCardSection.ARTWORK,
                 HomeCardSection.DATE,
                 HomeCardSection.TITLE,
-                HomeCardSection.ARTWORK,
                 HomeCardSection.PRIMARY_FIELD,
                 HomeCardSection.CREATOR,
                 HomeCardSection.CATEGORY,

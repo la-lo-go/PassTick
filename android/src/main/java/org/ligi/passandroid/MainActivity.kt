@@ -535,10 +535,12 @@ class MainActivity : ComponentActivity() {
                                     when (action) {
                                         HomeCardLayoutSettingsAction.Back -> backStack.removeLastOrNull()
                                         is HomeCardLayoutSettingsAction.Move -> {
-                                            val from = order.indexOf(action.section)
-                                            val to = (from + action.offset).coerceIn(order.indices)
+                                            val textOrder = order.filterNot { it == org.ligi.passandroid.repository.HomeCardSection.ARTWORK }
+                                            val from = textOrder.indexOf(action.section)
+                                            val to = (from + action.offset).coerceIn(textOrder.indices)
                                             if (from >= 0 && from != to) {
-                                                val updated = order.toMutableList().apply { add(to, removeAt(from)) }
+                                                val updated = listOf(org.ligi.passandroid.repository.HomeCardSection.ARTWORK) +
+                                                    textOrder.toMutableList().apply { add(to, removeAt(from)) }
                                                 viewModel.onAction(AppAction.SetHomeCardLayout(updated, hidden))
                                             }
                                         }

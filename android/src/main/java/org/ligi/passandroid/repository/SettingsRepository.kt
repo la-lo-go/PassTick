@@ -39,7 +39,8 @@ val defaultHomeCardSectionOrder = HomeCardSection.entries
 val defaultHiddenHomeCardSections = setOf(HomeCardSection.CREATOR)
 
 fun normalizeHomeCardSectionOrder(sections: List<HomeCardSection>): List<HomeCardSection> =
-    (sections.distinct() + defaultHomeCardSectionOrder).distinct()
+    listOf(HomeCardSection.ARTWORK) +
+        (sections + defaultHomeCardSectionOrder).distinct().filterNot { it == HomeCardSection.ARTWORK }
 
 val defaultPassDetailSectionOrder = PassDetailSection.entries
 

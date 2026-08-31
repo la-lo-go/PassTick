@@ -896,12 +896,34 @@ fun HomeCardLayoutSettingsScreen(
         ) {
             item {
                 Text(
-                    "Show or hide card content, then arrange its order. Creator is hidden by default.",
+                    "Choose the card image and arrange the text lines. Creator is hidden by default.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
-            itemsIndexed(order, key = { _, section -> section.name }) { index, section ->
+            item(key = "artwork") {
+                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                    ListItem(
+                        supportingContent = { Text("The image stays beside the text") },
+                        trailingContent = {
+                            Switch(
+                                checked = HomeCardSection.ARTWORK !in hidden,
+                                onCheckedChange = { visible ->
+                                    onAction(
+                                        org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.SetVisible(
+                                            HomeCardSection.ARTWORK,
+                                            visible,
+                                        ),
+                                    )
+                                },
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    ) { Text("Pass image") }
+                }
+            }
+            val textSections = order.filterNot { it == HomeCardSection.ARTWORK }
+            itemsIndexed(textSections, key = { _, section -> section.name }) { index, section ->
                 Surface(
                     modifier = Modifier.animateItem(),
                     shape = RoundedCornerShape(28.dp),
@@ -916,7 +938,7 @@ fun HomeCardLayoutSettingsScreen(
                                     onClick = { onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Move(section, -1)) },
                                 ) { Icon(Icons.Default.ArrowUpward, "Move ${section.displayName()} up") }
                                 IconButton(
-                                    enabled = index < order.lastIndex,
+                                    enabled = index < textSections.lastIndex,
                                     onClick = { onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Move(section, 1)) },
                                 ) { Icon(Icons.Default.ArrowDownward, "Move ${section.displayName()} down") }
                                 Switch(
