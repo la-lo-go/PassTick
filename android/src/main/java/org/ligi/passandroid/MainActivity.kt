@@ -45,7 +45,6 @@ import org.ligi.passandroid.navigation.PassDeepLinkRequest
 import org.ligi.passandroid.navigation.passDeepLinkRequestOrNull
 import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.compose.EditPassScreen
-import org.ligi.passandroid.ui.compose.ImportInspectionDialog
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.PassDetailScreen
@@ -79,7 +78,6 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) importFrom(intent)
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
-            val importInspection by viewModel.importInspection.collectAsStateWithLifecycle()
             val requestedPass by deepLinkRequest.collectAsStateWithLifecycle()
             val context = LocalContext.current
             val backStack = rememberNavBackStack(AppDestination.PassList)
@@ -214,9 +212,6 @@ class MainActivity : ComponentActivity() {
                     snackbarHostState.showSnackbar(it)
                     viewModel.onAction(AppAction.ClearMessage)
                 }
-            }
-            ImportInspectionDialog(importInspection) {
-                viewModel.onAction(AppAction.DismissImportInspection)
             }
             LaunchedEffect(requestedPass, state.passes) {
                 val request = requestedPass ?: return@LaunchedEffect

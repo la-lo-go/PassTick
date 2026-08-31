@@ -1,7 +1,13 @@
-<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <application>
+        <provider
+            android:name=".debug.PassDiagnosticsProvider"
+            android:authorities="${applicationId}.diagnostics"
+            android:exported="true"
+            android:enabled="true" />
+    </application>
 </manifest>
