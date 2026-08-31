@@ -59,6 +59,7 @@ class MainViewModel(
         MainUiState(
             passes = passes.sortedForDisplay(settings.sortOrder, settings.passOrder).map(PassUiModel::from),
             settings = settings,
+            isContentLoading = false,
             isBusy = isBusy,
             message = currentMessage,
             categories = categories,

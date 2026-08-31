@@ -225,20 +225,22 @@ fun PassHomeScreen(
                 contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                item(key = "sort") {
-                    HomeSortSelector(
-                        selectedSort = state.settings.sortOrder,
-                        onSort = { onAction(HomeAction.SetSortOrder(it)) },
-                    )
+                if (!state.isContentLoading) {
+                    item(key = "sort") {
+                        HomeSortSelector(
+                            selectedSort = state.settings.sortOrder,
+                            onSort = { onAction(HomeAction.SetSortOrder(it)) },
+                        )
+                    }
                 }
-                if (state.isBusy) {
+                if (state.isContentLoading || state.isBusy) {
                     item(key = "loading") {
                         Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
                             LoadingIndicator(Modifier.semantics { contentDescription = "Loading passes" })
                         }
                     }
                 }
-                if (visiblePasses.isEmpty() && !state.isBusy) {
+                if (visiblePasses.isEmpty() && !state.isContentLoading && !state.isBusy) {
                     item(key = "empty") { EmptyHome() }
                 }
                 if (todayPasses.isNotEmpty()) {

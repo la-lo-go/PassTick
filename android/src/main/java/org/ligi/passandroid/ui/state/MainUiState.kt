@@ -116,6 +116,7 @@ data class PassDraft(
 data class MainUiState(
     val passes: List<PassUiModel> = emptyList(),
     val settings: AppSettings = AppSettings(),
+    val isContentLoading: Boolean = true,
     val isBusy: Boolean = false,
     val message: String? = null,
     val categories: List<PassCategory> = emptyList(),

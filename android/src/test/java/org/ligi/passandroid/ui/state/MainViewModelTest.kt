@@ -61,6 +61,21 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `keeps content loading until passes and settings are ready`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+
+        assertThat(viewModel.uiState.value.isContentLoading).isTrue()
+        assertThat(viewModel.uiState.value.passes).isEmpty()
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.isContentLoading).isFalse()
+        assertThat(viewModel.uiState.value.passes.single().description).isEqualTo("Boarding pass")
+    }
+
+    @Test
     fun `saves all edited pass data through the repository`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Old")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
