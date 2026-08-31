@@ -58,4 +58,20 @@ class TheAppleStyleQuirkCorrector {
         assertThat(pass.calendarTimespan!!.from).isEqualTo(ZonedDateTime.parse(DATE_PROBE))
     }
 
+    @Test
+    fun `extracts a ReservaEntradas event date`() {
+        val pass = PassImpl(UUID.randomUUID().toString()).apply {
+            creator = "Icenter Torrent S.L."
+            fields = mutableListOf(
+                PassField("date-time", "Fecha y hora", "27/08/2026 - 17:20", false),
+            )
+        }
+
+        assertThat(tested.correctQuirks(pass)).isTrue()
+
+        assertThat(pass.calendarTimespan!!.from).isEqualTo(
+            ZonedDateTime.parse("2026-08-27T17:20:00+02:00[Europe/Madrid]"),
+        )
+    }
+
 }

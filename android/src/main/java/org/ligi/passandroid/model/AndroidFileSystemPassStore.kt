@@ -98,7 +98,8 @@ class AndroidFileSystemPassStore(
         }
 
         if (result != null) {
-            if (dirty) {
+            val corrected = (result as? PassImpl)?.let { ApplePassbookQuirkCorrector(tracker).correctQuirks(it) } == true
+            if (dirty || corrected) {
                 save(result)
             }
             passMap[id] = result

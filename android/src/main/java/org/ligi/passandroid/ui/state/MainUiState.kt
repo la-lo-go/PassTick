@@ -84,6 +84,11 @@ data class PassUiModel(
         barcodeAlternativeText = barcodeAlternativeText,
         fields = fields.filterNot { it.hidden }.map { PrintableField(it.label, it.value) },
     )
+
+    fun homeCardDetail(): String? = fields.asSequence()
+        .filter { !it.hidden && it.hint == "primaryFields" }
+        .map { it.value.trim() }
+        .firstOrNull { it.isNotEmpty() && !it.equals(description.trim(), ignoreCase = true) }
 }
 
 fun PassLocationUiModel.toPlatformLocation() = PlatformLocation(

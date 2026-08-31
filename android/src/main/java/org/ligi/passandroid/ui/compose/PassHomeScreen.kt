@@ -543,12 +543,6 @@ private fun TicketRow(
             ) {
             PassThumbnail(pass, Modifier.size(if (hero) 88.dp else 64.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (hero) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Default.Event, null, Modifier.size(16.dp))
-                        Text("Today", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
                 Text(
                     pass.description,
                     style = if (hero) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
@@ -556,6 +550,7 @@ private fun TicketRow(
                     maxLines = if (hero) 3 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                pass.homeCardDetail()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 pass.dateLabel()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 pass.creator?.takeIf(String::isNotBlank)?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
