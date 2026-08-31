@@ -190,6 +190,29 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `updates home card layout through explicit actions`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        val viewModel = MainViewModel(FakePassRepository(emptyList()), settings, FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.MoveHomeCardSection(org.ligi.passandroid.repository.HomeCardSection.DATE, -1))
+        viewModel.onAction(
+            AppAction.SetHomeCardSectionVisible(org.ligi.passandroid.repository.HomeCardSection.CREATOR, true),
+        )
+        advanceUntilIdle()
+
+        assertThat(settings.settings.value.homeCardSectionOrder.take(4)).containsExactly(
+            org.ligi.passandroid.repository.HomeCardSection.ARTWORK,
+            org.ligi.passandroid.repository.HomeCardSection.TITLE,
+            org.ligi.passandroid.repository.HomeCardSection.DATE,
+            org.ligi.passandroid.repository.HomeCardSection.PRIMARY_FIELD,
+        ).inOrder()
+        assertThat(settings.settings.value.hiddenHomeCardSections)
+            .doesNotContain(org.ligi.passandroid.repository.HomeCardSection.CREATOR)
+    }
+
+    @Test
     fun `adds a configurable category`() = runTest(dispatcher) {
         val settings = FakeSettingsRepository()
         val viewModel = MainViewModel(FakePassRepository(emptyList()), settings, FakePlatformActions())

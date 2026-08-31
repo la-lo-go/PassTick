@@ -150,14 +150,10 @@ sealed interface AppAction {
     data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction
     data class SetRemindersEnabled(val value: Boolean) : AppAction
     data class SetReminderMinutes(val value: Set<Int>) : AppAction
-    data class SetPassDetailLayout(
-        val order: List<PassDetailSection>,
-        val hidden: Set<PassDetailSection>,
-    ) : AppAction
-    data class SetHomeCardLayout(
-        val order: List<HomeCardSection>,
-        val hidden: Set<HomeCardSection>,
-    ) : AppAction
+    data class MovePassDetailSection(val section: PassDetailSection, val offset: Int) : AppAction
+    data class SetPassDetailSectionVisible(val section: PassDetailSection, val visible: Boolean) : AppAction
+    data class MoveHomeCardSection(val section: HomeCardSection, val offset: Int) : AppAction
+    data class SetHomeCardSectionVisible(val section: HomeCardSection, val visible: Boolean) : AppAction
     data class TogglePassReminder(val passId: String) : AppAction
     data class ConfigurePassReminder(val passId: String, val enabled: Boolean, val leadMinutes: Int?) : AppAction
     data object ClearMessage : AppAction

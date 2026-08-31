@@ -504,24 +504,14 @@ class MainActivity : ComponentActivity() {
                                     order = state.settings.passDetailSectionOrder,
                                     hidden = state.settings.hiddenPassDetailSections,
                                 ) { action ->
-                                    val order = state.settings.passDetailSectionOrder
-                                    val hidden = state.settings.hiddenPassDetailSections
                                     when (action) {
                                         PassDetailLayoutSettingsAction.Back -> backStack.removeLastOrNull()
-                                        is PassDetailLayoutSettingsAction.Move -> {
-                                            val from = order.indexOf(action.section)
-                                            val to = (from + action.offset).coerceIn(order.indices)
-                                            if (from >= 0 && from != to) {
-                                                val updated = order.toMutableList().apply { add(to, removeAt(from)) }
-                                                viewModel.onAction(AppAction.SetPassDetailLayout(updated, hidden))
-                                            }
-                                        }
-                                        is PassDetailLayoutSettingsAction.SetVisible -> {
-                                            val updated = hidden.toMutableSet().apply {
-                                                if (action.visible) remove(action.section) else add(action.section)
-                                            }
-                                            viewModel.onAction(AppAction.SetPassDetailLayout(order, updated))
-                                        }
+                                        is PassDetailLayoutSettingsAction.Move -> viewModel.onAction(
+                                            AppAction.MovePassDetailSection(action.section, action.offset),
+                                        )
+                                        is PassDetailLayoutSettingsAction.SetVisible -> viewModel.onAction(
+                                            AppAction.SetPassDetailSectionVisible(action.section, action.visible),
+                                        )
                                     }
                                 }
                             }
@@ -530,26 +520,14 @@ class MainActivity : ComponentActivity() {
                                     order = state.settings.homeCardSectionOrder,
                                     hidden = state.settings.hiddenHomeCardSections,
                                 ) { action ->
-                                    val order = state.settings.homeCardSectionOrder
-                                    val hidden = state.settings.hiddenHomeCardSections
                                     when (action) {
                                         HomeCardLayoutSettingsAction.Back -> backStack.removeLastOrNull()
-                                        is HomeCardLayoutSettingsAction.Move -> {
-                                            val textOrder = order.filterNot { it == org.ligi.passandroid.repository.HomeCardSection.ARTWORK }
-                                            val from = textOrder.indexOf(action.section)
-                                            val to = (from + action.offset).coerceIn(textOrder.indices)
-                                            if (from >= 0 && from != to) {
-                                                val updated = listOf(org.ligi.passandroid.repository.HomeCardSection.ARTWORK) +
-                                                    textOrder.toMutableList().apply { add(to, removeAt(from)) }
-                                                viewModel.onAction(AppAction.SetHomeCardLayout(updated, hidden))
-                                            }
-                                        }
-                                        is HomeCardLayoutSettingsAction.SetVisible -> {
-                                            val updated = hidden.toMutableSet().apply {
-                                                if (action.visible) remove(action.section) else add(action.section)
-                                            }
-                                            viewModel.onAction(AppAction.SetHomeCardLayout(order, updated))
-                                        }
+                                        is HomeCardLayoutSettingsAction.Move -> viewModel.onAction(
+                                            AppAction.MoveHomeCardSection(action.section, action.offset),
+                                        )
+                                        is HomeCardLayoutSettingsAction.SetVisible -> viewModel.onAction(
+                                            AppAction.SetHomeCardSectionVisible(action.section, action.visible),
+                                        )
                                     }
                                 }
                             }
