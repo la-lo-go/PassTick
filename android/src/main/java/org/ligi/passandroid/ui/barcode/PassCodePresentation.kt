@@ -54,17 +54,20 @@ fun PassCodePreview(
         modifier.pointerInput(format, message) {
             awaitEachGesture {
                 val down = awaitFirstDown()
-                val releasedBeforeHold = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                val gestureResult = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                     while (true) {
                         val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
                         if (change == null || !change.pressed) return@withTimeoutOrNull true
+                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                            return@withTimeoutOrNull false
+                        }
                     }
                     @Suppress("UNREACHABLE_CODE")
                     false
-                } ?: false
-                if (releasedBeforeHold) {
+                } ?: null
+                if (gestureResult == true) {
                     onPin()
-                } else {
+                } else if (gestureResult == null) {
                     onHoldChanged(true)
                     try {
                         while (true) {
