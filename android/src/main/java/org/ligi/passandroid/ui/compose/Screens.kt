@@ -394,7 +394,7 @@ private fun BarcodeCard(
             if (format != null && !message.isNullOrBlank()) {
                 BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val height = if (format.isQuadratic()) {
-                        maxWidth.coerceAtMost(if (emphasized) 460.dp else 360.dp)
+                        (maxWidth * 0.72f).coerceIn(180.dp, if (emphasized) 300.dp else 240.dp)
                     } else {
                         (maxWidth / 2.6f).coerceIn(144.dp, if (emphasized) 280.dp else 220.dp)
                     }
