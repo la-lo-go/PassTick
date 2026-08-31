@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Visibility
@@ -228,7 +228,7 @@ fun PassDetailScreen(
                             categories.forEach { category ->
                                 DropdownMenuItem(
                                     text = { Text("Move to ${category.name}") },
-                                    leadingIcon = { Icon(Icons.Default.DriveFileMove, null) },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, null) },
                                     onClick = {
                                     overflowOpen = false
                                     onAction(PassDetailAction.MoveToCategory(category.id))
@@ -345,7 +345,6 @@ fun PassDetailScreen(
                                     Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                                         ListItem(
                                             leadingContent = { Icon(if (calendarEventPresent) Icons.Default.CheckCircle else Icons.Default.CalendarMonth, null) },
-                                            headlineContent = { Text("Date and time") },
                                             supportingContent = {
                                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                                     pass.calendarDateTimeLines().forEach { Text(it) }
@@ -354,7 +353,7 @@ fun PassDetailScreen(
                                             },
                                             modifier = Modifier.fillMaxWidth().clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
                                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                        )
+                                        ) { Text("Date and time") }
                                     }
                                 }
                             }
