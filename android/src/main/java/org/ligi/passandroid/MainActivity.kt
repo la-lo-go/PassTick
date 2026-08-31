@@ -95,11 +95,21 @@ class MainActivity : ComponentActivity() {
                         PackageManager.PERMISSION_GRANTED,
                 )
             }
+            var enableFlashAfterPermission by remember { mutableStateOf(false) }
             val cameraPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
-            ) { granted -> hasCameraPermission = granted }
+            ) { granted ->
+                hasCameraPermission = granted
+                enableFlashAfterPermission = granted
+            }
             val flashlightController = remember(hasCameraPermission) {
                 if (hasCameraPermission) AndroidFlashlightController(context.applicationContext) else null
+            }
+            LaunchedEffect(flashlightController, enableFlashAfterPermission) {
+                if (enableFlashAfterPermission && flashlightController != null) {
+                    flashlightController.setEnabled(true)
+                    enableFlashAfterPermission = false
+                }
             }
             DisposableEffect(flashlightController) {
                 onDispose { flashlightController?.close() }
@@ -190,6 +200,7 @@ class MainActivity : ComponentActivity() {
                     PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
                     is PassDetailAction.SetFlashlightEnabled -> {
                         if (action.enabled && !hasCameraPermission) {
+                            enableFlashAfterPermission = true
                             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                         } else {
                             flashlightController?.setEnabled(action.enabled)
