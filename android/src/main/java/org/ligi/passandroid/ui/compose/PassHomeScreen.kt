@@ -43,6 +43,8 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
@@ -60,6 +62,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -102,6 +105,7 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.barcode.PassCodeImage
@@ -109,6 +113,8 @@ import org.threeten.bp.LocalDate
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import org.ligi.passandroid.ui.state.searchDocument
+import org.ligi.passandroid.ui.state.searchTerms
 
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
@@ -144,11 +150,12 @@ fun PassHomeScreen(
     var undoSnackbarJob by remember { mutableStateOf<Job?>(null) }
     var previewPassId by remember { mutableStateOf<String?>(null) }
     var previewOpeningPassId by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val previewPass = state.passes.firstOrNull { it.id == previewPassId }
     var previewContent by remember { mutableStateOf<PassUiModel?>(null) }
     LaunchedEffect(previewPass) { if (previewPass != null) previewContent = previewPass }
-    val visiblePasses = remember(state.passes, state.categories, state.selectedCategoryId) {
+    val categoryPasses = remember(state.passes, state.categories, state.selectedCategoryId) {
         state.selectedCategoryId?.let { selected -> state.passes.filter { it.categoryId == selected } }
             ?: run {
                 val hiddenCategoryIds = state.categories
@@ -156,6 +163,15 @@ fun PassHomeScreen(
                     .mapTo(mutableSetOf(), PassCategory::id)
                 state.passes.filterNot { it.categoryId in hiddenCategoryIds }
             }
+    }
+    val searchDocuments = remember(state.passes) { state.passes.associate { it.id to it.searchDocument() } }
+    val searchTerms = remember(searchQuery) { searchQuery.searchTerms() }
+    val visiblePasses = remember(categoryPasses, searchDocuments, searchTerms) {
+        if (searchTerms.isEmpty()) categoryPasses
+        else categoryPasses.filter { pass ->
+            val document = searchDocuments[pass.id].orEmpty()
+            searchTerms.all(document::contains)
+        }
     }
     val todayPasses = if (showTodayHero) visiblePasses.filter(PassUiModel::occursToday) else emptyList()
     val remainingPasses = if (showTodayHero) visiblePasses.filterNot(PassUiModel::occursToday) else visiblePasses
@@ -226,6 +242,21 @@ fun PassHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 if (!state.isContentLoading) {
+                    item(key = "search") {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("Search passes") },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, "Clear search") }
+                                }
+                            },
+                        )
+                    }
                     item(key = "sort") {
                         HomeSortSelector(
                             selectedSort = state.settings.sortOrder,
@@ -241,7 +272,9 @@ fun PassHomeScreen(
                     }
                 }
                 if (visiblePasses.isEmpty() && !state.isContentLoading && !state.isBusy) {
-                    item(key = "empty") { EmptyHome() }
+                    item(key = "empty") {
+                        if (searchTerms.isEmpty()) EmptyHome() else EmptySearch(searchQuery)
+                    }
                 }
                 if (todayPasses.isNotEmpty()) {
                     item(key = "today-heading") { SectionHeading("Today") }
@@ -251,6 +284,8 @@ fun PassHomeScreen(
                             categories = state.categories,
                             columns = if (expanded) 2 else 1,
                             hero = true,
+                            sectionOrder = state.settings.homeCardSectionOrder,
+                            hiddenSections = state.settings.hiddenHomeCardSections,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring ->
                                 if (restoring) dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id), "Pass restored")
@@ -276,6 +311,8 @@ fun PassHomeScreen(
                             categories = state.categories,
                             columns = if (expanded) 2 else 1,
                             hero = false,
+                            sectionOrder = state.settings.homeCardSectionOrder,
+                            hiddenSections = state.settings.hiddenHomeCardSections,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring ->
                                 if (restoring) dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id), "Pass restored")
@@ -412,6 +449,8 @@ private fun TicketFeed(
     categories: List<PassCategory>,
     columns: Int,
     hero: Boolean,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
@@ -437,6 +476,8 @@ private fun TicketFeed(
                                 pass = pass,
                                 category = category,
                                 hero = hero,
+                                sectionOrder = sectionOrder,
+                                hiddenSections = hiddenSections,
                                 modifier = Modifier.fillMaxWidth(),
                                 onOpen = onOpen,
                                 onArchive = onArchive,
@@ -464,6 +505,8 @@ private fun TicketSwipeContainer(
     pass: PassUiModel,
     category: PassCategory?,
     hero: Boolean,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
     modifier: Modifier,
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean) -> Unit,
@@ -505,6 +548,8 @@ private fun TicketSwipeContainer(
                 pass = pass,
                 category = category,
                 hero = hero,
+                sectionOrder = sectionOrder,
+                hiddenSections = hiddenSections,
                 modifier = Modifier.semantics {
                     customActions = listOf(
                         CustomAccessibilityAction(archiveLabel) { onArchive(pass.id, restoring); true },
@@ -525,6 +570,8 @@ private fun TicketRow(
     pass: PassUiModel,
     category: PassCategory?,
     hero: Boolean,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
     modifier: Modifier,
     onOpen: (String) -> Unit,
     onReorder: (Int) -> Unit,
@@ -618,25 +665,35 @@ private fun TicketRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-            PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
+            if (HomeCardSection.ARTWORK !in hiddenSections) {
+                PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    pass.description,
-                    style = if (hero) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                pass.homeCardDetail()?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                pass.dateLabel(compactForToday = hero)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                pass.creator?.takeIf(String::isNotBlank)?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    category?.let { CategoryBadge(it) }
-                    Text(pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase), style = MaterialTheme.typography.labelMedium)
+                sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }.forEach { section ->
+                    when (section) {
+                        HomeCardSection.ARTWORK -> Unit
+                        HomeCardSection.TITLE -> Text(
+                            pass.description,
+                            style = if (hero) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        HomeCardSection.CATEGORY -> category?.let { CategoryBadge(it) }
+                        HomeCardSection.PASS_TYPE -> Text(
+                            pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
                 }
             }
             }
@@ -756,6 +813,18 @@ private fun EmptyHome() {
     ) {
         Text("Your passes live here", style = MaterialTheme.typography.headlineSmall)
         Text("Import one or more pass files.", style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun EmptySearch(query: String) {
+    Column(
+        Modifier.fillMaxWidth().widthIn(max = 520.dp).padding(horizontal = 24.dp, vertical = 56.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("No matching passes", style = MaterialTheme.typography.headlineSmall)
+        Text("Try fewer or different words for “${query.trim()}”.", style = MaterialTheme.typography.bodyLarge)
     }
 }
 
