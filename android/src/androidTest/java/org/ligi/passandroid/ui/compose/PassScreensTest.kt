@@ -13,7 +13,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performClick
 import org.junit.Rule
 import org.junit.Test
@@ -56,7 +56,7 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
-        composeRule.onNodeWithText("Automatic barcode brightness").assertIsDisplayed()
+        composeRule.onNodeWithText("Use HDR and maximum code brightness").assertIsDisplayed()
     }
 
     @Test
@@ -106,9 +106,11 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
-        composeRule.onNodeWithText("Artwork").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(4)
+        composeRule.onNodeWithText("Artwork").assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
         composeRule.onNodeWithText("Gate").assertIsDisplayed()
-        composeRule.onNodeWithText("Add field").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Add field").assertIsDisplayed()
     }
 
     @Test
@@ -149,7 +151,8 @@ class PassScreensTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Delete pass").performClick()
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Delete permanently").performClick()
         composeRule.onNodeWithText("Delete pass permanently?").assertIsDisplayed()
         assertThat(actions).doesNotContain(PassDetailAction.Delete)
 
