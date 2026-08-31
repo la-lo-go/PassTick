@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     permissions[Manifest.permission.WRITE_CALENDAR] == true
                 viewModel.onAction(AppAction.SetOfferCalendarAfterImport(granted))
                 if (!granted) coroutineScope.launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
                     snackbarHostState.showSnackbar("Calendar permission is required for automatic events")
                 }
             }
@@ -133,6 +134,7 @@ class MainActivity : ComponentActivity() {
                     is HomeAction.OpenPass -> backStack.add(AppDestination.PassDetail(action.id))
                     is HomeAction.SelectCategory -> viewModel.onAction(AppAction.SelectCategory(action.categoryId))
                     is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
+                    is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.id, action.offset))
                     is HomeAction.Archive -> {
                         state.passes.firstOrNull { it.id == action.id }?.let {
                             undoCategories["archive:${action.id}"] = it.categoryId
@@ -424,6 +426,7 @@ class MainActivity : ComponentActivity() {
                                                     },
                                                 )
                                                 coroutineScope.launch {
+                                                    snackbarHostState.currentSnackbarData?.dismiss()
                                                     snackbarHostState.showSnackbar(
                                                         "Allow pass reminders in Android notification settings",
                                                     )

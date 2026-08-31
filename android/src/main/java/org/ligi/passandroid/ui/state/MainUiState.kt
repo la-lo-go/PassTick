@@ -135,6 +135,7 @@ sealed interface AppAction {
     data class SetTheme(val value: ThemeMode) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
+    data class ReorderPass(val passId: String, val offset: Int) : AppAction
     data class SetHighlightTodayPasses(val value: Boolean) : AppAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : AppAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction

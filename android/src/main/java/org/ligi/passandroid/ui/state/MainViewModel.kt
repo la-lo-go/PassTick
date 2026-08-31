@@ -51,7 +51,7 @@ class MainViewModel(
         val categories = settings.categories.withLegacyCategories(passes)
         val timeline = buildPassTimeline(passes, Instant.now(), ZoneId.systemDefault())
         MainUiState(
-            passes = passes.sortedWith(settings.sortOrder.snapshotComparator()).map(PassUiModel::from),
+            passes = passes.sortedForDisplay(settings.sortOrder, settings.passOrder).map(PassUiModel::from),
             settings = settings,
             isBusy = isBusy,
             message = currentMessage,
@@ -176,6 +176,16 @@ class MainViewModel(
                 settingsRepository.setAutomaticBrightness(action.value)
             }
             is AppAction.SetSortOrder -> viewModelScope.launch { settingsRepository.setSortOrder(action.value) }
+            is AppAction.ReorderPass -> viewModelScope.launch {
+                val currentIds = uiState.value.passes.map(PassUiModel::id).toMutableList()
+                val from = currentIds.indexOf(action.passId)
+                val to = (from + action.offset).coerceIn(currentIds.indices)
+                if (from >= 0 && from != to) {
+                    currentIds.add(to, currentIds.removeAt(from))
+                    settingsRepository.setPassOrder(currentIds)
+                    settingsRepository.setSortOrder(PassSortOrder.MANUAL)
+                }
+            }
             is AppAction.SetHighlightTodayPasses -> viewModelScope.launch {
                 settingsRepository.setHighlightTodayPasses(action.value)
             }
@@ -259,7 +269,17 @@ private fun PassSortOrder.snapshotComparator(): Comparator<PassSnapshot> {
             val rightDistance = right.sortDate()?.let { Duration.between(now, it.toLocalDateTime()).abs() }
             compareNullable(leftDistance, rightDistance)
         }
+        PassSortOrder.MANUAL -> compareBy(PassSnapshot::id)
     }
+}
+
+private fun List<PassSnapshot>.sortedForDisplay(
+    sortOrder: PassSortOrder,
+    manualOrder: List<String>,
+): List<PassSnapshot> {
+    if (sortOrder != PassSortOrder.MANUAL) return sortedWith(sortOrder.snapshotComparator())
+    val positions = manualOrder.withIndex().associate { it.value to it.index }
+    return sortedWith(compareBy<PassSnapshot> { positions[it.id] ?: Int.MAX_VALUE }.thenBy(PassSnapshot::id))
 }
 
 private fun List<PassCategory>.withLegacyCategories(passes: List<PassSnapshot>): List<PassCategory> {

@@ -1,10 +1,16 @@
 package org.ligi.passandroid.ui.compose
 
-import android.graphics.BitmapFactory
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -14,6 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -28,7 +36,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
@@ -51,21 +60,21 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
@@ -76,12 +85,14 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.barcode.PassCodeImage
 import org.threeten.bp.LocalDate
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.Locale
@@ -90,6 +101,7 @@ sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
     data class SelectCategory(val categoryId: String?) : HomeAction
     data class SetSortOrder(val order: PassSortOrder) : HomeAction
+    data class ReorderPass(val id: String, val offset: Int) : HomeAction
     data class Archive(val id: String) : HomeAction
     data class Restore(val id: String) : HomeAction
     data class Delete(val id: String) : HomeAction
@@ -117,6 +129,10 @@ fun PassHomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var undoSnackbarJob by remember { mutableStateOf<Job?>(null) }
+    var previewPassId by remember { mutableStateOf<String?>(null) }
+    val previewPass = state.passes.firstOrNull { it.id == previewPassId }
+    var previewContent by remember { mutableStateOf<PassUiModel?>(null) }
+    LaunchedEffect(previewPass) { if (previewPass != null) previewContent = previewPass }
     val visiblePasses = remember(state.passes, state.categories, state.selectedCategoryId) {
         state.selectedCategoryId?.let { selected -> state.passes.filter { it.categoryId == selected } }
             ?: run {
@@ -155,8 +171,9 @@ fun PassHomeScreen(
     Scaffold(
         topBar = {
             HomeToolbar(
-                selectedSort = state.settings.sortOrder,
-                onSort = { onAction(HomeAction.SetSortOrder(it)) },
+                categories = state.categories,
+                selectedCategoryId = state.selectedCategoryId,
+                onSelectCategory = { onAction(HomeAction.SelectCategory(it)) },
                 onTimeline = { onAction(HomeAction.OpenTimeline) },
                 onSettings = { onAction(HomeAction.OpenSettings) },
             )
@@ -178,14 +195,11 @@ fun PassHomeScreen(
                 contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                if (state.categories.isNotEmpty()) {
-                    item(key = "categories") {
-                        CategorySelector(
-                            categories = state.categories,
-                            selectedId = state.selectedCategoryId,
-                            onSelect = { onAction(HomeAction.SelectCategory(it)) },
-                        )
-                    }
+                item(key = "sort") {
+                    HomeSortSelector(
+                        selectedSort = state.settings.sortOrder,
+                        onSort = { onAction(HomeAction.SetSortOrder(it)) },
+                    )
                 }
                 if (state.isBusy) {
                     item(key = "loading") {
@@ -211,12 +225,14 @@ fun PassHomeScreen(
                                 else dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id), "Pass archived")
                             },
                             onDelete = { id -> dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id), "Pass deleted") },
+                            onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
+                            onPreviewChanged = { previewPassId = it },
                         )
                     }
                 }
                 if (remainingPasses.isNotEmpty()) {
                     if (todayPasses.isNotEmpty()) {
-                        item(key = "passes-heading") { SectionHeading("Later") }
+                        item(key = "passes-heading") { SectionHeading("Other passes") }
                     }
                     item(key = "pass-feed") {
                         TicketFeed(
@@ -230,8 +246,27 @@ fun PassHomeScreen(
                                 else dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id), "Pass archived")
                             },
                             onDelete = { id -> dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id), "Pass deleted") },
+                            onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
+                            onPreviewChanged = { previewPassId = it },
                         )
                     }
+                }
+            }
+            AnimatedVisibility(
+                visible = previewPass != null,
+                modifier = if (expanded) Modifier.align(Alignment.CenterEnd) else Modifier.align(Alignment.BottomCenter),
+                enter = if (expanded) slideInHorizontally { it } else slideInVertically { it },
+                exit = if (expanded) slideOutHorizontally { it } else slideOutVertically { it },
+            ) {
+                previewContent?.let { pass ->
+                    PassHoldPreview(
+                        pass = pass,
+                        modifier = if (expanded) {
+                            Modifier.fillMaxHeight().widthIn(max = 440.dp).padding(16.dp)
+                        } else {
+                            Modifier.fillMaxWidth().padding(12.dp)
+                        },
+                    )
                 }
             }
         }
@@ -241,44 +276,50 @@ fun PassHomeScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeToolbar(
-    selectedSort: PassSortOrder,
-    onSort: (PassSortOrder) -> Unit,
+    categories: List<PassCategory>,
+    selectedCategoryId: String?,
+    onSelectCategory: (String?) -> Unit,
     onTimeline: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    var sortMenuOpen by remember { mutableStateOf(false) }
+    var navigationMenuOpen by remember { mutableStateOf(false) }
     TopAppBar(
         title = {
+            CategorySelector(
+                categories = categories,
+                selectedId = selectedCategoryId,
+                onSelect = onSelectCategory,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        navigationIcon = {
             Box {
-                TextButton(onClick = { sortMenuOpen = true }) {
-                    Icon(Icons.AutoMirrored.Filled.Sort, null)
-                    Spacer(Modifier.size(8.dp))
-                    Text(selectedSort.displayName())
-                }
-                DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
-                    PassSortOrder.entries.forEach { order ->
-                        DropdownMenuItem(
-                            text = { Text(order.displayName()) },
-                            trailingIcon = { if (order == selectedSort) Text("Selected", style = MaterialTheme.typography.labelSmall) },
-                            onClick = {
-                                sortMenuOpen = false
-                                onSort(order)
-                            },
-                        )
-                    }
+                IconButton(onClick = { navigationMenuOpen = true }) { Icon(Icons.Default.Menu, "Navigation menu") }
+                DropdownMenu(navigationMenuOpen, { navigationMenuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Timeline") },
+                        leadingIcon = { Icon(Icons.Default.Timeline, null) },
+                        onClick = { navigationMenuOpen = false; onTimeline() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Settings") },
+                        leadingIcon = { Icon(Icons.Default.Settings, null) },
+                        onClick = { navigationMenuOpen = false; onSettings() },
+                    )
                 }
             }
-        },
-        actions = {
-            IconButton(onClick = onTimeline) { Icon(Icons.Default.Timeline, "Timeline") }
-            IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Settings") }
         },
     )
 }
 
 @Composable
-private fun CategorySelector(categories: List<PassCategory>, selectedId: String?, onSelect: (String?) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun CategorySelector(
+    categories: List<PassCategory>,
+    selectedId: String?,
+    onSelect: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             FilterChip(selected = selectedId == null, onClick = { onSelect(null) }, label = { Text("All") })
         }
@@ -294,6 +335,38 @@ private fun CategorySelector(categories: List<PassCategory>, selectedId: String?
 }
 
 @Composable
+private fun HomeSortSelector(selectedSort: PassSortOrder, onSort: (PassSortOrder) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            val ascending = selectedSort == PassSortOrder.DATE_ASC
+            FilterChip(
+                selected = selectedSort == PassSortOrder.DATE_ASC || selectedSort == PassSortOrder.DATE_DESC,
+                onClick = { onSort(if (ascending) PassSortOrder.DATE_DESC else PassSortOrder.DATE_ASC) },
+                label = { Text(if (ascending) "Date ascending" else "Date descending") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) },
+            )
+        }
+        item {
+            FilterChip(
+                selected = selectedSort == PassSortOrder.DATE_DIFF,
+                onClick = { onSort(PassSortOrder.DATE_DIFF) },
+                label = { Text("Nearest date") },
+            )
+        }
+        item {
+            FilterChip(
+                selected = selectedSort == PassSortOrder.TYPE,
+                onClick = { onSort(PassSortOrder.TYPE) },
+                label = { Text("Pass type") },
+            )
+        }
+        if (selectedSort == PassSortOrder.MANUAL) {
+            item { FilterChip(selected = true, onClick = {}, label = { Text("Manual order") }) }
+        }
+    }
+}
+
+@Composable
 private fun TicketFeed(
     passes: List<PassUiModel>,
     categories: List<PassCategory>,
@@ -302,6 +375,8 @@ private fun TicketFeed(
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
+    onReorder: (String, Int) -> Unit,
+    onPreviewChanged: (String?) -> Unit,
 ) {
     val feeds = remember(passes, columns) {
         List(columns) { column -> passes.filterIndexed { index, _ -> index % columns == column } }
@@ -325,6 +400,8 @@ private fun TicketFeed(
                                 onOpen = onOpen,
                                 onArchive = onArchive,
                                 onDelete = onDelete,
+                                onReorder = onReorder,
+                                onPreviewChanged = onPreviewChanged,
                             )
                             if (index < feed.lastIndex) {
                                 HorizontalDivider(Modifier.padding(horizontal = if (hero) 20.dp else 16.dp))
@@ -349,6 +426,8 @@ private fun TicketSwipeContainer(
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
+    onReorder: (String, Int) -> Unit,
+    onPreviewChanged: (String?) -> Unit,
 ) {
     val restoring = category?.role == PassCategoryRole.ARCHIVE
     val archiveLabel = if (restoring) "Restore" else "Archive"
@@ -383,7 +462,6 @@ private fun TicketSwipeContainer(
                 pass = pass,
                 category = category,
                 hero = hero,
-                archiveLabel = archiveLabel,
                 modifier = Modifier.semantics {
                     customActions = listOf(
                         CustomAccessibilityAction(archiveLabel) { onArchive(pass.id, restoring); true },
@@ -391,8 +469,8 @@ private fun TicketSwipeContainer(
                     )
                 },
                 onOpen = onOpen,
-                onArchive = { onArchive(pass.id, restoring) },
-                onDelete = { onDelete(pass.id) },
+                onReorder = { offset -> onReorder(pass.id, offset) },
+                onPreviewChanged = { visible -> onPreviewChanged(pass.id.takeIf { visible }) },
             )
         },
     )
@@ -403,18 +481,46 @@ private fun TicketRow(
     pass: PassUiModel,
     category: PassCategory?,
     hero: Boolean,
-    archiveLabel: String,
     modifier: Modifier,
     onOpen: (String) -> Unit,
-    onArchive: () -> Unit,
-    onDelete: () -> Unit,
+    onReorder: (Int) -> Unit,
+    onPreviewChanged: (Boolean) -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
+    var dragOffset by remember(pass.id) { mutableFloatStateOf(0f) }
     Surface(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(ZeroCornerSize),
-        modifier = modifier.fillMaxWidth().animateContentSize().clickable { onOpen(pass.id) },
+        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer { translationY = dragOffset }
+            .pointerInput(pass.id) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val held = withTimeoutOrNull(1_000) {
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                            if (change == null || !change.pressed) return@withTimeoutOrNull false
+                            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                return@withTimeoutOrNull false
+                            }
+                        }
+                        @Suppress("UNREACHABLE_CODE")
+                        false
+                    } ?: true
+                    if (held) {
+                        onPreviewChanged(true)
+                        try {
+                            while (true) {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                                change?.consume()
+                                if (change == null || !change.pressed) break
+                            }
+                        } finally {
+                            onPreviewChanged(false)
+                        }
+                    }
+                }
+            }
+            .clickable { onOpen(pass.id) },
     ) {
         Row(
             Modifier.fillMaxWidth().padding(if (hero) 20.dp else 16.dp),
@@ -445,20 +551,53 @@ private fun TicketRow(
                     Text(pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase), style = MaterialTheme.typography.labelMedium)
                 }
             }
-            Box {
-                IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, "Pass actions") }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(archiveLabel) },
-                        leadingIcon = { Icon(if (archiveLabel == "Restore") Icons.Default.Restore else Icons.Default.Archive, null) },
-                        onClick = { menuOpen = false; onArchive() },
+            Icon(
+                Icons.Default.DragHandle,
+                "Reorder ${pass.description}",
+                Modifier.size(40.dp).pointerInput(pass.id) {
+                    detectDragGesturesAfterLongPress(
+                        onDragEnd = { dragOffset = 0f },
+                        onDragCancel = { dragOffset = 0f },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            dragOffset += amount.y
+                            when {
+                                dragOffset > 56.dp.toPx() -> { onReorder(1); dragOffset = 0f }
+                                dragOffset < -56.dp.toPx() -> { onReorder(-1); dragOffset = 0f }
+                            }
+                        },
                     )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        leadingIcon = { Icon(Icons.Default.Delete, null) },
-                        onClick = { menuOpen = false; onDelete() },
+                }.padding(8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PassHoldPreview(pass: PassUiModel, modifier: Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 12.dp,
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(pass.description, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            pass.creator?.takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            if (pass.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+                    PassCodeImage(
+                        format = pass.barcodeFormat,
+                        message = pass.barcodeMessage,
+                        modifier = Modifier.fillMaxWidth().height(if (pass.barcodeFormat.isQuadratic()) 280.dp else 160.dp)
+                            .padding(12.dp),
+                        contentDescription = "Preview pass code",
                     )
                 }
+            }
+            pass.dateLabel()?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+            pass.fields.filterNot { it.hidden }.take(4).forEach { field ->
+                Text("${field.label}: ${field.value}", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -468,13 +607,15 @@ private fun TicketRow(
 private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
     val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
         ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
-    val bitmap = remember(artwork?.bytes) {
-        artwork?.bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
-    }
-    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
-        if (bitmap != null) {
-            Image(bitmap, "Pass artwork", Modifier.fillMaxSize().padding(8.dp), contentScale = ContentScale.Fit)
-        } else {
+    if (artwork != null) {
+        AdaptivePassArtwork(
+            bytes = artwork.bytes,
+            contentDescription = "Pass artwork",
+            modifier = modifier,
+            cornerRadius = 18.dp,
+        )
+    } else {
+        Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(pass.description.take(1).uppercase(Locale.ROOT), style = MaterialTheme.typography.titleLarge)
             }
@@ -533,11 +674,4 @@ private fun PassUiModel.occursToday(): Boolean {
 private fun PassUiModel.dateLabel(): String? {
     val value = calendarTimeSpan?.from ?: calendarTimeSpan?.to ?: return null
     return value.format(DateTimeFormatter.ofPattern("EEE, MMM d · HH:mm", Locale.getDefault()))
-}
-
-private fun PassSortOrder.displayName() = when (this) {
-    PassSortOrder.DATE_DESC -> "Newest first"
-    PassSortOrder.DATE_ASC -> "Oldest first"
-    PassSortOrder.DATE_DIFF -> "Nearest date"
-    PassSortOrder.TYPE -> "Pass type"
 }

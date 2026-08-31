@@ -13,7 +13,7 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class ThemeMode { SYSTEM, LIGHT, DARK }
+enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED }
 
 enum class PassCategoryRole { INBOX, FAVORITES, ARCHIVE, PAST, TRASH, CUSTOM }
 
@@ -36,6 +36,7 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val automaticBrightness: Boolean = true,
     val sortOrder: PassSortOrder = PassSortOrder.DATE_DESC,
+    val passOrder: List<String> = emptyList(),
     val categories: List<PassCategory> = defaultPassCategories,
     val highlightTodayPasses: Boolean = true,
     val automaticallyMarkPast: Boolean = false,
@@ -52,6 +53,7 @@ interface SettingsRepository {
     suspend fun setThemeMode(value: ThemeMode)
     suspend fun setAutomaticBrightness(value: Boolean)
     suspend fun setSortOrder(value: PassSortOrder)
+    suspend fun setPassOrder(value: List<String>)
     suspend fun setCategories(value: List<PassCategory>)
     suspend fun setHighlightTodayPasses(value: Boolean)
     suspend fun setAutomaticallyMarkPast(value: Boolean)
@@ -71,6 +73,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             automaticBrightness = preferences[AUTOMATIC_BRIGHTNESS] ?: true,
             sortOrder = preferences[SORT]?.let { runCatching { PassSortOrder.valueOf(it) }.getOrNull() }
                 ?: PassSortOrder.DATE_DESC,
+            passOrder = preferences[PASS_ORDER]?.let(::decodePassOrder).orEmpty(),
             categories = preferences[CATEGORIES]?.let(::decodeCategories)?.let(::normalizeCategories)
                 ?: defaultPassCategories,
             highlightTodayPasses = preferences[HIGHLIGHT_TODAY] ?: true,
@@ -89,6 +92,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setThemeMode(value: ThemeMode) = update(THEME, value.name)
     override suspend fun setAutomaticBrightness(value: Boolean) = update(AUTOMATIC_BRIGHTNESS, value)
     override suspend fun setSortOrder(value: PassSortOrder) = update(SORT, value.name)
+    override suspend fun setPassOrder(value: List<String>) = update(PASS_ORDER, encodePassOrder(value))
     override suspend fun setCategories(value: List<PassCategory>) = update(
         CATEGORIES,
         encodeCategories(normalizeCategories(value)),
@@ -118,6 +122,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val THEME = stringPreferencesKey("theme")
         val AUTOMATIC_BRIGHTNESS = booleanPreferencesKey("automatic_brightness")
         val SORT = stringPreferencesKey("sort_order")
+        val PASS_ORDER = stringPreferencesKey("pass_order")
         val CATEGORIES = stringPreferencesKey("categories")
         val HIGHLIGHT_TODAY = booleanPreferencesKey("highlight_today_passes")
         val AUTO_MARK_PAST = booleanPreferencesKey("automatically_mark_past")
@@ -129,6 +134,13 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val REMINDER_LEAD_BY_PASS = stringPreferencesKey("reminder_lead_minutes_by_pass")
     }
 }
+
+private fun encodePassOrder(values: List<String>) = JSONArray(values.filter(String::isNotBlank).distinct()).toString()
+
+private fun decodePassOrder(value: String): List<String> = runCatching {
+    val json = JSONArray(value)
+    buildList { repeat(json.length()) { index -> add(json.getString(index)) } }
+}.getOrDefault(emptyList())
 
 private fun encodeReminderLeads(values: Map<String, Int>) = JSONObject().apply {
     values.forEach { (passId, minutes) ->

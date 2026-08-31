@@ -158,6 +158,23 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `reorders passes and switches to manual order`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        val repository = FakePassRepository(
+            listOf(snapshot("one", "One"), snapshot("two", "Two"), snapshot("three", "Three")),
+        )
+        val viewModel = MainViewModel(repository, settings, FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.ReorderPass("three", -1))
+        advanceUntilIdle()
+
+        assertThat(settings.settings.value.sortOrder).isEqualTo(PassSortOrder.MANUAL)
+        assertThat(viewModel.uiState.value.passes.map(PassUiModel::id)).containsExactly("one", "three", "two")
+    }
+
+    @Test
     fun `adds a configurable category`() = runTest(dispatcher) {
         val settings = FakeSettingsRepository()
         val viewModel = MainViewModel(FakePassRepository(emptyList()), settings, FakePlatformActions())
@@ -267,7 +284,12 @@ private class FakeSettingsRepository : SettingsRepository {
     override val settings = MutableStateFlow(AppSettings())
     override suspend fun setThemeMode(value: ThemeMode) = Unit
     override suspend fun setAutomaticBrightness(value: Boolean) = Unit
-    override suspend fun setSortOrder(value: PassSortOrder) = Unit
+    override suspend fun setSortOrder(value: PassSortOrder) {
+        settings.value = settings.value.copy(sortOrder = value)
+    }
+    override suspend fun setPassOrder(value: List<String>) {
+        settings.value = settings.value.copy(passOrder = value)
+    }
     override suspend fun setCategories(value: List<PassCategory>) {
         settings.value = settings.value.copy(categories = value)
     }

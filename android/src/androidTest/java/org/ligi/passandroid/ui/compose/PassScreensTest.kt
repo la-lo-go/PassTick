@@ -26,6 +26,7 @@ import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.PassDetailAction
+import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.theme.PassTheme
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -56,6 +57,7 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
+        composeRule.onNodeWithText("Amoled").assertIsDisplayed()
         composeRule.onNodeWithText("Use HDR and maximum code brightness").assertIsDisplayed()
     }
 
@@ -74,6 +76,8 @@ class PassScreensTest {
         val image = composeRule.onRoot().captureToImage()
         assertVisualContent(image)
         composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Reorder Boarding pass").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Pass actions").assertDoesNotExist()
     }
 
     @Test
@@ -111,6 +115,20 @@ class PassScreensTest {
         composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
         composeRule.onNodeWithText("Gate").assertIsDisplayed()
         composeRule.onNodeWithText("Add field").assertIsDisplayed()
+    }
+
+    @Test
+    fun unchangedEditorClosesWithoutSaving() {
+        val actions = mutableListOf<EditPassAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                EditPassScreen(pass("one", "Boarding pass", PassType.BOARDING), actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Save and go back").performClick()
+
+        assertThat(actions).containsExactly(EditPassAction.Back)
     }
 
     @Test

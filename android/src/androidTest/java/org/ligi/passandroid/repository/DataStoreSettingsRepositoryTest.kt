@@ -14,9 +14,10 @@ class DataStoreSettingsRepositoryTest {
             val repository = DataStoreSettingsRepository(
                 InstrumentationRegistry.getInstrumentation().targetContext,
             )
-            repository.setThemeMode(ThemeMode.DARK)
+            repository.setThemeMode(ThemeMode.AMOLED)
             repository.setAutomaticBrightness(false)
             repository.setSortOrder(PassSortOrder.TYPE)
+            repository.setPassOrder(listOf("pass-3", "pass-1"))
             val categories = defaultPassCategories + PassCategory("travel", "Travel", 0xFF006C4C)
             repository.setCategories(categories)
             repository.setHighlightTodayPasses(false)
@@ -28,8 +29,9 @@ class DataStoreSettingsRepositoryTest {
             repository.setReminderLeadMinutesByPass(mapOf("pass-3" to 45))
 
             val restored = repository.settings.first {
-                it.themeMode == ThemeMode.DARK && !it.automaticBrightness &&
-                    it.sortOrder == PassSortOrder.TYPE && it.categories == categories &&
+                it.themeMode == ThemeMode.AMOLED && !it.automaticBrightness &&
+                    it.sortOrder == PassSortOrder.TYPE && it.passOrder == listOf("pass-3", "pass-1") &&
+                    it.categories == categories &&
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
                     it.remindersEnabled && it.reminderMinutes == setOf(15, 30) &&
                     it.reminderExcludedPassIds == setOf("pass-2") &&
@@ -38,9 +40,10 @@ class DataStoreSettingsRepositoryTest {
 
             assertThat(restored).isEqualTo(
                 AppSettings(
-                    ThemeMode.DARK,
+                    ThemeMode.AMOLED,
                     automaticBrightness = false,
                     sortOrder = PassSortOrder.TYPE,
+                    passOrder = listOf("pass-3", "pass-1"),
                     categories = categories,
                     highlightTodayPasses = false,
                     automaticallyMarkPast = true,

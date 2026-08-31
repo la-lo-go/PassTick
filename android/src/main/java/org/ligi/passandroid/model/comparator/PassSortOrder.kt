@@ -7,12 +7,14 @@ enum class PassSortOrder constructor(val int: Int) {
     DATE_DESC(0),
     DATE_ASC(-1),
     TYPE(1),
-    DATE_DIFF(2);
+    DATE_DIFF(2),
+    MANUAL(3);
 
     fun toComparator(): Comparator<Pass> = when (this) {
         TYPE -> PassByTypeFirstAndTimeSecondComparator()
         DATE_DESC -> DirectionAwarePassByTimeComparator(DirectionAwarePassByTimeComparator.DIRECTION_DESC)
         DATE_DIFF -> PassTemporalDistanceComparator()
         DATE_ASC -> DirectionAwarePassByTimeComparator(DirectionAwarePassByTimeComparator.DIRECTION_ASC)
+        MANUAL -> compareBy(Pass::id)
     }
 }

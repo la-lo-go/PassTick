@@ -41,14 +41,29 @@ fun PassTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
+        ThemeMode.AMOLED -> true
     }
     val context = LocalContext.current
-    val colors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val baseColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else if (dark) {
         DarkColors
     } else {
         LightColors
+    }
+    val colors = if (themeMode == ThemeMode.AMOLED) {
+        baseColors.copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceDim = Color.Black,
+            surfaceContainerLowest = Color.Black,
+            surfaceContainerLow = Color(0xFF030303),
+            surfaceContainer = Color(0xFF050505),
+            surfaceContainerHigh = Color(0xFF080808),
+            surfaceContainerHighest = Color(0xFF0B0B0B),
+        )
+    } else {
+        baseColors
     }
     MaterialExpressiveTheme(
         colorScheme = colors,
