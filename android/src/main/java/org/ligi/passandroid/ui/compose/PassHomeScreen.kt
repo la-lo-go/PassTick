@@ -46,6 +46,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -73,6 +74,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
@@ -113,6 +116,7 @@ fun PassHomeScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var undoSnackbarJob by remember { mutableStateOf<Job?>(null) }
     val visiblePasses = remember(state.passes, state.categories, state.selectedCategoryId) {
         state.selectedCategoryId?.let { selected -> state.passes.filter { it.categoryId == selected } }
             ?: run {
@@ -127,12 +131,24 @@ fun PassHomeScreen(
 
     fun dispatchReversible(action: HomeAction, operation: UndoOperation, message: String) {
         onAction(action)
-        scope.launch {
-            if (snackbarHostState.showSnackbar(message = message, actionLabel = "Undo", withDismissAction = true) ==
+        undoSnackbarJob?.cancel()
+        snackbarHostState.currentSnackbarData?.dismiss()
+        undoSnackbarJob = scope.launch {
+            val timeout = launch {
+                delay(5_000)
+                snackbarHostState.currentSnackbarData?.dismiss()
+            }
+            if (snackbarHostState.showSnackbar(
+                    message = message,
+                    actionLabel = "Undo",
+                    withDismissAction = false,
+                    duration = SnackbarDuration.Indefinite,
+                ) ==
                 androidx.compose.material3.SnackbarResult.ActionPerformed
             ) {
                 onAction(HomeAction.Undo(operation))
             }
+            timeout.cancel()
         }
     }
 

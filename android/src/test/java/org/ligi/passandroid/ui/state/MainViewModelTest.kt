@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -140,6 +141,23 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `serializes a silent move and its undo without an extra message`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Train", "new"))).apply {
+            moveDelayMillis["archive"] = 100
+        }
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+
+        viewModel.onAction(AppAction.MovePass("pass-1", "archive", announce = false))
+        viewModel.onAction(AppAction.MovePass("pass-1", "new", announce = false))
+        advanceUntilIdle()
+
+        assertThat(repository.moved).containsExactly("pass-1" to "archive", "pass-1" to "new")
+        assertThat(viewModel.uiState.value.passes.single().categoryId).isEqualTo("new")
+        assertThat(viewModel.uiState.value.message).isNull()
+    }
+
+    @Test
     fun `adds a configurable category`() = runTest(dispatcher) {
         val settings = FakeSettingsRepository()
         val viewModel = MainViewModel(FakePassRepository(emptyList()), settings, FakePlatformActions())
@@ -211,6 +229,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val exports = mutableListOf<Pair<String, Uri>>()
     val created = mutableListOf<PassUpdate>()
     val moved = mutableListOf<Pair<String, String>>()
+    val moveDelayMillis = mutableMapOf<String, Long>()
 
     override fun observePasses() = passes.asStateFlow()
     override suspend fun import(uri: Uri) = Result.failure<PassSnapshot>(UnsupportedOperationException())
@@ -220,6 +239,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     }
     override suspend fun update(id: String, update: PassUpdate) { updates += id to update }
     override suspend fun moveToCategory(id: String, categoryId: String) {
+        delay(moveDelayMillis[categoryId] ?: 0)
         moved += id to categoryId
         passes.value = passes.value.map { if (it.id == id) it.copy(categoryId = categoryId) else it }
     }

@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
                             undoCategories["archive:${action.id}"] = it.categoryId
                         }
                         state.categories.firstOrNull { it.role == PassCategoryRole.ARCHIVE }?.let {
-                            viewModel.onAction(AppAction.MovePass(action.id, it.id))
+                            viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
                         }
                     }
                     is HomeAction.Restore -> {
@@ -146,7 +146,7 @@ class MainActivity : ComponentActivity() {
                             undoCategories["restore:${action.id}"] = it.categoryId
                         }
                         state.categories.firstOrNull { it.role == PassCategoryRole.INBOX }?.let {
-                            viewModel.onAction(AppAction.MovePass(action.id, it.id))
+                            viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
                         }
                     }
                     is HomeAction.Delete -> {
@@ -154,7 +154,7 @@ class MainActivity : ComponentActivity() {
                             undoCategories["delete:${action.id}"] = it.categoryId
                         }
                         state.categories.firstOrNull { it.role == PassCategoryRole.TRASH }?.let {
-                            viewModel.onAction(AppAction.MovePass(action.id, it.id))
+                            viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
                         }
                     }
                     is HomeAction.Undo -> {
@@ -164,7 +164,9 @@ class MainActivity : ComponentActivity() {
                             is UndoOperation.Delete -> "delete:${action.operation.passId}"
                         }
                         undoCategories.remove(key)?.let { categoryId ->
-                            viewModel.onAction(AppAction.MovePass(action.operation.passId, categoryId))
+                            viewModel.onAction(
+                                AppAction.MovePass(action.operation.passId, categoryId, announce = false),
+                            )
                         }
                     }
                     HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
@@ -204,6 +206,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(state.message) {
                 state.message?.let {
+                    snackbarHostState.currentSnackbarData?.dismiss()
                     snackbarHostState.showSnackbar(it)
                     viewModel.onAction(AppAction.ClearMessage)
                 }

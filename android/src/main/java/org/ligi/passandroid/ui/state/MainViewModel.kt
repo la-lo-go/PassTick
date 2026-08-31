@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.model.comparator.PassSortOrder
@@ -41,6 +42,7 @@ class MainViewModel(
     private val busy = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
     private val selectedCategoryId = MutableStateFlow<String?>(null)
+    private val categoryMoves = Channel<AppAction.MovePass>(Channel.UNLIMITED)
     private val passes = passRepository.observePasses()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -60,6 +62,13 @@ class MainViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     init {
+        viewModelScope.launch {
+            for (move in categoryMoves) {
+                runCatching { passRepository.moveToCategory(move.id, move.categoryId) }
+                    .onSuccess { if (move.announce) message.value = "Pass moved" }
+                    .onFailure { message.value = it.message ?: "Operation failed" }
+            }
+        }
         viewModelScope.launch {
             combine(passes, settingsRepository.settings) { currentPasses, settings -> currentPasses to settings }
                 .collectLatest { (currentPasses, settings) ->
@@ -132,9 +141,7 @@ class MainViewModel(
             }
             is AppAction.DeletePass -> launchOperation("Pass deleted") { check(passRepository.delete(action.id)) }
             is AppAction.SavePass -> launchOperation("Pass saved") { save(action) }
-            is AppAction.MovePass -> launchOperation("Pass moved") {
-                passRepository.moveToCategory(action.id, action.categoryId)
-            }
+            is AppAction.MovePass -> check(categoryMoves.trySend(action).isSuccess) { "Pass move queue is closed" }
             is AppAction.SelectCategory -> selectedCategoryId.value = action.categoryId
             is AppAction.SaveCategory -> viewModelScope.launch {
                 val categories = uiState.value.settings.categories

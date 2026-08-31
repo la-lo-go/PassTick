@@ -127,7 +127,7 @@ sealed interface AppAction {
     data class OpenLocation(val id: String, val locationIndex: Int) : AppAction
     data class DeletePass(val id: String) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
-    data class MovePass(val id: String, val categoryId: String) : AppAction
+    data class MovePass(val id: String, val categoryId: String, val announce: Boolean = true) : AppAction
     data class SelectCategory(val categoryId: String?) : AppAction
     data class SaveCategory(val category: PassCategory) : AppAction
     data class DeleteCategory(val categoryId: String) : AppAction

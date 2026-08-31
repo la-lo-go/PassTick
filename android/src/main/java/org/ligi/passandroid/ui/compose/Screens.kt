@@ -415,7 +415,12 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
         val draft = currentDraft()
         val error = validatePassDraft(draft)
         if (error == null) {
-            onAction(EditPassAction.Save(draft))
+            val initialDraft = pass?.toEditableDraft()
+            if (draft == initialDraft) {
+                onAction(EditPassAction.Back)
+            } else {
+                onAction(EditPassAction.Save(draft))
+            }
         } else {
             scope.launch { snackbarHostState.showSnackbar(error, withDismissAction = true) }
         }
@@ -573,6 +578,27 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
         }
     }
 }
+
+private fun PassUiModel.toEditableDraft(): PassDraft = PassDraft(
+    description = description,
+    creator = creator.orEmpty(),
+    type = type,
+    accentColor = accentColor,
+    barcodeFormat = barcodeFormat,
+    barcodeMessage = barcodeMessage.orEmpty(),
+    barcodeAlternativeText = barcodeAlternativeText.orEmpty(),
+    fields = fields,
+    calendarStart = calendarTimeSpan?.from?.toString().orEmpty(),
+    calendarEnd = calendarTimeSpan?.to?.toString().orEmpty(),
+    locations = locations.map {
+        val addressOnly = it.latitude == 0.0 && it.longitude == 0.0 && !it.name.isNullOrBlank()
+        PassLocationDraft(
+            name = it.name.orEmpty(),
+            latitude = if (addressOnly) "" else it.latitude.toString(),
+            longitude = if (addressOnly) "" else it.longitude.toString(),
+        )
+    },
+)
 
 internal fun validatePassDraft(draft: PassDraft): String? {
     if (draft.description.isBlank()) return "Add a description before leaving."
