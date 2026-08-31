@@ -23,6 +23,7 @@ import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.ui.state.ImportEntryStatus
 import org.ligi.passandroid.ui.state.ImportInspectionEntry
 import org.ligi.passandroid.ui.state.ImportInspectionState
+import java.security.MessageDigest
 
 @Composable
 fun ImportInspectionDialog(state: ImportInspectionState, onDismiss: () -> Unit) {
@@ -78,10 +79,26 @@ private fun ImportedPassSummary(pass: PassSnapshot) {
     pass.creator?.takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     val details = buildList {
         add(pass.type.name.lowercase().replaceFirstChar(Char::uppercase))
-        pass.barcodeFormat?.let { add(it.name) } ?: add("No barcode")
+        pass.barcodeFormat?.let { format ->
+            add("$format · ${pass.barcodeMessage.orEmpty().fingerprint()}")
+        } ?: add("No barcode")
         add("${pass.fields.size} fields")
         pass.calendarTimeSpan?.from?.let { add(it.toLocalDateTime().toString()) }
         if (pass.artwork.isNotEmpty()) add(pass.artwork.joinToString { it.kind.name.lowercase() })
     }
     Text(details.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    pass.fields.take(3).takeIf { it.isNotEmpty() }?.let { fields ->
+        Text(
+            fields.joinToString(" · ") { field -> "${field.label}: ${field.value.take(48)}" },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+        )
+    }
+}
+
+private fun String.fingerprint(): String {
+    if (isEmpty()) return "empty code"
+    val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray())
+    return "code ${digest.take(4).joinToString("") { byte -> "%02x".format(byte) }}"
 }
