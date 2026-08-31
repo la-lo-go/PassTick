@@ -1,10 +1,8 @@
 package org.ligi.passandroid.ui.compose
 
-import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +32,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Share
@@ -78,8 +77,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
@@ -230,12 +227,6 @@ fun PassDetailScreen(
                                     onAction(PassDetailAction.MoveToCategory(category.id))
                                 })
                             }
-                            pass?.locations?.forEachIndexed { index, location ->
-                                DropdownMenuItem(text = { Text(location.name?.takeIf(String::isNotBlank) ?: "Open location") }, onClick = {
-                                    overflowOpen = false
-                                    onAction(PassDetailAction.OpenLocation(index))
-                                })
-                            }
                             DropdownMenuItem(text = { Text("Delete permanently") }, onClick = {
                                 overflowOpen = false
                                 confirmDelete = true
@@ -279,7 +270,7 @@ fun PassDetailScreen(
             Box(Modifier.fillMaxSize().padding(padding)) {
                 LazyColumn(
                     Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 136.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                 item {
@@ -311,6 +302,26 @@ fun PassDetailScreen(
                         }
                     }
                 }
+                if (pass.locations.isNotEmpty()) {
+                    item {
+                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                            Column(Modifier.padding(vertical = 8.dp)) {
+                                pass.locations.forEachIndexed { index, location ->
+                                    val label = location.name?.takeIf(String::isNotBlank)
+                                        ?: "${location.latitude}, ${location.longitude}"
+                                    ListItem(
+                                        leadingContent = { Icon(Icons.Default.LocationOn, null) },
+                                        supportingContent = { Text("Open in Maps") },
+                                        modifier = Modifier.clickable {
+                                            onAction(PassDetailAction.OpenLocation(index))
+                                        },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    ) { Text(label) }
+                                }
+                            }
+                        }
+                    }
+                }
                 pass.calendarEvent?.let {
                     item {
                         Button(onClick = { onAction(PassDetailAction.AddToCalendar) }, modifier = Modifier.fillMaxWidth()) {
@@ -337,10 +348,12 @@ private fun ReminderChoice(label: String, selected: Boolean, onClick: () -> Unit
 private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>, modifier: Modifier) {
     val artwork = preferredKinds.firstNotNullOfOrNull { kind -> pass.artwork.firstOrNull { it.kind == kind } }
         ?: return
-    val bitmap = remember(artwork.bytes) {
-        BitmapFactory.decodeByteArray(artwork.bytes, 0, artwork.bytes.size)?.asImageBitmap()
-    } ?: return
-    Image(bitmap, "Pass artwork", modifier, contentScale = ContentScale.Fit)
+    AdaptivePassArtwork(
+        bytes = artwork.bytes,
+        contentDescription = "Pass artwork",
+        modifier = modifier,
+        cornerRadius = 24.dp,
+    )
 }
 
 @Composable
@@ -422,7 +435,10 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
                 onAction(EditPassAction.Save(draft))
             }
         } else {
-            scope.launch { snackbarHostState.showSnackbar(error, withDismissAction = true) }
+            scope.launch {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(error, withDismissAction = true)
+            }
         }
     }
 

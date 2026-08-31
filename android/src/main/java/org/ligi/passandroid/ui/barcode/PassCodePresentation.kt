@@ -8,7 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun PassCodePreview(
@@ -53,11 +54,27 @@ fun PassCodePreview(
         modifier.pointerInput(format, message) {
             awaitEachGesture {
                 val down = awaitFirstDown()
-                onHoldChanged(true)
-                val up = waitForUpOrCancellation()
-                val wasTap = up != null && up.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
-                onHoldChanged(false)
-                if (wasTap) onPin()
+                val releasedBeforeHold = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                    while (true) {
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                        if (change == null || !change.pressed) return@withTimeoutOrNull true
+                    }
+                    @Suppress("UNREACHABLE_CODE")
+                    false
+                } ?: false
+                if (releasedBeforeHold) {
+                    onPin()
+                } else {
+                    onHoldChanged(true)
+                    try {
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                            if (change == null || !change.pressed) break
+                        }
+                    } finally {
+                        onHoldChanged(false)
+                    }
+                }
             }
         },
         contentAlignment = Alignment.Center,
@@ -68,6 +85,24 @@ fun PassCodePreview(
             widthPx = constraints.maxWidth,
             heightPx = constraints.maxHeight,
             contentDescription = "Pass code. Hold or tap to enlarge",
+        )
+    }
+}
+
+@Composable
+fun PassCodeImage(
+    format: PassBarCodeFormat,
+    message: String,
+    modifier: Modifier = Modifier,
+    contentDescription: String = "Pass code",
+) {
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        CrispPassCode(
+            format = format,
+            message = message,
+            widthPx = constraints.maxWidth,
+            heightPx = constraints.maxHeight,
+            contentDescription = contentDescription,
         )
     }
 }
@@ -90,7 +125,7 @@ fun ExpandedPassCodeDialog(
             contentAlignment = Alignment.Center,
         ) {
             Surface(
-                modifier = Modifier.fillMaxWidth().padding(12.dp).sizeIn(maxWidth = 960.dp, maxHeight = 720.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).widthIn(max = 960.dp)
                     .clickable {},
                 shape = RoundedCornerShape(32.dp),
                 color = Color.White,
@@ -102,7 +137,7 @@ fun ExpandedPassCodeDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     BoxWithConstraints(
-                        Modifier.fillMaxWidth().weight(1f),
+                        Modifier.fillMaxWidth().aspectRatio(if (format.isQuadratic()) 1f else 2.6f),
                         contentAlignment = Alignment.Center,
                     ) {
                         CrispPassCode(

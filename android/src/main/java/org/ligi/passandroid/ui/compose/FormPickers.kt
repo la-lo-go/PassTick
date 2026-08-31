@@ -25,6 +25,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -135,12 +137,14 @@ fun DatePickerField(
     modifier: Modifier = Modifier,
 ) {
     var open by remember { mutableStateOf(false) }
+    var pendingDate by remember { mutableStateOf<LocalDate?>(null) }
+    var openTime by remember { mutableStateOf(false) }
     val selectedMillis = value?.toInstant()?.toEpochMilli()
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { open = true }, modifier = Modifier.weight(1f)) {
             Icon(Icons.Default.CalendarMonth, null)
             Text(
-                value?.let { DateTimeFormatter.ofPattern("EEE, d MMM yyyy").format(java.time.Instant.ofEpochMilli(it.toInstant().toEpochMilli()).atZone(java.time.ZoneId.systemDefault())) }
+                value?.let { DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm").format(java.time.Instant.ofEpochMilli(it.toInstant().toEpochMilli()).atZone(java.time.ZoneId.systemDefault())) }
                     ?: label,
                 Modifier.padding(start = 10.dp),
             )
@@ -157,9 +161,8 @@ fun DatePickerField(
                 TextButton(onClick = {
                     state.selectedDateMillis?.let { millis ->
                         val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                        val zone = value?.zone ?: ZoneId.systemDefault()
-                        val time = value?.toLocalTime() ?: LocalTime.NOON
-                        onValueChange(ZonedDateTime.of(LocalDate.of(date.year, date.monthValue, date.dayOfMonth), time, zone))
+                        pendingDate = LocalDate.of(date.year, date.monthValue, date.dayOfMonth)
+                        openTime = true
                     }
                     open = false
                 }) { Text("Select") }
@@ -168,6 +171,45 @@ fun DatePickerField(
         ) {
             DatePicker(state = state)
         }
+    }
+    if (openTime) {
+        val initialTime = value?.toLocalTime() ?: LocalTime.NOON
+        val timeState = rememberTimePickerState(
+            initialHour = initialTime.hour,
+            initialMinute = initialTime.minute,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = {
+                openTime = false
+                pendingDate = null
+            },
+            title = { Text("Select time") },
+            text = { TimePicker(state = timeState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val date = pendingDate
+                    if (date != null) {
+                        val zone = value?.zone ?: ZoneId.systemDefault()
+                        onValueChange(
+                            ZonedDateTime.of(
+                                date,
+                                LocalTime.of(timeState.hour, timeState.minute),
+                                zone,
+                            ),
+                        )
+                    }
+                    openTime = false
+                    pendingDate = null
+                }) { Text("Select") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    openTime = false
+                    pendingDate = null
+                }) { Text("Cancel") }
+            },
+        )
     }
 }
 
