@@ -86,4 +86,57 @@ class TheAppleStyleQuirkCorrector {
         assertThat(pass.calendarTimespan!!.from!!.toLocalDateTime().toString()).isEqualTo("2026-09-09T18:45")
     }
 
+    @Test
+    fun `recovers a month first date when its English label makes the order explicit`() {
+        val pass = PassImpl(UUID.randomUUID().toString()).apply {
+            fields = mutableListOf(
+                PassField("event", "US date and time", "08/09/2026 5:20 PM", false),
+            )
+        }
+
+        tested.correctQuirks(pass)
+
+        assertThat(pass.calendarTimespan!!.from!!.toLocalDateTime().toString()).isEqualTo("2026-08-09T17:20")
+    }
+
+    @Test
+    fun `recovers a Spanish month name date from a labelled field`() {
+        val pass = PassImpl(UUID.randomUUID().toString()).apply {
+            fields = mutableListOf(
+                PassField("evento", "Fecha y hora", "15 septiembre 2026, 18:45", false),
+            )
+        }
+
+        tested.correctQuirks(pass)
+
+        assertThat(pass.calendarTimespan!!.from!!.toLocalDateTime().toString()).isEqualTo("2026-09-15T18:45")
+    }
+
+    @Test
+    fun `combines labelled date and time fields`() {
+        val pass = PassImpl(UUID.randomUUID().toString()).apply {
+            fields = mutableListOf(
+                PassField("event_date", "Event date", "27/08/2026", false),
+                PassField("event_time", "Start time", "17:20", false),
+            )
+        }
+
+        tested.correctQuirks(pass)
+
+        assertThat(pass.calendarTimespan!!.from!!.toLocalDateTime().toString()).isEqualTo("2026-08-27T17:20")
+    }
+
+    @Test
+    fun `does not treat unrelated numbers as a pass date`() {
+        val pass = PassImpl(UUID.randomUUID().toString()).apply {
+            fields = mutableListOf(
+                PassField("seat", "Seat", "Car 12, seat 08, gate 27", false),
+            )
+        }
+
+        tested.correctQuirks(pass)
+
+        assertThat(pass.calendarTimespan).isNull()
+    }
+
 }

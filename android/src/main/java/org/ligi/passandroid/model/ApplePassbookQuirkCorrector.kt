@@ -2,46 +2,148 @@ package org.ligi.passandroid.model
 
 import org.ligi.passandroid.Tracker
 import org.ligi.passandroid.model.pass.PassImpl
+import org.threeten.bp.LocalDate
 import org.threeten.bp.LocalDateTime
+import org.threeten.bp.LocalTime
 import org.threeten.bp.ZoneId
 import org.threeten.bp.ZonedDateTime
 import org.threeten.bp.format.DateTimeFormatter
+import java.util.Locale
 
 class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
     fun correctQuirks(pass: PassImpl): Boolean {
         val originalDescription = pass.description
         val originalTimeSpan = pass.calendarTimespan
         correctWestbahnDescription(pass)
-        recoverCalendarDate(pass)
         recoverReservaEntradasDate(pass)
+        recoverCalendarDate(pass)
         return pass.description != originalDescription || pass.calendarTimespan != originalTimeSpan
     }
 
     private fun recoverCalendarDate(pass: PassImpl) {
         if (pass.calendarTimespan != null) return
-        val date = pass.fields
+        val fields = pass.fields
             .asSequence()
-            .sortedByDescending { it.key == "date" }
-            .mapNotNull { field -> field.value?.let(::parseDateTime) }
+            .sortedByDescending(::dateFieldScore)
+            .toList()
+        val date = fields
+            .asSequence()
+            .mapNotNull { field ->
+                field.value
+                    ?.takeIf(::containsTime)
+                    ?.let { parseDateTime(it, field.key, field.label) }
+            }
             .firstOrNull()
+            ?: parseSeparateDateAndTime(pass)
+            ?: fields.asSequence()
+                .mapNotNull { field -> field.value?.let { parseDateTime(it, field.key, field.label) } }
+                .firstOrNull()
             ?: return
         tracker.trackEvent("quirk_fix", "find_date", "find_date", 0L)
         pass.calendarTimespan = PassImpl.TimeSpan(from = date)
     }
 
-    private fun parseDateTime(value: String): ZonedDateTime? = runCatching {
-        ZonedDateTime.parse(value)
-    }.getOrNull() ?: LOCAL_DATE_TIME.find(value)?.let { match ->
-        runCatching {
-            LocalDateTime.of(
-                match.groupValues[3].toInt(),
-                match.groupValues[2].toInt(),
-                match.groupValues[1].toInt(),
-                match.groupValues[4].toInt(),
-                match.groupValues[5].toInt(),
-            ).atZone(ZoneId.systemDefault())
+    private fun parseDateTime(value: String, key: String?, label: String?): ZonedDateTime? {
+        ISO_DATE_TIME.find(value)?.value?.let { iso ->
+            runCatching { ZonedDateTime.parse(iso) }.getOrNull()?.let { return it }
+        }
+        runCatching { ZonedDateTime.parse(value) }.getOrNull()?.let { return it }
+
+        val hint = "$key $label".lowercase(Locale.ROOT)
+        MONTH_NAME_DATE.find(value)?.let { match ->
+            return localDateTime(
+                year = match.groupValues[3].toInt(),
+                month = monthNumber(match.groupValues[2]) ?: return null,
+                day = match.groupValues[1].toInt(),
+                time = match.groupValues[4],
+                meridiem = match.groupValues[5],
+            )
+        }
+        MONTH_FIRST_NAME_DATE.find(value)?.let { match ->
+            return localDateTime(
+                year = match.groupValues[3].toInt(),
+                month = monthNumber(match.groupValues[1]) ?: return null,
+                day = match.groupValues[2].toInt(),
+                time = match.groupValues[4],
+                meridiem = match.groupValues[5],
+            )
+        }
+        NUMERIC_DATE.find(value)?.let { match ->
+            val first = match.groupValues[1].toInt()
+            val second = match.groupValues[2].toInt()
+            val monthFirst = when {
+                first > 12 -> false
+                second > 12 -> true
+                hint.containsAny(MONTH_FIRST_HINTS) -> true
+                hint.containsAny(DAY_FIRST_HINTS) -> false
+                else -> false
+            }
+            return localDateTime(
+                year = match.groupValues[3].toInt(),
+                month = if (monthFirst) first else second,
+                day = if (monthFirst) second else first,
+                time = match.groupValues[4],
+                meridiem = match.groupValues[5],
+            )
+        }
+        return null
+    }
+
+    private fun parseSeparateDateAndTime(pass: PassImpl): ZonedDateTime? {
+        val dateField = pass.fields
+            .asSequence()
+            .filter { dateFieldScore(it) > 0 }
+            .mapNotNull { field -> field.value?.let { value -> parseLocalDate(value, field.key, field.label) } }
+            .firstOrNull()
+            ?: return null
+        val timeField = pass.fields
+            .asSequence()
+            .filter { timeFieldScore(it) > 0 }
+            .mapNotNull { it.value?.let(::parseLocalTime) }
+            .firstOrNull()
+            ?: return null
+        return LocalDateTime.of(dateField, timeField).atZone(ZoneId.systemDefault())
+    }
+
+    private fun parseLocalDate(value: String, key: String?, label: String?): LocalDate? =
+        parseDateTime(value, key, label)?.toLocalDate()
+
+    private fun containsTime(value: String): Boolean = TIME.containsMatchIn(value) || ISO_DATE_TIME.containsMatchIn(value)
+
+    private fun parseLocalTime(value: String): LocalTime? = TIME.find(value)?.let { match ->
+        val hour = match.groupValues[1].toInt()
+        val minute = match.groupValues[2].toInt()
+        val meridiem = match.groupValues[3]
+        val normalizedHour = when {
+            meridiem.equals("pm", ignoreCase = true) && hour < 12 -> hour + 12
+            meridiem.equals("am", ignoreCase = true) && hour == 12 -> 0
+            else -> hour
+        }
+        runCatching { LocalTime.of(normalizedHour, minute) }.getOrNull()
+    }
+
+    private fun localDateTime(year: Int, month: Int, day: Int, time: String, meridiem: String): ZonedDateTime? {
+        val localTime = if (time.isBlank()) LocalTime.MIDNIGHT else parseLocalTime("$time $meridiem") ?: return null
+        return runCatching {
+            LocalDateTime.of(year, month, day, localTime.hour, localTime.minute).atZone(ZoneId.systemDefault())
         }.getOrNull()
     }
+
+    private fun dateFieldScore(field: org.ligi.passandroid.model.pass.PassField): Int {
+        val hint = "${field.key} ${field.label}".lowercase(Locale.ROOT)
+        return when {
+            hint.containsAny(DATE_TIME_HINTS) -> 2
+            hint.containsAny(DATE_HINTS) -> 1
+            else -> 0
+        }
+    }
+
+    private fun timeFieldScore(field: org.ligi.passandroid.model.pass.PassField): Int =
+        if ("${field.key} ${field.label}".lowercase(Locale.ROOT).containsAny(TIME_HINTS)) 1 else 0
+
+    private fun String.containsAny(words: Set<String>) = words.any(::contains)
+
+    private fun monthNumber(name: String): Int? = MONTHS[name.lowercase(Locale.ROOT).trimEnd('.')]
 
     private fun correctWestbahnDescription(pass: PassImpl) {
         if (pass.calendarTimespan != null || pass.creator != "WESTbahn") return
@@ -72,6 +174,40 @@ class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
         const val RESERVA_ENTRADAS_DATE_FIELD = "date-time"
         val RESERVA_ENTRADAS_DATE = Regex("(\\d{2}/\\d{2}/\\d{4}).*?(\\d{2}:\\d{2})")
         val RESERVA_ENTRADAS_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-        val LOCAL_DATE_TIME = Regex("(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4}).*?(\\d{1,2}):(\\d{2})")
+        val ISO_DATE_TIME = Regex("\\b\\d{4}-\\d{2}-\\d{2}T[^\\s]+")
+        val NUMERIC_DATE = Regex(
+            "\\b(\\d{1,2})[./-](\\d{1,2})[./-](\\d{4})(?:[^\\d]{1,12}(\\d{1,2}:\\d{2})(?:\\s*([AaPp][.]?[Mm][.]?))?)?",
+        )
+        val MONTH_NAME_DATE = Regex(
+            "\\b(\\d{1,2})\\s+([\\p{L}.]+)\\s+(\\d{4})(?:[^\\d]{0,12}(\\d{1,2}:\\d{2})(?:\\s*([AaPp][.]?[Mm][.]?))?)?",
+            RegexOption.IGNORE_CASE,
+        )
+        val MONTH_FIRST_NAME_DATE = Regex(
+            "\\b([\\p{L}.]+)\\s+(\\d{1,2})(?:,)?\\s+(\\d{4})(?:[^\\d]{0,12}(\\d{1,2}:\\d{2})(?:\\s*([AaPp][.]?[Mm][.]?))?)?",
+            RegexOption.IGNORE_CASE,
+        )
+        val TIME = Regex("\\b(\\d{1,2}):(\\d{2})(?:\\s*([AaPp][.]?[Mm][.]?))?\\b")
+
+        val DATE_TIME_HINTS = setOf(
+            "date-time", "datetime", "date and time", "fecha y hora", "fecha/hora", "datum und uhrzeit",
+        )
+        val DATE_HINTS = setOf("date", "fecha", "datum", "jour", "data")
+        val TIME_HINTS = setOf("time", "hora", "uhrzeit", "heure", "start time", "departure time")
+        val MONTH_FIRST_HINTS = setOf("en-us", "english", "us date", "month/day", "month first")
+        val DAY_FIRST_HINTS = setOf("fecha", "date", "datum", "jour", "data", "dd/mm", "day/month")
+        val MONTHS = mapOf(
+            "jan" to 1, "january" to 1, "enero" to 1,
+            "feb" to 2, "february" to 2, "febrero" to 2,
+            "mar" to 3, "march" to 3, "marzo" to 3,
+            "apr" to 4, "april" to 4, "abril" to 4,
+            "may" to 5, "mayo" to 5,
+            "jun" to 6, "june" to 6, "junio" to 6,
+            "jul" to 7, "july" to 7, "julio" to 7,
+            "aug" to 8, "august" to 8, "agosto" to 8,
+            "sep" to 9, "sept" to 9, "september" to 9, "septiembre" to 9, "setiembre" to 9,
+            "oct" to 10, "october" to 10, "octubre" to 10,
+            "nov" to 11, "november" to 11, "noviembre" to 11,
+            "dec" to 12, "december" to 12, "diciembre" to 12,
+        )
     }
 }
