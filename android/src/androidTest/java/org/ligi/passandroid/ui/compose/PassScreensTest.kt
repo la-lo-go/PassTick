@@ -39,7 +39,7 @@ class PassScreensTest {
     fun emptyHomeShowsImportAction() {
         composeRule.setContent {
             PassTheme(AppSettings().themeMode) {
-                PassHomeScreen(MainUiState(), {})
+                PassHomeScreen(MainUiState(isContentLoading = false), {})
             }
         }
         composeRule.mainClock.advanceTimeBy(1_000)
