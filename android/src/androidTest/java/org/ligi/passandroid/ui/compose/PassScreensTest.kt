@@ -1,6 +1,7 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.DeviceConfigurationOverride
@@ -100,7 +101,7 @@ class PassScreensTest {
     }
 
     @Test
-    fun editorExposesPassFieldsBarcodeAndArtwork() {
+    fun editorExposesPassFieldsAndBarcodeWithoutArtworkControls() {
         val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
             barcodeFormat = PassBarCodeFormat.QR_CODE,
             barcodeMessage = "payload",
@@ -112,8 +113,7 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
         composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(4)
-        composeRule.onNodeWithText("Artwork").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
+        composeRule.onNodeWithText("Artwork").assertDoesNotExist()
         composeRule.onNodeWithText("Gate").assertIsDisplayed()
         composeRule.onNodeWithText("Add field").assertIsDisplayed()
     }
