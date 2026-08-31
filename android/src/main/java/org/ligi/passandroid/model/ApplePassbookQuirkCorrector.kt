@@ -21,12 +21,26 @@ class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
         if (pass.calendarTimespan != null) return
         val date = pass.fields
             .asSequence()
-            .filter { it.key == "date" }
-            .mapNotNull { field -> runCatching { ZonedDateTime.parse(field.value) }.getOrNull() }
+            .sortedByDescending { it.key == "date" }
+            .mapNotNull { field -> field.value?.let(::parseDateTime) }
             .firstOrNull()
             ?: return
         tracker.trackEvent("quirk_fix", "find_date", "find_date", 0L)
         pass.calendarTimespan = PassImpl.TimeSpan(from = date)
+    }
+
+    private fun parseDateTime(value: String): ZonedDateTime? = runCatching {
+        ZonedDateTime.parse(value)
+    }.getOrNull() ?: LOCAL_DATE_TIME.find(value)?.let { match ->
+        runCatching {
+            LocalDateTime.of(
+                match.groupValues[3].toInt(),
+                match.groupValues[2].toInt(),
+                match.groupValues[1].toInt(),
+                match.groupValues[4].toInt(),
+                match.groupValues[5].toInt(),
+            ).atZone(ZoneId.systemDefault())
+        }.getOrNull()
     }
 
     private fun correctWestbahnDescription(pass: PassImpl) {
@@ -58,5 +72,6 @@ class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
         const val RESERVA_ENTRADAS_DATE_FIELD = "date-time"
         val RESERVA_ENTRADAS_DATE = Regex("(\\d{2}/\\d{2}/\\d{4}).*?(\\d{2}:\\d{2})")
         val RESERVA_ENTRADAS_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+        val LOCAL_DATE_TIME = Regex("(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4}).*?(\\d{1,2}):(\\d{2})")
     }
 }

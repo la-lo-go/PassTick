@@ -74,4 +74,16 @@ class TheAppleStyleQuirkCorrector {
         )
     }
 
+    @Test
+    fun `extracts a local date and time from another pass field`() {
+        val pass = PassImpl(UUID.randomUUID().toString()).apply {
+            fields = mutableListOf(
+                PassField("entry", "Doors open", "Doors open 09-09-2026 at 18:45", false),
+            )
+        }
+
+        assertThat(tested.correctQuirks(pass)).isTrue()
+        assertThat(pass.calendarTimespan!!.from!!.toLocalDateTime().toString()).isEqualTo("2026-09-09T18:45")
+    }
+
 }
