@@ -37,7 +37,9 @@ internal fun AdaptivePassArtwork(
         else -> Color.White
     }
     BoxWithConstraints(modifier) {
-        val radius = (minOf(maxWidth, maxHeight) * 0.2f).coerceIn(12.dp, 32.dp)
+        // A pass image should align with the surrounding cards without turning a wide strip
+        // into a capsule. The old 32 dp cap was too pronounced in the detail screen.
+        val radius = (minOf(maxWidth, maxHeight) * 0.16f).coerceIn(12.dp, 24.dp)
         Surface(
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(radius),

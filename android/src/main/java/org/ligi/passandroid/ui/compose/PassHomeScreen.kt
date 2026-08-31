@@ -85,8 +85,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -528,22 +531,29 @@ private fun TicketRow(
 ) {
     var dragOffset by remember(pass.id) { mutableFloatStateOf(0f) }
     var pendingReorder by remember(pass.id) { mutableStateOf(0) }
+    val interactionSource = remember(pass.id) { MutableInteractionSource() }
+    val scope = rememberCoroutineScope()
     Surface(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(ZeroCornerSize),
-        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer { translationY = dragOffset },
+        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer { translationY = dragOffset }
+            .indication(interactionSource, LocalIndication.current),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(if (hero) 20.dp else 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val interactionSource = remember(pass.id) { MutableInteractionSource() }
-            val scope = rememberCoroutineScope()
             Row(
                 Modifier.weight(1f)
-                    .indication(interactionSource, LocalIndication.current)
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        onClick(label = "Open ${pass.description}") {
+                            onOpen(pass.id)
+                            true
+                        }
+                    }
                     .pointerInput(pass.id) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)

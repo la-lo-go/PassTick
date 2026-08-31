@@ -17,6 +17,19 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 enum class PassCategoryRole { INBOX, FAVORITES, ARCHIVE, PAST, TRASH, CUSTOM }
 
+enum class PassDetailSection {
+    ARTWORK,
+    BARCODE,
+    FIELDS,
+    LOCATIONS,
+    CALENDAR,
+}
+
+val defaultPassDetailSectionOrder = PassDetailSection.entries
+
+fun normalizePassDetailSectionOrder(sections: List<PassDetailSection>): List<PassDetailSection> =
+    (sections.distinct() + defaultPassDetailSectionOrder).distinct()
+
 data class PassCategory(
     val id: String,
     val name: String,
@@ -46,6 +59,8 @@ data class AppSettings(
     val reminderMinutes: Set<Int> = setOf(60),
     val reminderExcludedPassIds: Set<String> = emptySet(),
     val reminderLeadMinutesByPass: Map<String, Int> = emptyMap(),
+    val passDetailSectionOrder: List<PassDetailSection> = defaultPassDetailSectionOrder,
+    val hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
 )
 
 interface SettingsRepository {
@@ -64,6 +79,7 @@ interface SettingsRepository {
     suspend fun setReminderMinutes(value: Set<Int>)
     suspend fun setReminderExcludedPassIds(value: Set<String>)
     suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>)
+    suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -91,6 +107,13 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 ?: setOf((preferences[REMINDER_MINUTES] ?: 60).coerceIn(0, 10_080)),
             reminderExcludedPassIds = preferences[REMINDER_EXCLUDED_PASS_IDS].orEmpty(),
             reminderLeadMinutesByPass = preferences[REMINDER_LEAD_BY_PASS]?.let(::decodeReminderLeads).orEmpty(),
+            passDetailSectionOrder = preferences[PASS_DETAIL_SECTION_ORDER]
+                ?.let(::decodePassDetailSectionOrder)
+                ?: defaultPassDetailSectionOrder,
+            hiddenPassDetailSections = preferences[HIDDEN_PASS_DETAIL_SECTIONS]
+                ?.mapNotNull { value -> runCatching { PassDetailSection.valueOf(value) }.getOrNull() }
+                ?.toSet()
+                .orEmpty(),
         )
     }
 
@@ -119,6 +142,12 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         REMINDER_LEAD_BY_PASS,
         encodeReminderLeads(value),
     )
+    override suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>) {
+        context.settingsDataStore.edit {
+            it[PASS_DETAIL_SECTION_ORDER] = encodePassDetailSectionOrder(order)
+            it[HIDDEN_PASS_DETAIL_SECTIONS] = hidden.mapTo(mutableSetOf()) { section -> section.name }
+        }
+    }
 
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
@@ -139,6 +168,8 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val REMINDER_MINUTES_SET = stringSetPreferencesKey("reminder_minutes")
         val REMINDER_EXCLUDED_PASS_IDS = stringSetPreferencesKey("reminder_excluded_pass_ids")
         val REMINDER_LEAD_BY_PASS = stringPreferencesKey("reminder_lead_minutes_by_pass")
+        val PASS_DETAIL_SECTION_ORDER = stringPreferencesKey("pass_detail_section_order")
+        val HIDDEN_PASS_DETAIL_SECTIONS = stringSetPreferencesKey("hidden_pass_detail_sections")
     }
 }
 
@@ -148,6 +179,20 @@ private fun decodePassOrder(value: String): List<String> = runCatching {
     val json = JSONArray(value)
     buildList { repeat(json.length()) { index -> add(json.getString(index)) } }
 }.getOrDefault(emptyList())
+
+private fun encodePassDetailSectionOrder(values: List<PassDetailSection>) =
+    JSONArray(normalizePassDetailSectionOrder(values).map(PassDetailSection::name)).toString()
+
+private fun decodePassDetailSectionOrder(value: String): List<PassDetailSection> = runCatching {
+    val json = JSONArray(value)
+    normalizePassDetailSectionOrder(
+        buildList {
+            repeat(json.length()) { index ->
+                runCatching { PassDetailSection.valueOf(json.getString(index)) }.getOrNull()?.let(::add)
+            }
+        },
+    )
+}.getOrDefault(defaultPassDetailSectionOrder)
 
 private fun encodeReminderLeads(values: Map<String, Int>) = JSONObject().apply {
     values.forEach { (passId, minutes) ->

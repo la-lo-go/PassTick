@@ -5,6 +5,7 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
+import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassArtworkKind
@@ -147,6 +148,10 @@ sealed interface AppAction {
     data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction
     data class SetRemindersEnabled(val value: Boolean) : AppAction
     data class SetReminderMinutes(val value: Set<Int>) : AppAction
+    data class SetPassDetailLayout(
+        val order: List<PassDetailSection>,
+        val hidden: Set<PassDetailSection>,
+    ) : AppAction
     data class TogglePassReminder(val passId: String) : AppAction
     data class ConfigurePassReminder(val passId: String, val enabled: Boolean, val leadMinutes: Int?) : AppAction
     data object ClearMessage : AppAction

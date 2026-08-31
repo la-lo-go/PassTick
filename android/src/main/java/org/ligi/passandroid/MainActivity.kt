@@ -46,6 +46,7 @@ import org.ligi.passandroid.navigation.passDeepLinkRequestOrNull
 import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
+import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.PassDetailScreen
 import org.ligi.passandroid.ui.compose.PassHomeScreen
@@ -60,6 +61,7 @@ import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.SettingsAction
+import org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.platform.AndroidFlashlightController
 import org.ligi.passandroid.platform.FlashlightState
@@ -348,6 +350,8 @@ class MainActivity : ComponentActivity() {
                                             flashlightEnabled = flashlight.isEnabled,
                                             enhanceCodeBrightness = state.settings.automaticBrightness,
                                             calendarEventPresent = calendarEventPresent,
+                                            passDetailSectionOrder = state.settings.passDetailSectionOrder,
+                                            hiddenPassDetailSections = state.settings.hiddenPassDetailSections,
                                             onAction = { action ->
                                                 handlePassDetailAction(selected.passId, action)
                                             },
@@ -413,6 +417,7 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetAutomaticBrightness -> viewModel.onAction(AppAction.SetAutomaticBrightness(action.value))
                                         is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
                                         SettingsAction.OpenCategories -> backStack.add(AppDestination.CategorySettings)
+                                        SettingsAction.OpenPassDetailLayout -> backStack.add(AppDestination.PassDetailLayoutSettings)
                                         is SettingsAction.SetHighlightTodayPasses -> viewModel.onAction(
                                             AppAction.SetHighlightTodayPasses(action.value),
                                         )
@@ -473,6 +478,32 @@ class MainActivity : ComponentActivity() {
                                         is CategorySettingsAction.Move -> viewModel.onAction(
                                             AppAction.MoveCategory(action.categoryId, action.offset),
                                         )
+                                    }
+                                }
+                            }
+                            entry<AppDestination.PassDetailLayoutSettings> {
+                                PassDetailLayoutSettingsScreen(
+                                    order = state.settings.passDetailSectionOrder,
+                                    hidden = state.settings.hiddenPassDetailSections,
+                                ) { action ->
+                                    val order = state.settings.passDetailSectionOrder
+                                    val hidden = state.settings.hiddenPassDetailSections
+                                    when (action) {
+                                        PassDetailLayoutSettingsAction.Back -> backStack.removeLastOrNull()
+                                        is PassDetailLayoutSettingsAction.Move -> {
+                                            val from = order.indexOf(action.section)
+                                            val to = (from + action.offset).coerceIn(order.indices)
+                                            if (from >= 0 && from != to) {
+                                                val updated = order.toMutableList().apply { add(to, removeAt(from)) }
+                                                viewModel.onAction(AppAction.SetPassDetailLayout(updated, hidden))
+                                            }
+                                        }
+                                        is PassDetailLayoutSettingsAction.SetVisible -> {
+                                            val updated = hidden.toMutableSet().apply {
+                                                if (action.visible) remove(action.section) else add(action.section)
+                                            }
+                                            viewModel.onAction(AppAction.SetPassDetailLayout(order, updated))
+                                        }
                                     }
                                 }
                             }

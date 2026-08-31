@@ -9,5 +9,6 @@ sealed interface AppDestination : NavKey {
     @Serializable data class EditPass(val passId: String) : AppDestination
     @Serializable data object Settings : AppDestination
     @Serializable data object CategorySettings : AppDestination
+    @Serializable data object PassDetailLayoutSettings : AppDestination
     @Serializable data object Timeline : AppDestination
 }

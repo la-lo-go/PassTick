@@ -28,6 +28,10 @@ class DataStoreSettingsRepositoryTest {
             repository.setReminderMinutes(setOf(15, 30))
             repository.setReminderExcludedPassIds(setOf("pass-2"))
             repository.setReminderLeadMinutesByPass(mapOf("pass-3" to 45))
+            repository.setPassDetailLayout(
+                listOf(PassDetailSection.BARCODE, PassDetailSection.ARTWORK),
+                setOf(PassDetailSection.ARTWORK),
+            )
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
@@ -36,7 +40,14 @@ class DataStoreSettingsRepositoryTest {
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
                     it.remindersEnabled && it.reminderMinutes == setOf(15, 30) &&
                     it.reminderExcludedPassIds == setOf("pass-2") &&
-                    it.reminderLeadMinutesByPass == mapOf("pass-3" to 45)
+                    it.reminderLeadMinutesByPass == mapOf("pass-3" to 45) &&
+                    it.passDetailSectionOrder == listOf(
+                        PassDetailSection.BARCODE,
+                        PassDetailSection.ARTWORK,
+                        PassDetailSection.FIELDS,
+                        PassDetailSection.LOCATIONS,
+                        PassDetailSection.CALENDAR,
+                    ) && it.hiddenPassDetailSections == setOf(PassDetailSection.ARTWORK)
             }
 
             assertThat(restored).isEqualTo(
@@ -54,6 +65,14 @@ class DataStoreSettingsRepositoryTest {
                     reminderMinutes = setOf(15, 30),
                     reminderExcludedPassIds = setOf("pass-2"),
                     reminderLeadMinutesByPass = mapOf("pass-3" to 45),
+                    passDetailSectionOrder = listOf(
+                        PassDetailSection.BARCODE,
+                        PassDetailSection.ARTWORK,
+                        PassDetailSection.FIELDS,
+                        PassDetailSection.LOCATIONS,
+                        PassDetailSection.CALENDAR,
+                    ),
+                    hiddenPassDetailSections = setOf(PassDetailSection.ARTWORK),
                 ),
             )
         }

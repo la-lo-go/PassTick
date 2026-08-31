@@ -210,6 +210,9 @@ class MainViewModel(
             is AppAction.SetReminderMinutes -> viewModelScope.launch {
                 settingsRepository.setReminderMinutes(action.value)
             }
+            is AppAction.SetPassDetailLayout -> viewModelScope.launch {
+                settingsRepository.setPassDetailLayout(action.order, action.hidden)
+            }
             is AppAction.TogglePassReminder -> viewModelScope.launch {
                 val excluded = uiState.value.settings.reminderExcludedPassIds.toMutableSet()
                 if (!excluded.add(action.passId)) excluded.remove(action.passId)

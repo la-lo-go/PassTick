@@ -2,6 +2,7 @@ package org.ligi.passandroid.ui.state
 
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.ThemeMode
+import org.ligi.passandroid.repository.PassDetailSection
 
 sealed interface PassDetailAction {
     data object Back : PassDetailAction
@@ -29,11 +30,18 @@ sealed interface SettingsAction {
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction
+    data object OpenPassDetailLayout : SettingsAction
     data class SetHighlightTodayPasses(val value: Boolean) : SettingsAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : SettingsAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : SettingsAction
     data class SetRemindersEnabled(val value: Boolean) : SettingsAction
     data class SetReminderMinutes(val value: Set<Int>) : SettingsAction
+}
+
+sealed interface PassDetailLayoutSettingsAction {
+    data object Back : PassDetailLayoutSettingsAction
+    data class Move(val section: PassDetailSection, val offset: Int) : PassDetailLayoutSettingsAction
+    data class SetVisible(val section: PassDetailSection, val visible: Boolean) : PassDetailLayoutSettingsAction
 }
 
 sealed interface CategorySettingsAction {

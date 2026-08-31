@@ -305,4 +305,10 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>) {
         settings.value = settings.value.copy(reminderLeadMinutesByPass = value)
     }
+    override suspend fun setPassDetailLayout(
+        order: List<org.ligi.passandroid.repository.PassDetailSection>,
+        hidden: Set<org.ligi.passandroid.repository.PassDetailSection>,
+    ) {
+        settings.value = settings.value.copy(passDetailSectionOrder = order, hiddenPassDetailSections = hidden)
+    }
 }

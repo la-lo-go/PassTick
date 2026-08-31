@@ -92,6 +92,8 @@ import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.repository.PassDetailSection
+import org.ligi.passandroid.repository.defaultPassDetailSectionOrder
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.PassDetailAction
@@ -103,6 +105,7 @@ import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
+import org.threeten.bp.format.DateTimeFormatter
 import java.util.UUID
 import kotlinx.coroutines.launch
 
@@ -120,6 +123,8 @@ fun PassDetailScreen(
     flashlightEnabled: Boolean = false,
     enhanceCodeBrightness: Boolean = true,
     calendarEventPresent: Boolean = false,
+    passDetailSectionOrder: List<PassDetailSection> = defaultPassDetailSectionOrder,
+    hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
     onAction: (PassDetailAction) -> Unit,
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
@@ -127,7 +132,6 @@ fun PassDetailScreen(
     var configureReminder by remember { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
-    var showArtwork by remember(pass?.id) { mutableStateOf(true) }
     val codeExpanded = codeHeld || codePinned
     LaunchedEffect(initialCodeExpanded) {
         if (initialCodeExpanded) onInitialCodeShown()
@@ -243,8 +247,9 @@ fun PassDetailScreen(
             if (pass != null) {
                 HorizontalFloatingToolbar(
                     expanded = true,
+                    colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
                     floatingActionButton = {
-                        FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = { onAction(PassDetailAction.Edit) }) {
+                        FloatingToolbarDefaults.StandardFloatingActionButton(onClick = { onAction(PassDetailAction.Edit) }) {
                             Icon(Icons.Default.Edit, "Edit pass")
                         }
                     },
@@ -279,81 +284,69 @@ fun PassDetailScreen(
                 val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.STRIP }
                     ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
                     ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
-                if (artwork != null && showArtwork) {
-                    item {
-                        Box(Modifier.fillMaxWidth().height(160.dp)) {
-                            PassArtwork(pass, listOf(artwork.kind), Modifier.fillMaxSize())
-                            IconButton(
-                                onClick = { showArtwork = false },
-                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                            ) { Icon(Icons.Default.VisibilityOff, "Hide photo") }
-                        }
-                    }
-                }
-                item {
-                    BarcodeCard(
-                        pass = pass,
-                        emphasized = artwork == null || !showArtwork,
-                        onHoldChanged = { codeHeld = it },
-                        onPin = { codePinned = true },
-                    )
-                }
-                if (artwork != null && !showArtwork) {
-                    item {
-                        OutlinedButton(onClick = { showArtwork = true }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Visibility, null)
-                            Text("Show photo", Modifier.padding(start = 8.dp))
-                        }
-                    }
-                }
                 val visibleFields = pass.fields.filterNot { it.hidden }
-                if (visibleFields.isNotEmpty()) {
-                    item {
-                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                            Column(Modifier.padding(vertical = 8.dp)) {
-                                visibleFields.forEach { field ->
-                                    ListItem(
-                                        supportingContent = { Text(field.label) },
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    ) { Text(field.value) }
+                passDetailSectionOrder
+                    .filterNot(hiddenPassDetailSections::contains)
+                    .forEach { section ->
+                        when (section) {
+                            PassDetailSection.ARTWORK -> if (artwork != null) item {
+                                Box(Modifier.fillMaxWidth().height(160.dp)) {
+                                    PassArtwork(pass, listOf(artwork.kind), Modifier.fillMaxSize())
+                                }
+                            }
+                            PassDetailSection.BARCODE -> item {
+                                BarcodeCard(
+                                    pass = pass,
+                                    emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenPassDetailSections,
+                                    onHoldChanged = { codeHeld = it },
+                                    onPin = { codePinned = true },
+                                )
+                            }
+                            PassDetailSection.FIELDS -> if (visibleFields.isNotEmpty()) item {
+                                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                                    Column(Modifier.padding(vertical = 8.dp)) {
+                                        visibleFields.forEach { field ->
+                                            ListItem(
+                                                supportingContent = { Text(field.label) },
+                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                            ) { Text(field.value) }
+                                        }
+                                    }
+                                }
+                            }
+                            PassDetailSection.LOCATIONS -> if (pass.locations.isNotEmpty()) item {
+                                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                                    Column(Modifier.padding(vertical = 8.dp)) {
+                                        pass.locations.forEachIndexed { index, location ->
+                                            val label = location.name?.takeIf(String::isNotBlank)
+                                                ?: "${location.latitude}, ${location.longitude}"
+                                            ListItem(
+                                                leadingContent = { Icon(Icons.Default.LocationOn, null) },
+                                                supportingContent = { Text("Open in Maps") },
+                                                modifier = Modifier.clickable {
+                                                    onAction(PassDetailAction.OpenLocation(index))
+                                                },
+                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                            ) { Text(label) }
+                                        }
+                                    }
+                                }
+                            }
+                            PassDetailSection.CALENDAR -> pass.calendarEvent?.let {
+                                item {
+                                    Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                                        ListItem(
+                                            leadingContent = { Icon(if (calendarEventPresent) Icons.Default.CheckCircle else Icons.Default.CalendarMonth, null) },
+                                            supportingContent = { Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar") },
+                                            modifier = Modifier.clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
+                                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        ) { Text(pass.dateTimeLabel()) }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                if (pass.locations.isNotEmpty()) {
-                    item {
-                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                            Column(Modifier.padding(vertical = 8.dp)) {
-                                pass.locations.forEachIndexed { index, location ->
-                                    val label = location.name?.takeIf(String::isNotBlank)
-                                        ?: "${location.latitude}, ${location.longitude}"
-                                    ListItem(
-                                        leadingContent = { Icon(Icons.Default.LocationOn, null) },
-                                        supportingContent = { Text("Open in Maps") },
-                                        modifier = Modifier.clickable {
-                                            onAction(PassDetailAction.OpenLocation(index))
-                                        },
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    ) { Text(label) }
-                                }
-                            }
-                        }
-                    }
-                }
-                pass.calendarEvent?.let {
-                    item {
-                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                            ListItem(
-                                leadingContent = { Icon(if (calendarEventPresent) Icons.Default.CheckCircle else Icons.Default.CalendarMonth, null) },
-                                supportingContent = { Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar") },
-                                modifier = Modifier.clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            ) { Text("Date and time") }
-                        }
-                    }
-                }
-            }
             }
         }
     }
@@ -729,6 +722,11 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                             modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         ) { Text("Categories") }
+                        ListItem(
+                            supportingContent = { Text("Choose the sections shown in each pass") },
+                            modifier = Modifier.clickable { onAction(SettingsAction.OpenPassDetailLayout) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        ) { Text("Pass view") }
                     }
                 }
                 item {
@@ -786,6 +784,85 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
         ) {
             Column(Modifier.padding(vertical = 8.dp), content = content)
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PassDetailLayoutSettingsScreen(
+    order: List<PassDetailSection>,
+    hidden: Set<PassDetailSection>,
+    onAction: (org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction) -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Pass view") },
+                navigationIcon = {
+                    IconButton(onClick = { onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Back) }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                Text(
+                    "Show or hide sections, then arrange their order.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+            items(order, key = PassDetailSection::name) { section ->
+                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                    ListItem(
+                        supportingContent = { Text(if (section in hidden) "Hidden" else "Shown") },
+                        trailingContent = {
+                            Row {
+                                IconButton(onClick = {
+                                    onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, -1))
+                                }) { Icon(Icons.Default.ArrowUpward, "Move ${section.displayName()} up") }
+                                IconButton(onClick = {
+                                    onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, 1))
+                                }) { Icon(Icons.Default.ArrowDownward, "Move ${section.displayName()} down") }
+                                Switch(
+                                    checked = section !in hidden,
+                                    onCheckedChange = { visible ->
+                                        onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.SetVisible(section, visible))
+                                    },
+                                )
+                            }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    ) { Text(section.displayName()) }
+                }
+            }
+        }
+    }
+}
+
+private fun PassDetailSection.displayName() = when (this) {
+    PassDetailSection.ARTWORK -> "Pass image"
+    PassDetailSection.BARCODE -> "Barcode"
+    PassDetailSection.FIELDS -> "Pass details"
+    PassDetailSection.LOCATIONS -> "Locations"
+    PassDetailSection.CALENDAR -> "Date and time"
+}
+
+private fun PassUiModel.dateTimeLabel(): String {
+    val formatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm")
+    val from = calendarTimeSpan?.from
+    val to = calendarTimeSpan?.to
+    return when {
+        from != null && to != null -> "${from.format(formatter)} – ${to.format(formatter)}"
+        from != null -> from.format(formatter)
+        to != null -> to.format(formatter)
+        else -> "Date and time"
     }
 }
 
