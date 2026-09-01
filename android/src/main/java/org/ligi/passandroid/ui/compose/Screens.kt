@@ -96,6 +96,7 @@ import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.defaultPassDetailSectionOrder
+import org.ligi.passandroid.repository.isUserOrganized
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.PassDetailAction
@@ -1005,7 +1006,7 @@ fun CategorySettingsScreen(
             Modifier.fillMaxSize().padding(padding),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp),
         ) {
-            items(categories, key = PassCategory::id) { category ->
+            items(categories.filter(PassCategory::isUserOrganized), key = PassCategory::id) { category ->
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(24.dp),

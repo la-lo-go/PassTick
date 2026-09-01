@@ -21,9 +21,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -153,7 +156,7 @@ sealed interface UndoOperation {
 
 internal fun UndoOperation.toAppAction() = AppAction.MovePass(passId, originalCategoryId, announce = false)
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun PassHomeScreen(
     state: MainUiState,
@@ -168,6 +171,7 @@ fun PassHomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchHasFocus by remember { mutableStateOf(false) }
+    var searchImeWasVisible by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -208,6 +212,17 @@ fun PassHomeScreen(
     }
     LaunchedEffect(searchExpanded) {
         if (searchExpanded) searchFocusRequester.requestFocus()
+    }
+    val isImeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(searchExpanded, searchHasFocus, isImeVisible) {
+        if (!searchExpanded || !searchHasFocus) {
+            searchImeWasVisible = false
+        } else if (isImeVisible) {
+            searchImeWasVisible = true
+        } else if (searchImeWasVisible) {
+            focusManager.clearFocus()
+            searchImeWasVisible = false
+        }
     }
 
     fun dispatchReversible(action: HomeAction, operation: UndoOperation, message: String) {

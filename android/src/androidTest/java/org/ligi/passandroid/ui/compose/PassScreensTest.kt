@@ -163,6 +163,12 @@ class PassScreensTest {
         composeRule.onNodeWithText("Newest first").assertDoesNotExist()
 
         pressBack()
+        composeRule.waitUntil(timeoutMillis = 2_000) {
+            runCatching {
+                composeRule.onNodeWithContentDescription("Pass search").assertIsNotFocused()
+                true
+            }.getOrDefault(false)
+        }
         composeRule.onNodeWithContentDescription("Pass search").assertIsNotFocused()
 
         pressBack()
@@ -188,7 +194,8 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { CategorySettingsScreen(defaultPassCategories, {}) }
         }
 
-        composeRule.onNodeWithText("Inbox").assertIsDisplayed()
+        composeRule.onNodeWithText("Inbox").assertDoesNotExist()
+        composeRule.onNodeWithText("Trash").assertDoesNotExist()
         composeRule.onNodeWithText("Favorites").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Add category").assertIsDisplayed()
     }

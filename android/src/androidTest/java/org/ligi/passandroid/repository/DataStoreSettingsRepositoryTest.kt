@@ -32,6 +32,10 @@ class DataStoreSettingsRepositoryTest {
                 listOf(PassDetailSection.BARCODE, PassDetailSection.ARTWORK),
                 setOf(PassDetailSection.ARTWORK),
             )
+            repository.setHomeCardLayout(
+                defaultHomeCardSectionOrder,
+                setOf(HomeCardSection.CREATOR),
+            )
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
