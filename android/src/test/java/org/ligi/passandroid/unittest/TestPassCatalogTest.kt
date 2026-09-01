@@ -13,10 +13,7 @@ class TestPassCatalogTest {
 
     @Test
     fun catalogContainsAReadablePassForEveryBarcodeFormat() {
-        val catalog = javaClass.classLoader!!
-            .getResourceAsStream("test-passes/catalog.json")!!
-            .bufferedReader()
-            .use { JSONArray(it.readText()) }
+        val catalog = JSONArray(readCatalog())
 
         val passes = (0 until catalog.length()).map { index ->
             val fixture = catalog.getJSONObject(index)
@@ -37,4 +34,21 @@ class TestPassCatalogTest {
         assertThat(passes.map { it.second }).anySatisfy { pass -> assertThat(pass.calendarTimespan?.to).isNull() }
         assertThat(passes.map { it.second }).anySatisfy { pass -> assertThat(pass.fields).anyMatch { it.hide } }
     }
+
+    @Test
+    fun catalogUsesReadableUtf8Text() {
+        val catalog = readCatalog()
+
+        assertThat(catalog).contains("Row A · Seat 7")
+        assertThat(catalog).contains("MAD → BCN")
+        assertThat(catalog).contains("Adolfo Suárez Madrid–Barajas Airport")
+        assertThat(catalog).contains("€25")
+        assertThat(catalog).contains("North Café")
+        assertThat(catalog).doesNotContain("Â", "Ã", "â")
+    }
+
+    private fun readCatalog() = javaClass.classLoader!!
+        .getResourceAsStream("test-passes/catalog.json")!!
+        .bufferedReader(Charsets.UTF_8)
+        .use { it.readText() }
 }

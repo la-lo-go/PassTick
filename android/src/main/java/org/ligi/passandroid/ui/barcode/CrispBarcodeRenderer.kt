@@ -14,12 +14,7 @@ data class RenderedBarcodeMatrix(
 )
 
 object CrispBarcodeRenderer {
-    private val supportedFormats = setOf(
-        PassBarCodeFormat.QR_CODE,
-        PassBarCodeFormat.AZTEC,
-        PassBarCodeFormat.PDF_417,
-        PassBarCodeFormat.CODE_128,
-    )
+    private val supportedFormats = PassBarCodeFormat.entries.toSet()
 
     fun supports(format: PassBarCodeFormat): Boolean = format in supportedFormats
 
@@ -50,7 +45,7 @@ object CrispBarcodeRenderer {
         val quietZone = format.quietZonePixels()
         val contentWidth = source.width + quietZone.horizontal * 2
         val contentHeight = source.height + quietZone.vertical * 2
-        val isLinear = format == PassBarCodeFormat.CODE_128
+        val isLinear = format.isLinear()
         val scale = if (isLinear) {
             maxWidthPx / contentWidth
         } else {
@@ -98,10 +93,26 @@ object CrispBarcodeRenderer {
 
 private data class QuietZone(val horizontal: Int, val vertical: Int)
 
+private fun PassBarCodeFormat.isLinear() = when (this) {
+    PassBarCodeFormat.CODE_39,
+    PassBarCodeFormat.CODE_128,
+    PassBarCodeFormat.EAN_8,
+    PassBarCodeFormat.EAN_13,
+    PassBarCodeFormat.ITF,
+    -> true
+
+    else -> false
+}
+
 private fun PassBarCodeFormat.quietZonePixels() = when (this) {
     PassBarCodeFormat.QR_CODE -> QuietZone(horizontal = 4, vertical = 4)
     PassBarCodeFormat.AZTEC -> QuietZone(horizontal = 2, vertical = 2)
+    PassBarCodeFormat.DATA_MATRIX -> QuietZone(horizontal = 1, vertical = 1)
     PassBarCodeFormat.PDF_417 -> QuietZone(horizontal = 2, vertical = 8)
-    PassBarCodeFormat.CODE_128 -> QuietZone(horizontal = 10, vertical = 0)
-    else -> QuietZone(horizontal = 0, vertical = 0)
+    PassBarCodeFormat.CODE_39,
+    PassBarCodeFormat.CODE_128,
+    PassBarCodeFormat.EAN_8,
+    PassBarCodeFormat.EAN_13,
+    PassBarCodeFormat.ITF,
+    -> QuietZone(horizontal = 10, vertical = 0)
 }

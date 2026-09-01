@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $catalogPath = Join-Path $PSScriptRoot "../../android/src/test/resources/test-passes/catalog.json"
-$catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
+$catalog = Get-Content -LiteralPath $catalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $resolvedOutput = [System.IO.Path]::GetFullPath($OutputDirectory)
 
 New-Item -ItemType Directory -Force -Path $resolvedOutput | Out-Null

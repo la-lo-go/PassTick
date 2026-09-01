@@ -9,14 +9,21 @@ class CrispBarcodeRendererTest {
     fun `uses whole pixel modules within the requested bounds`() {
         val bounds = 720 to 420
 
-        listOf(
-            PassBarCodeFormat.QR_CODE,
-            PassBarCodeFormat.AZTEC,
-            PassBarCodeFormat.PDF_417,
-            PassBarCodeFormat.CODE_128,
-        ).forEach { format ->
+        val messages = mapOf(
+            PassBarCodeFormat.QR_CODE to "PASS-1234-EXAMPLE",
+            PassBarCodeFormat.AZTEC to "PASS-1234-EXAMPLE",
+            PassBarCodeFormat.PDF_417 to "PASS-1234-EXAMPLE",
+            PassBarCodeFormat.CODE_128 to "PASS-1234-EXAMPLE",
+            PassBarCodeFormat.CODE_39 to "PASS-1234",
+            PassBarCodeFormat.DATA_MATRIX to "PASS-1234-EXAMPLE",
+            PassBarCodeFormat.EAN_8 to "96385074",
+            PassBarCodeFormat.EAN_13 to "5901234123457",
+            PassBarCodeFormat.ITF to "12345678901234",
+        )
+
+        messages.forEach { (format, message) ->
             val rendered = CrispBarcodeRenderer.renderMatrix(
-                data = "PASS-1234-EXAMPLE",
+                data = message,
                 format = format,
                 maxWidthPx = bounds.first,
                 maxHeightPx = bounds.second,
@@ -27,6 +34,22 @@ class CrispBarcodeRendererTest {
             assertThat(rendered.pixels.width).isLessThanOrEqualTo(bounds.first)
             assertThat(rendered.pixels.height).isLessThanOrEqualTo(bounds.second)
             assertTransitionsAlignToModules(rendered)
+        }
+    }
+
+    @Test
+    fun `linear formats use the available height`() {
+        mapOf(
+            PassBarCodeFormat.CODE_39 to "PASS-1234",
+            PassBarCodeFormat.CODE_128 to "PASS-1234-EXAMPLE",
+            PassBarCodeFormat.EAN_8 to "96385074",
+            PassBarCodeFormat.EAN_13 to "5901234123457",
+            PassBarCodeFormat.ITF to "12345678901234",
+        ).forEach { (format, message) ->
+            val rendered = CrispBarcodeRenderer.renderMatrix(message, format, 720, 420)
+
+            assertThat(rendered).describedAs(format.name).isNotNull
+            assertThat(rendered!!.pixels.height).isEqualTo(420)
         }
     }
 

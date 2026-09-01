@@ -15,7 +15,7 @@ enum class PassBarCodeFormat {
     QR_CODE;
 
     fun isQuadratic() = when (this) {
-        QR_CODE, AZTEC -> true
+        QR_CODE, AZTEC, DATA_MATRIX -> true
         else -> false
     }
 
