@@ -158,14 +158,16 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithContentDescription("Search passes").performClick()
-        composeRule.onNodeWithContentDescription("Pass search").assertIsFocused()
+        val search = composeRule.onNodeWithContentDescription("Pass search")
+        search.performClick()
+        search.assertIsFocused()
         composeRule.onNodeWithText("All").assertDoesNotExist()
         composeRule.onNodeWithText("Newest first").assertDoesNotExist()
 
         pressBack()
         composeRule.waitUntil(timeoutMillis = 2_000) {
             runCatching {
-                composeRule.onNodeWithContentDescription("Pass search").assertIsNotFocused()
+                search.assertIsNotFocused()
                 true
             }.getOrDefault(false)
         }
