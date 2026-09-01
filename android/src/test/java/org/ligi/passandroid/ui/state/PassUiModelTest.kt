@@ -27,6 +27,26 @@ class PassUiModelTest {
         assertThat(pass.homeCardDetail()).isNull()
     }
 
+    @Test
+    fun `uses the primary field initial for a pass without artwork`() {
+        val pass = pass(
+            description = "Reservation",
+            fields = listOf(PassFieldUiModel("event", "Event", "concert", false, "primaryFields")),
+        )
+
+        assertThat(pass.homeCardInitial()).isEqualTo("C")
+    }
+
+    @Test
+    fun `falls back to the description initial when the primary field is empty`() {
+        val pass = pass(
+            description = " reservation",
+            fields = listOf(PassFieldUiModel("event", "Event", " ", false, "primaryFields")),
+        )
+
+        assertThat(pass.homeCardInitial()).isEqualTo("R")
+    }
+
     private fun pass(description: String, fields: List<PassFieldUiModel>) = PassUiModel(
         id = "pass",
         description = description,

@@ -91,6 +91,15 @@ data class PassUiModel(
         .filter { !it.hidden && it.hint == "primaryFields" }
         .map { it.value.trim() }
         .firstOrNull { it.isNotEmpty() && !it.equals(description.trim(), ignoreCase = true) }
+
+    fun homeCardInitial(): String = fields.asSequence()
+        .filter { !it.hidden && it.hint == "primaryFields" }
+        .map { it.value.trim() }
+        .firstOrNull { it.isNotEmpty() }
+        ?.first()
+        ?.uppercaseChar()
+        ?.toString()
+        ?: description.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
 }
 
 fun PassLocationUiModel.toPlatformLocation() = PlatformLocation(

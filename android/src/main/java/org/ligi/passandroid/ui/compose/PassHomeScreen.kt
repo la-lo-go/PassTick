@@ -51,7 +51,6 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
@@ -1154,7 +1153,10 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.ConfirmationNumber, "Pass artwork", Modifier.fillMaxSize().padding(6.dp))
+                Text(
+                    text = pass.homeCardInitial(),
+                    style = MaterialTheme.typography.titleLarge,
+                )
             }
         }
     }
