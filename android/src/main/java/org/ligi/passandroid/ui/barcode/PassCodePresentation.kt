@@ -72,6 +72,7 @@ fun PassCodePreview(
                     try {
                         while (true) {
                             val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                            change?.consume()
                             if (change == null || !change.pressed) break
                         }
                     } finally {
@@ -129,7 +130,16 @@ fun ExpandedPassCodeDialog(
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).widthIn(max = 960.dp)
-                    .clickable {},
+                    .clickable {}
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            } while (event.changes.any { it.pressed })
+                        }
+                    },
                 shape = RoundedCornerShape(32.dp),
                 color = Color.White,
                 contentColor = Color.Black,

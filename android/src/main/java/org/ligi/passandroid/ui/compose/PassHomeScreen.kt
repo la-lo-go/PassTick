@@ -85,7 +85,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -782,30 +781,16 @@ private fun TicketRow(
                 PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                var titleRendered = false
-                var titleLineCount by remember(pass.id) { mutableIntStateOf(1) }
-                var artworkClearanceAdded = false
                 sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }.forEach { section ->
-                    if (
-                        titleRendered &&
-                        !artworkClearanceAdded &&
-                        HomeCardSection.ARTWORK !in hiddenSections &&
-                        titleLineCount == 1
-                    ) {
-                        Spacer(Modifier.height(if (hero) 14.dp else 2.dp))
-                        artworkClearanceAdded = true
-                    }
                     when (section) {
                         HomeCardSection.ARTWORK -> Unit
                         HomeCardSection.TITLE -> {
-                            titleRendered = true
                             Text(
                                 pass.description,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                onTextLayout = { titleLineCount = it.lineCount },
                             )
                         }
                         HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()?.let {
@@ -817,8 +802,16 @@ private fun TicketRow(
                         HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        HomeCardSection.CATEGORY -> category?.takeIf(PassCategory::isUserOrganized)?.let { CategoryBadge(it) }
-                        HomeCardSection.PASS_TYPE -> Text(
+                        HomeCardSection.CATEGORY -> category?.takeIf(PassCategory::isUserOrganized)?.let {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                                CategoryBadge(it)
+                            }
+                        }
+                        HomeCardSection.PASS_TYPE -> if (category?.isUserOrganized() != true) Text(
                             pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
                             style = MaterialTheme.typography.labelMedium,
                         )
