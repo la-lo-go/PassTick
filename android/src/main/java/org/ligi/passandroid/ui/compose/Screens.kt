@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Check
@@ -231,6 +233,16 @@ fun PassDetailScreen(
                                 onClick = {
                                     overflowOpen = false
                                     tagMenuOpen = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (pass?.isProtected == true) "Remove protection" else "Protect pass") },
+                                leadingIcon = {
+                                    Icon(if (pass?.isProtected == true) Icons.Default.LockOpen else Icons.Default.Lock, null)
+                                },
+                                onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.SetProtected(pass?.isProtected != true))
                                 },
                             )
                             DropdownMenuItem(

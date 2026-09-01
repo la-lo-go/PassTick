@@ -16,6 +16,7 @@ sealed interface PassDetailAction {
     data class SetFlashlightEnabled(val enabled: Boolean) : PassDetailAction
     data class OpenLocation(val index: Int) : PassDetailAction
     data class MoveToCategory(val categoryId: String) : PassDetailAction
+    data class SetProtected(val protected: Boolean) : PassDetailAction
     data object Delete : PassDetailAction
 }
 

@@ -197,12 +197,13 @@ fun PassHomeScreen(
     }
     val categoryNames = remember(state.categories) { state.categories.associate { it.id to it.name } }
     val searchDocuments = remember(state.passes, categoryNames) {
-        state.passes.associate { pass -> pass.id to pass.searchDocument(categoryNames[pass.categoryId]) }
+        state.passes.filterNot(PassUiModel::isProtected)
+            .associate { pass -> pass.id to pass.searchDocument(categoryNames[pass.categoryId]) }
     }
     val searchTerms = remember(searchQuery) { searchQuery.searchTerms() }
     val visiblePasses = remember(categoryPasses, searchDocuments, searchTerms) {
         if (searchTerms.isEmpty()) categoryPasses
-        else categoryPasses.filter { pass ->
+        else categoryPasses.filterNot(PassUiModel::isProtected).filter { pass ->
             val document = searchDocuments[pass.id].orEmpty()
             searchTerms.all(document::contains)
         }
@@ -973,7 +974,7 @@ private fun TicketRow(
                                 }
                                 @Suppress("UNREACHABLE_CODE") false
                             } ?: true
-                            if (held) {
+                            if (held && !pass.isProtected) {
                                 onPreviewChanged(true)
                                 var opening = false
                                 var releasedAfterPreview = false
@@ -1007,7 +1008,7 @@ private fun TicketRow(
                                         onPreviewChanged(false)
                                     }
                                 }
-                            } else if (releasedBeforeLongPress && !movedBeforeLongPress) {
+                            } else if (!held && releasedBeforeLongPress && !movedBeforeLongPress) {
                                 interactionSource.tryEmit(PressInteraction.Release(press))
                                 onOpen(pass.id)
                             } else {

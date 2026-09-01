@@ -19,6 +19,9 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import org.junit.Rule
 import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
@@ -195,6 +198,24 @@ class PassScreensTest {
         composeRule.onNodeWithContentDescription("Pass search").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Search passes").assertDoesNotExist()
         composeRule.onNodeWithText("Search passes").assertIsDisplayed()
+    }
+
+    @Test
+    fun protectedPassIsExcludedFromSearchAndHoldPreview() {
+        val protectedPass = pass("private", "Private ticket", PassType.EVENT).copy(isProtected = true)
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassHomeScreen(MainUiState(passes = listOf(protectedPass), isContentLoading = false), {})
+            }
+        }
+
+        composeRule.onNodeWithText("Private ticket").performTouchInput { longClick() }
+        composeRule.onNodeWithContentDescription("Pass preview scrim").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Search passes").performClick()
+        composeRule.onNodeWithContentDescription("Pass search").performTextInput("Private")
+
+        composeRule.onNodeWithText("Private ticket").assertDoesNotExist()
+        composeRule.onNodeWithText("No matching passes").assertIsDisplayed()
     }
 
     @Test
