@@ -134,6 +134,7 @@ sealed interface AppAction {
     data class AddToCalendar(val id: String) : AppAction
     data class OpenLocation(val id: String, val locationIndex: Int) : AppAction
     data class DeletePass(val id: String) : AppAction
+    data class SetPassPendingDeletion(val id: String, val pending: Boolean) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
     data class MovePass(val id: String, val categoryId: String, val announce: Boolean = true) : AppAction
     data class SelectCategory(val categoryId: String?) : AppAction

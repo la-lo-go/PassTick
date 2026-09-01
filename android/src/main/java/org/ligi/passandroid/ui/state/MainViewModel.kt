@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
@@ -48,11 +49,15 @@ class MainViewModel(
     private val busy = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
     private val selectedCategoryId = MutableStateFlow<String?>(null)
+    private val pendingDeletionIds = MutableStateFlow<Set<String>>(emptySet())
     private val categoryMoves = Channel<AppAction.MovePass>(Channel.UNLIMITED)
     private val passes = passRepository.observePasses()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val visiblePasses = combine(passes, pendingDeletionIds) { currentPasses, pendingIds ->
+        currentPasses.filterNot { it.id in pendingIds }
+    }
 
-    val uiState = combine(passes, settingsRepository.settings, busy, message, selectedCategoryId) {
+    val uiState = combine(visiblePasses, settingsRepository.settings, busy, message, selectedCategoryId) {
             passes, settings, isBusy, currentMessage, requestedCategoryId ->
         val categories = settings.categories.withLegacyCategories(passes)
         val timeline = buildPassTimeline(passes, Instant.now(), ZoneId.systemDefault())
@@ -146,7 +151,16 @@ class MainViewModel(
                 val location = pass.locations.getOrNull(action.locationIndex) ?: error("Location not found")
                 platformActions.openLocation(location.toPlatformLocation())
             }
-            is AppAction.DeletePass -> launchOperation("Pass deleted") { check(passRepository.delete(action.id)) }
+            is AppAction.DeletePass -> viewModelScope.launch {
+                busy.value = true
+                runCatching { check(passRepository.delete(action.id)) }
+                    .onFailure { message.value = it.message ?: "Operation failed" }
+                pendingDeletionIds.update { it - action.id }
+                busy.value = false
+            }
+            is AppAction.SetPassPendingDeletion -> pendingDeletionIds.update { pendingIds ->
+                if (action.pending) pendingIds + action.id else pendingIds - action.id
+            }
             is AppAction.SavePass -> launchOperation("Pass saved") { save(action) }
             is AppAction.MovePass -> check(categoryMoves.trySend(action).isSuccess) { "Pass move queue is closed" }
             is AppAction.SelectCategory -> selectedCategoryId.value = action.categoryId

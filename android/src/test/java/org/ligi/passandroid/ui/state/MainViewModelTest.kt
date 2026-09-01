@@ -61,6 +61,26 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `pending deletion hides a pass and undo restores it before physical deletion`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.SetPassPendingDeletion("pass-1", true))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.passes).isEmpty()
+        assertThat(repository.deletedIds).isEmpty()
+
+        viewModel.onAction(AppAction.SetPassPendingDeletion("pass-1", false))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.passes.map(PassUiModel::id)).containsExactly("pass-1")
+        assertThat(repository.deletedIds).isEmpty()
+    }
+
+    @Test
     fun `keeps content loading until passes and settings are ready`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())

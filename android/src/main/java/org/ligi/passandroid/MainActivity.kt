@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -39,6 +41,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -145,6 +148,29 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            fun requestDelete(passId: String) {
+                viewModel.onAction(AppAction.SetPassPendingDeletion(passId, true))
+                coroutineScope.launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    val timeout = launch {
+                        delay(5_000)
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                    }
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Pass deleted",
+                        actionLabel = "Undo",
+                        withDismissAction = false,
+                        duration = SnackbarDuration.Indefinite,
+                    )
+                    timeout.cancel()
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.onAction(AppAction.SetPassPendingDeletion(passId, false))
+                    } else {
+                        viewModel.onAction(AppAction.DeletePass(passId))
+                    }
+                }
+            }
+
             fun handleHomeAction(action: HomeAction) {
                 when (action) {
                     is HomeAction.OpenPass -> backStack.add(AppDestination.PassDetail(action.id))
@@ -162,7 +188,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     is HomeAction.Delete -> {
-                        viewModel.onAction(AppAction.DeletePass(action.id))
+                        requestDelete(action.id)
                     }
                     is HomeAction.Undo -> viewModel.onAction(action.operation.toAppAction())
                     HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
@@ -196,7 +222,10 @@ class MainActivity : ComponentActivity() {
                     is PassDetailAction.MoveToCategory -> viewModel.onAction(
                         AppAction.MovePass(passId, action.categoryId),
                     )
-                    PassDetailAction.Delete -> viewModel.onAction(AppAction.DeletePass(passId))
+                    PassDetailAction.Delete -> {
+                        requestDelete(passId)
+                        backStack.removeLastOrNull()
+                    }
                 }
             }
 
