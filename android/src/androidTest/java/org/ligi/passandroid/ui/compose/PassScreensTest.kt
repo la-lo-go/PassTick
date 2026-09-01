@@ -205,6 +205,21 @@ class PassScreensTest {
         composeRule.onNodeWithText("Delete permanently").assertDoesNotExist()
     }
 
+    @Test
+    fun expandedPassCodeUsesModalPresentation() {
+        val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
+            barcodeFormat = PassBarCodeFormat.QR_CODE,
+            barcodeMessage = "payload",
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass, onAction = {}, initialCodeExpanded = true)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Expanded pass code").assertIsDisplayed()
+    }
+
     private fun assertVisualContent(image: androidx.compose.ui.graphics.ImageBitmap) {
         assertThat(image.width).isGreaterThan(0)
         assertThat(image.height).isGreaterThan(0)
