@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
@@ -100,6 +101,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -365,6 +367,8 @@ fun PassHomeScreen(
                             hero = true,
                             sectionOrder = state.settings.homeCardSectionOrder,
                             hiddenSections = state.settings.hiddenHomeCardSections,
+                            showProtectedPassLockIcon = state.settings.showProtectedPassLockIcon,
+                            blurProtectedPassCards = state.settings.blurProtectedPassCards,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring, originalCategoryId ->
                                 if (restoring) {
@@ -380,6 +384,9 @@ fun PassHomeScreen(
                                 if (it == null) previewOpeningPassId = null
                             },
                             onPreviewOpeningChanged = { previewOpeningPassId = it },
+                            onProtectedPreviewRequested = {
+                                scope.launch { snackbarHostState.showSnackbar("Unlock the pass to preview it") }
+                            },
                         )
                     }
                 }
@@ -395,6 +402,8 @@ fun PassHomeScreen(
                             hero = false,
                             sectionOrder = state.settings.homeCardSectionOrder,
                             hiddenSections = state.settings.hiddenHomeCardSections,
+                            showProtectedPassLockIcon = state.settings.showProtectedPassLockIcon,
+                            blurProtectedPassCards = state.settings.blurProtectedPassCards,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring, originalCategoryId ->
                                 if (restoring) {
@@ -410,6 +419,9 @@ fun PassHomeScreen(
                                 if (it == null) previewOpeningPassId = null
                             },
                             onPreviewOpeningChanged = { previewOpeningPassId = it },
+                            onProtectedPreviewRequested = {
+                                scope.launch { snackbarHostState.showSnackbar("Unlock the pass to preview it") }
+                            },
                         )
                     }
                 }
@@ -590,12 +602,15 @@ private fun TicketFeed(
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
+    showProtectedPassLockIcon: Boolean,
+    blurProtectedPassCards: Boolean,
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
     onDelete: (String, String) -> Unit,
     onReorder: (List<String>) -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
+    onProtectedPreviewRequested: () -> Unit,
 ) {
     val feeds = remember(passes, columns) {
         List(columns) { column -> passes.filterIndexed { index, _ -> index % columns == column } }
@@ -609,6 +624,8 @@ private fun TicketFeed(
                     hero = hero,
                     sectionOrder = sectionOrder,
                     hiddenSections = hiddenSections,
+                    showProtectedPassLockIcon = showProtectedPassLockIcon,
+                    blurProtectedPassCards = blurProtectedPassCards,
                     modifier = Modifier.weight(1f),
                     onOpen = onOpen,
                     onArchive = onArchive,
@@ -616,6 +633,7 @@ private fun TicketFeed(
                     onReorder = onReorder,
                     onPreviewChanged = onPreviewChanged,
                     onPreviewOpeningChanged = onPreviewOpeningChanged,
+                    onProtectedPreviewRequested = onProtectedPreviewRequested,
                 )
             } else {
                 Spacer(Modifier.weight(1f))
@@ -635,6 +653,8 @@ private fun ReorderableTicketColumn(
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
+    showProtectedPassLockIcon: Boolean,
+    blurProtectedPassCards: Boolean,
     modifier: Modifier,
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
@@ -642,6 +662,7 @@ private fun ReorderableTicketColumn(
     onReorder: (List<String>) -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
+    onProtectedPreviewRequested: () -> Unit,
 ) {
     var visualPasses by remember { mutableStateOf(passes) }
     var measuredBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
@@ -735,6 +756,8 @@ private fun ReorderableTicketColumn(
                     hero = hero,
                     sectionOrder = sectionOrder,
                     hiddenSections = hiddenSections,
+                    showProtectedPassLockIcon = showProtectedPassLockIcon,
+                    blurProtectedPassCards = blurProtectedPassCards,
                     modifier = Modifier.fillMaxWidth()
                         .onGloballyPositioned { coordinates ->
                             if (draggedId == null) {
@@ -820,6 +843,7 @@ private fun ReorderableTicketColumn(
                     onReorderCancel = ::clearDrag,
                     onPreviewChanged = onPreviewChanged,
                     onPreviewOpeningChanged = onPreviewOpeningChanged,
+                    onProtectedPreviewRequested = onProtectedPreviewRequested,
                 )
             }
         }
@@ -834,6 +858,8 @@ private fun TicketSwipeContainer(
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
+    showProtectedPassLockIcon: Boolean,
+    blurProtectedPassCards: Boolean,
     modifier: Modifier,
     shape: Shape,
     reorderingActive: Boolean,
@@ -846,6 +872,7 @@ private fun TicketSwipeContainer(
     onReorderCancel: () -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
+    onProtectedPreviewRequested: () -> Unit,
 ) {
     val restoring = category?.role == PassCategoryRole.ARCHIVE
     val archiveLabel = if (restoring) "Restore" else "Archive"
@@ -894,6 +921,8 @@ private fun TicketSwipeContainer(
                 hero = hero,
                 sectionOrder = sectionOrder,
                 hiddenSections = hiddenSections,
+                showProtectedPassLockIcon = showProtectedPassLockIcon,
+                blurProtectedPassCards = blurProtectedPassCards,
                 modifier = Modifier.semantics {
                     customActions = listOf(
                         CustomAccessibilityAction(archiveLabel) { onArchive(pass.id, restoring, pass.categoryId); true },
@@ -908,6 +937,7 @@ private fun TicketSwipeContainer(
                 onReorderCancel = onReorderCancel,
                 onPreviewChanged = { visible -> onPreviewChanged(pass.id.takeIf { visible }) },
                 onPreviewOpeningChanged = { opening -> onPreviewOpeningChanged(pass.id.takeIf { opening }) },
+                onProtectedPreviewRequested = onProtectedPreviewRequested,
             )
         },
     )
@@ -920,6 +950,8 @@ private fun TicketRow(
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
+    showProtectedPassLockIcon: Boolean,
+    blurProtectedPassCards: Boolean,
     modifier: Modifier,
     shape: Shape,
     onOpen: (String) -> Unit,
@@ -929,6 +961,7 @@ private fun TicketRow(
     onReorderCancel: () -> Unit,
     onPreviewChanged: (Boolean) -> Unit,
     onPreviewOpeningChanged: (Boolean) -> Unit,
+    onProtectedPreviewRequested: () -> Unit,
 ) {
     val interactionSource = remember(pass.id) { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
@@ -946,9 +979,19 @@ private fun TicketRow(
         ) {
             Row(
                 Modifier.weight(1f)
+                    .then(if (pass.isProtected && blurProtectedPassCards) Modifier.blur(8.dp) else Modifier)
                     .semantics(mergeDescendants = true) {
                         role = Role.Button
-                        onClick(label = "Open ${pass.description}") {
+                        if (pass.isProtected && blurProtectedPassCards) {
+                            contentDescription = "Protected pass information blurred"
+                        }
+                        onClick(
+                            label = if (pass.isProtected && blurProtectedPassCards) {
+                                "Open protected pass"
+                            } else {
+                                "Open ${pass.description}"
+                            },
+                        ) {
                             onOpen(pass.id)
                             true
                         }
@@ -974,7 +1017,10 @@ private fun TicketRow(
                                 }
                                 @Suppress("UNREACHABLE_CODE") false
                             } ?: true
-                            if (held && !pass.isProtected) {
+                            if (held && pass.isProtected) {
+                                interactionSource.tryEmit(PressInteraction.Cancel(press))
+                                onProtectedPreviewRequested()
+                            } else if (held) {
                                 onPreviewChanged(true)
                                 var opening = false
                                 var releasedAfterPreview = false
@@ -1071,6 +1117,9 @@ private fun TicketRow(
                     }
                 }
             }
+            }
+            if (pass.isProtected && showProtectedPassLockIcon) {
+                Icon(Icons.Default.Lock, "Protected pass", Modifier.size(20.dp))
             }
             Icon(
                 Icons.Default.DragHandle,

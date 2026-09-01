@@ -211,11 +211,30 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Private ticket").performTouchInput { longClick() }
         composeRule.onNodeWithContentDescription("Pass preview scrim").assertDoesNotExist()
+        composeRule.onNodeWithText("Unlock the pass to preview it").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Protected pass").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Search passes").performClick()
         composeRule.onNodeWithText("Private ticket").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Pass search").performTextInput("Private")
 
         composeRule.onNodeWithText("No matching passes").assertIsDisplayed()
+    }
+
+    @Test
+    fun protectedPassPresentationRespectsPrivacySettings() {
+        val protectedPass = pass("private", "Private ticket", PassType.EVENT).copy(isProtected = true)
+        val settings = AppSettings(showProtectedPassLockIcon = false, blurProtectedPassCards = true)
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassHomeScreen(
+                    MainUiState(passes = listOf(protectedPass), settings = settings, isContentLoading = false),
+                    {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Protected pass").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Protected pass information blurred").assertIsDisplayed()
     }
 
     @Test
