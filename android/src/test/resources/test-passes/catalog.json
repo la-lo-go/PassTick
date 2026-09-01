@@ -1,0 +1,172 @@
+[
+  {
+    "fileName": "cinema-qr.espass",
+    "pass": {
+      "id": "test-cinema-qr",
+      "accentColor": "#ff6750a4",
+      "creator": "Aurora Cinema",
+      "type": "EVENT",
+      "barCode": { "format": "QR_CODE", "message": "CINEMA-QR-A7-204", "alternativeText": "Row A · Seat 7" },
+      "description": "Midnight Premiere",
+      "validTimespans": [],
+      "calendarTimespan": { "from": "2026-09-01T20:30:00+02:00", "to": "2026-09-01T22:45:00+02:00" },
+      "fields": [
+        { "key": "screen", "label": "Screen", "value": "4", "hide": false, "hint": "secondaryFields" },
+        { "key": "seat", "label": "Seat", "value": "A7", "hide": false, "hint": "auxiliaryFields" },
+        { "key": "terms", "label": "Admission", "value": "Doors open 20 minutes before the film.", "hide": true, "hint": "backFields" }
+      ],
+      "locations": [{ "name": "Aurora Cinema", "lat": 40.4168, "lon": -3.7038 }],
+      "serial": "CINEMA-QR-001"
+    }
+  },
+  {
+    "fileName": "flight-aztec.espass",
+    "pass": {
+      "id": "test-flight-aztec",
+      "accentColor": "#ff006874",
+      "creator": "Northwind Air",
+      "type": "BOARDING",
+      "barCode": { "format": "AZTEC", "message": "M1DOE/JANE EABC123 MADBCN NW 0427 245Y018A0001", "alternativeText": "ABC123" },
+      "description": "Madrid to Barcelona",
+      "validTimespans": [],
+      "calendarTimespan": { "from": "2026-09-02T08:10:00+02:00" },
+      "fields": [
+        { "key": "gate", "label": "Gate", "value": "J42", "hide": false, "hint": "headerFields" },
+        { "key": "route", "label": "Route", "value": "MAD → BCN", "hide": false, "hint": "primaryFields" },
+        { "key": "boarding", "label": "Boarding", "value": "07:35", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [{ "name": "Adolfo Suárez Madrid–Barajas Airport", "lat": 40.4983, "lon": -3.5676 }],
+      "serial": "NW-0427-ABC123"
+    }
+  },
+  {
+    "fileName": "festival-pdf417.espass",
+    "pass": {
+      "id": "test-festival-pdf417",
+      "accentColor": "#ff9a4522",
+      "creator": "Sol Festival",
+      "type": "EVENT",
+      "barCode": { "format": "PDF_417", "message": "SOL26|WEEKEND|GA|8792310042", "alternativeText": "Weekend · General admission" },
+      "description": "Sol Festival Weekend",
+      "validTimespans": [{ "from": "2026-09-04T16:00:00+02:00", "to": "2026-09-07T02:00:00+02:00" }],
+      "calendarTimespan": { "from": "2026-09-04T16:00:00+02:00", "to": "2026-09-07T02:00:00+02:00" },
+      "fields": [
+        { "key": "access", "label": "Access", "value": "Weekend", "hide": false, "hint": "primaryFields" },
+        { "key": "zone", "label": "Zone", "value": "General admission", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [{ "name": "Parque del Río", "lat": 40.4111, "lon": -3.7221 }],
+      "serial": "SOL26-8792310042"
+    }
+  },
+  {
+    "fileName": "train-code128.espass",
+    "pass": {
+      "id": "test-train-code128",
+      "accentColor": "#ff355f2f",
+      "creator": "Iberia Rail",
+      "type": "BOARDING",
+      "barCode": { "format": "CODE_128", "message": "IR260901MADVLC004812", "alternativeText": "0048 12" },
+      "description": "Madrid to Valencia",
+      "validTimespans": [],
+      "calendarTimespan": { "from": "2026-09-03T11:25:00+02:00" },
+      "fields": [
+        { "key": "coach", "label": "Coach", "value": "4", "hide": false, "hint": "secondaryFields" },
+        { "key": "seat", "label": "Seat", "value": "12A", "hide": false, "hint": "auxiliaryFields" },
+        { "key": "fare", "label": "Fare", "value": "Flexible", "hide": true, "hint": "backFields" }
+      ],
+      "locations": [{ "name": "Madrid Puerta de Atocha", "lat": 40.4066, "lon": -3.6891 }],
+      "serial": "IR-0048-12A"
+    }
+  },
+  {
+    "fileName": "museum-code39.espass",
+    "pass": {
+      "id": "test-museum-code39",
+      "accentColor": "#ff735c00",
+      "creator": "Modern Arts Museum",
+      "type": "COUPON",
+      "barCode": { "format": "CODE_39", "message": "MUSEUM-2609-1842", "alternativeText": "MUSEUM-2609-1842" },
+      "description": "Exhibition Admission",
+      "validTimespans": [{ "to": "2026-12-31T23:59:00+01:00" }],
+      "fields": [
+        { "key": "admission", "label": "Admission", "value": "Adult", "hide": false, "hint": "primaryFields" },
+        { "key": "exhibition", "label": "Exhibition", "value": "Form and Light", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [{ "name": "Modern Arts Museum", "lat": 41.3851, "lon": 2.1734 }],
+      "serial": "MUSEUM-1842"
+    }
+  },
+  {
+    "fileName": "membership-data-matrix.espass",
+    "pass": {
+      "id": "test-membership-data-matrix",
+      "accentColor": "#ff485d92",
+      "creator": "City Library",
+      "type": "LOYALTY",
+      "barCode": { "format": "DATA_MATRIX", "message": "LIBRARY:MEMBER:003821994", "alternativeText": "003 821 994" },
+      "description": "Library Membership",
+      "validTimespans": [],
+      "fields": [
+        { "key": "member", "label": "Member", "value": "Alex Morgan", "hide": false, "hint": "primaryFields" },
+        { "key": "expires", "label": "Expires", "value": "September 2027", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [],
+      "serial": "003821994"
+    }
+  },
+  {
+    "fileName": "shop-ean13.espass",
+    "pass": {
+      "id": "test-shop-ean13",
+      "accentColor": "#ff8c4a60",
+      "creator": "Neighborhood Market",
+      "type": "COUPON",
+      "barCode": { "format": "EAN_13", "message": "5901234123457", "alternativeText": "590 1234 12345 7" },
+      "description": "20% Weekend Discount",
+      "validTimespans": [{ "to": "2026-09-06T21:00:00+02:00" }],
+      "fields": [
+        { "key": "offer", "label": "Offer", "value": "20% off", "hide": false, "hint": "primaryFields" },
+        { "key": "minimum", "label": "Minimum spend", "value": "€25", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [],
+      "serial": "5901234123457"
+    }
+  },
+  {
+    "fileName": "cafe-ean8.espass",
+    "pass": {
+      "id": "test-cafe-ean8",
+      "accentColor": "#ff6f5d2f",
+      "creator": "North Café",
+      "type": "LOYALTY",
+      "barCode": { "format": "EAN_8", "message": "96385074", "alternativeText": "9638 5074" },
+      "description": "Coffee Rewards",
+      "validTimespans": [],
+      "fields": [
+        { "key": "stamps", "label": "Stamps", "value": "7 of 10", "hide": false, "hint": "primaryFields" },
+        { "key": "reward", "label": "Next reward", "value": "Any hot drink", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [{ "name": "North Café", "lat": 43.263, "lon": -2.935 }],
+      "serial": "96385074"
+    }
+  },
+  {
+    "fileName": "parcel-itf.espass",
+    "pass": {
+      "id": "test-parcel-itf",
+      "accentColor": "#ff496727",
+      "creator": "Green Parcel",
+      "type": "GENERIC",
+      "barCode": { "format": "ITF", "message": "12345678901234", "alternativeText": "1234 5678 9012 34" },
+      "description": "Parcel Collection",
+      "validTimespans": [{ "to": "2026-09-10T20:00:00+02:00" }],
+      "fields": [
+        { "key": "locker", "label": "Locker", "value": "B-14", "hide": false, "hint": "primaryFields" },
+        { "key": "recipient", "label": "Recipient", "value": "Alex Morgan", "hide": false, "hint": "secondaryFields" },
+        { "key": "instructions", "label": "Instructions", "value": "Scan the code at the collection screen.", "hide": true, "hint": "backFields" }
+      ],
+      "locations": [{ "name": "Central Parcel Locker", "lat": 39.4699, "lon": -0.3763 }],
+      "serial": "GP-12345678901234"
+    }
+  }
+]
