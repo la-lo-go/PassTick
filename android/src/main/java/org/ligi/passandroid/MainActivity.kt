@@ -162,9 +162,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     is HomeAction.Delete -> {
-                        state.categories.firstOrNull { it.role == PassCategoryRole.TRASH }?.let {
-                            viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
-                        }
+                        viewModel.onAction(AppAction.DeletePass(action.id))
                     }
                     is HomeAction.Undo -> viewModel.onAction(action.operation.toAppAction())
                     HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
@@ -198,6 +196,7 @@ class MainActivity : ComponentActivity() {
                     is PassDetailAction.MoveToCategory -> viewModel.onAction(
                         AppAction.MovePass(passId, action.categoryId),
                     )
+                    PassDetailAction.Delete -> viewModel.onAction(AppAction.DeletePass(passId))
                 }
             }
 

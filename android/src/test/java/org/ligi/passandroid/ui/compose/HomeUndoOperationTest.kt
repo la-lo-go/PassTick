@@ -12,10 +12,4 @@ class HomeUndoOperationTest {
         assertThat(action).isEqualTo(AppAction.MovePass("today-pass", "favorites", announce = false))
     }
 
-    @Test
-    fun `undo delete restores a Today pass to its original category`() {
-        val action = UndoOperation.Delete("today-pass", "inbox").toAppAction()
-
-        assertThat(action).isEqualTo(AppAction.MovePass("today-pass", "inbox", announce = false))
-    }
 }

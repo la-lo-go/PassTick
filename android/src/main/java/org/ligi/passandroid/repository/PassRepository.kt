@@ -102,8 +102,8 @@ class FilePassRepository(
 ) : PassRepository {
     override fun observePasses(): Flow<List<PassSnapshot>> = flow {
         passStore.syncPassStoreWithClassifier(context.getString(R.string.topic_new))
-        emit(snapshot())
-        emitAll(passStore.updates.map { snapshot() })
+        emit(visibleSnapshots())
+        emitAll(passStore.updates.map { visibleSnapshots() })
     }
 
     override suspend fun import(uri: Uri): Result<PassSnapshot> = withContext(ioDispatcher) {
@@ -232,6 +232,8 @@ class FilePassRepository(
             passStore.classifier.getTopic(pass.id, context.getString(R.string.topic_new)),
         )
     }
+
+    private fun visibleSnapshots() = snapshot().filterNot { it.categoryId == "trash" }
 }
 
 private fun Pass.toSnapshot(path: File, categoryId: String) = PassSnapshot(

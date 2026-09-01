@@ -216,7 +216,7 @@ fun PassDetailScreen(
                                     }
                                 },
                             )
-                            categories.forEach { category ->
+                            categories.filterNot { it.role == PassCategoryRole.TRASH }.forEach { category ->
                                 DropdownMenuItem(
                                     text = { Text("Move to ${category.name}") },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, null) },
@@ -226,6 +226,14 @@ fun PassDetailScreen(
                                     },
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("Delete pass") },
+                                leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.Delete)
+                                },
+                            )
                         }
                     }
                 },

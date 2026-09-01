@@ -203,7 +203,7 @@ class PassScreensTest {
     }
 
     @Test
-    fun permanentDeleteIsNotExposed() {
+    fun passActionsExposeDeleteWithoutTrash() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) {
                 PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = {})
@@ -212,6 +212,8 @@ class PassScreensTest {
 
         composeRule.onNodeWithContentDescription("Pass actions").performClick()
         composeRule.onNodeWithText("Delete permanently").assertDoesNotExist()
+        composeRule.onNodeWithText("Move to Trash").assertDoesNotExist()
+        composeRule.onNodeWithText("Delete pass").assertIsDisplayed()
     }
 
     @Test

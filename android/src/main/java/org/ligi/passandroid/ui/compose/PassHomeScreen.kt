@@ -150,7 +150,6 @@ sealed interface UndoOperation {
 
     data class Archive(override val passId: String, override val originalCategoryId: String) : UndoOperation
     data class Restore(override val passId: String, override val originalCategoryId: String) : UndoOperation
-    data class Delete(override val passId: String, override val originalCategoryId: String) : UndoOperation
 }
 
 internal fun UndoOperation.toAppAction() = AppAction.MovePass(passId, originalCategoryId, announce = false)
@@ -349,9 +348,7 @@ fun PassHomeScreen(
                                     dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
                                 }
                             },
-                            onDelete = { id, originalCategoryId ->
-                                dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id, originalCategoryId), "Pass deleted")
-                            },
+                            onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
                             onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
                             onPreviewChanged = {
                                 previewPassId = it
@@ -381,9 +378,7 @@ fun PassHomeScreen(
                                     dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
                                 }
                             },
-                            onDelete = { id, originalCategoryId ->
-                                dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id, originalCategoryId), "Pass deleted")
-                            },
+                            onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
                             onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
                             onPreviewChanged = {
                                 previewPassId = it
