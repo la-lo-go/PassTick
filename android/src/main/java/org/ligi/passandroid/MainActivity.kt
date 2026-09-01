@@ -179,10 +179,6 @@ class MainActivity : ComponentActivity() {
                 when (action) {
                     PassDetailAction.Back -> backStack.removeLastOrNull()
                     PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(passId))
-                    PassDetailAction.Delete -> {
-                        viewModel.onAction(AppAction.DeletePass(passId))
-                        backStack.removeLastOrNull()
-                    }
                     PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(passId))
                     PassDetailAction.Print -> viewModel.onAction(AppAction.PrintPass(passId))
                     PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))

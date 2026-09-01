@@ -8,7 +8,6 @@ import org.ligi.passandroid.repository.HomeCardSection
 sealed interface PassDetailAction {
     data object Back : PassDetailAction
     data object Edit : PassDetailAction
-    data object Delete : PassDetailAction
     data object Share : PassDetailAction
     data object Print : PassDetailAction
     data object AddToCalendar : PassDetailAction

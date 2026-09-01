@@ -131,7 +131,6 @@ fun PassDetailScreen(
     onAction: (PassDetailAction) -> Unit,
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
     var configureReminder by remember { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
@@ -153,24 +152,6 @@ fun PassDetailScreen(
     }
     DisposableEffect(Unit) {
         onDispose { onAction(PassDetailAction.SetFlashlightEnabled(false)) }
-    }
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete pass permanently?") },
-            text = { Text("This action cannot be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmDelete = false
-                        onAction(PassDetailAction.Delete)
-                    },
-                ) { Text("Delete permanently") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
-            },
-        )
     }
     if (configureReminder) {
         AlertDialog(
@@ -246,14 +227,6 @@ fun PassDetailScreen(
                                     },
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text("Delete permanently") },
-                                leadingIcon = { Icon(Icons.Default.Delete, null) },
-                                onClick = {
-                                overflowOpen = false
-                                confirmDelete = true
-                                },
-                            )
                         }
                     }
                 },

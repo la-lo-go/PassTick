@@ -27,7 +27,6 @@ import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
-import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.theme.PassTheme
 import androidx.compose.ui.unit.DpSize
@@ -195,21 +194,15 @@ class PassScreensTest {
     }
 
     @Test
-    fun permanentDeleteRequiresConfirmation() {
-        val actions = mutableListOf<PassDetailAction>()
+    fun permanentDeleteIsNotExposed() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) {
-                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add)
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = {})
             }
         }
 
         composeRule.onNodeWithContentDescription("Pass actions").performClick()
-        composeRule.onNodeWithText("Delete permanently").performClick()
-        composeRule.onNodeWithText("Delete pass permanently?").assertIsDisplayed()
-        assertThat(actions).doesNotContain(PassDetailAction.Delete)
-
-        composeRule.onNodeWithText("Delete permanently").performClick()
-        assertThat(actions).containsExactly(PassDetailAction.Delete)
+        composeRule.onNodeWithText("Delete permanently").assertDoesNotExist()
     }
 
     private fun assertVisualContent(image: androidx.compose.ui.graphics.ImageBitmap) {
