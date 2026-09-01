@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.ZeroCornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -96,6 +95,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
@@ -107,6 +108,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -262,6 +266,13 @@ fun PassHomeScreen(
                     onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenTimeline) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
+                HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                Text(
+                    "Customize",
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 NavigationDrawerItem(
                     label = { Text("Pass view") },
                     selected = false,
@@ -269,6 +280,7 @@ fun PassHomeScreen(
                     onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenPassViewSettings) },
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
+                HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 NavigationDrawerItem(
                     label = { Text("Home cards") },
                     selected = false,
@@ -446,6 +458,7 @@ private fun HomeToolbar(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
                     modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester)
+                        .height(48.dp)
                         .onFocusChanged { onSearchFocusChanged(it.hasFocus) }
                         .semantics { contentDescription = "Pass search" },
                     singleLine = true,
@@ -554,14 +567,16 @@ private fun TicketFeed(
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         feeds.forEach { feed ->
             if (feed.isNotEmpty()) {
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(if (hero) 28.dp else 20.dp),
-                    color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-                ) {
-                    Column {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         feed.forEachIndexed { index, pass ->
                             val category = categories.firstOrNull { it.id == pass.categoryId }
+                            val radius = if (hero) 28.dp else 20.dp
+                            val shape = RoundedCornerShape(
+                                topStart = if (index == 0) radius else 0.dp,
+                                topEnd = if (index == 0) radius else 0.dp,
+                                bottomStart = if (index == feed.lastIndex) radius else 0.dp,
+                                bottomEnd = if (index == feed.lastIndex) radius else 0.dp,
+                            )
                             TicketSwipeContainer(
                                 pass = pass,
                                 category = category,
@@ -569,6 +584,7 @@ private fun TicketFeed(
                                 sectionOrder = sectionOrder,
                                 hiddenSections = hiddenSections,
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = shape,
                                 onOpen = onOpen,
                                 onArchive = onArchive,
                                 onDelete = onDelete,
@@ -576,12 +592,8 @@ private fun TicketFeed(
                                 onPreviewChanged = onPreviewChanged,
                                 onPreviewOpeningChanged = onPreviewOpeningChanged,
                             )
-                            if (index < feed.lastIndex) {
-                                HorizontalDivider(Modifier.padding(horizontal = if (hero) 20.dp else 16.dp))
-                            }
                         }
                     }
-                }
             } else {
                 Spacer(Modifier.weight(1f))
             }
@@ -598,6 +610,7 @@ private fun TicketSwipeContainer(
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
     modifier: Modifier,
+    shape: Shape,
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
     onDelete: (String, String) -> Unit,
@@ -622,7 +635,7 @@ private fun TicketSwipeContainer(
     }
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier,
+        modifier = modifier.clip(shape),
         gesturesEnabled = !isReordering,
         backgroundContent = {
             val deleting = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
@@ -651,6 +664,7 @@ private fun TicketSwipeContainer(
                         CustomAccessibilityAction("Delete") { onDelete(pass.id, pass.categoryId); true },
                     )
                 },
+                shape = shape,
                 onOpen = onOpen,
                 onReorder = { offset -> onReorder(pass.id, offset) },
                 onReorderingChanged = { isReordering = it },
@@ -669,6 +683,7 @@ private fun TicketRow(
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
     modifier: Modifier,
+    shape: Shape,
     onOpen: (String) -> Unit,
     onReorder: (Int) -> Unit,
     onReorderingChanged: (Boolean) -> Unit,
@@ -676,19 +691,19 @@ private fun TicketRow(
     onPreviewOpeningChanged: (Boolean) -> Unit,
 ) {
     var dragOffset by remember(pass.id) { mutableFloatStateOf(0f) }
-    var pendingReorder by remember(pass.id) { mutableStateOf(0) }
     var isReordering by remember(pass.id) { mutableStateOf(false) }
     val interactionSource = remember(pass.id) { MutableInteractionSource() }
+    val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     Surface(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(ZeroCornerSize),
-        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer {
+        shape = shape,
+        modifier = modifier.fillMaxWidth().animateContentSize().zIndex(if (isReordering) 1f else 0f).graphicsLayer {
             translationY = dragOffset
-            scaleX = if (isReordering) 1.015f else 1f
-            scaleY = if (isReordering) 1.015f else 1f
-            shadowElevation = if (isReordering) 8.dp.toPx() else 0f
+            scaleX = if (isReordering) 1.025f else 1f
+            scaleY = if (isReordering) 1.025f else 1f
+            shadowElevation = if (isReordering) 12.dp.toPx() else 0f
         }
             .indication(interactionSource, LocalIndication.current),
     ) {
@@ -821,26 +836,28 @@ private fun TicketRow(
                     detectDragGesturesAfterLongPress(
                         onDragStart = {
                             isReordering = true
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                             onReorderingChanged(true)
                         },
                         onDragEnd = {
-                            val offset = pendingReorder
                             dragOffset = 0f
-                            pendingReorder = 0
                             isReordering = false
                             onReorderingChanged(false)
-                            if (offset != 0) onReorder(offset)
                         },
                         onDragCancel = {
                             dragOffset = 0f
-                            pendingReorder = 0
                             isReordering = false
                             onReorderingChanged(false)
                         },
                         onDrag = { change, amount ->
                             change.consume()
                             dragOffset = (dragOffset + amount.y).coerceIn(-224.dp.toPx(), 224.dp.toPx())
-                            pendingReorder = (dragOffset / 72.dp.toPx()).roundToInt()
+                            val offset = (dragOffset / 72.dp.toPx()).roundToInt()
+                            if (offset != 0) {
+                                onReorder(offset)
+                                dragOffset -= offset * 72.dp.toPx()
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
                         },
                     )
                 }.padding(8.dp),

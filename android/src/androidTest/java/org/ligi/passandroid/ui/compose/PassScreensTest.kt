@@ -22,6 +22,8 @@ import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.defaultPassCategories
+import org.ligi.passandroid.repository.HomeCardSection
+import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.ui.state.PassFieldUiModel
@@ -200,6 +202,30 @@ class PassScreensTest {
         composeRule.onNodeWithText("Trash").assertDoesNotExist()
         composeRule.onNodeWithText("Favorites").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Add category").assertIsDisplayed()
+    }
+
+    @Test
+    fun homeCardCustomizationUsesControlsWithoutVisibilityNarration() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                HomeCardLayoutSettingsScreen(HomeCardSection.entries, setOf(HomeCardSection.CREATOR), {})
+            }
+        }
+
+        composeRule.onNodeWithText("Shown").assertDoesNotExist()
+        composeRule.onNodeWithText("Hidden").assertDoesNotExist()
+        composeRule.onNodeWithText("Creator is hidden by default", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun passDetailCustomizationUsesControlsWithoutVisibilityNarration() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailLayoutSettingsScreen(PassDetailSection.entries, emptySet(), {})
+            }
+        }
+        composeRule.onNodeWithText("Shown").assertDoesNotExist()
+        composeRule.onNodeWithText("Hidden").assertDoesNotExist()
     }
 
     @Test

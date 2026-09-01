@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
@@ -52,6 +53,7 @@ import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -188,10 +190,14 @@ fun PassDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text(pass?.description ?: "Pass") },
-                navigationIcon = { IconButton(onClick = { onAction(PassDetailAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = {
+                    FilledTonalIconButton(onClick = { onAction(PassDetailAction.Back) }, shape = CircleShape) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
                 actions = {
                     Box {
-                        IconButton(onClick = { overflowOpen = true }, enabled = pass != null) {
+                        FilledTonalIconButton(onClick = { overflowOpen = true }, enabled = pass != null, shape = CircleShape) {
                             Icon(Icons.Default.MoreVert, "Pass actions")
                         }
                         DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
@@ -313,21 +319,24 @@ fun PassDetailScreen(
                                 }
                             }
                             PassDetailSection.LOCATIONS -> if (pass.locations.isNotEmpty()) item {
-                                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                                    Column(Modifier.padding(vertical = 8.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         pass.locations.forEachIndexed { index, location ->
                                             val label = location.name?.takeIf(String::isNotBlank)
                                                 ?: "${location.latitude}, ${location.longitude}"
-                                            ListItem(
-                                                leadingContent = { Icon(Icons.Default.LocationOn, null) },
-                                                supportingContent = { Text("Open in Maps") },
+                                            Surface(
                                                 modifier = Modifier.fillMaxWidth().clickable {
                                                     onAction(PassDetailAction.OpenLocation(index))
                                                 },
-                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                            ) { Text(label) }
+                                                shape = RoundedCornerShape(28.dp),
+                                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                            ) {
+                                                ListItem(
+                                                    leadingContent = { Icon(Icons.Default.LocationOn, null) },
+                                                    supportingContent = { Text("Open in Maps") },
+                                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                                ) { Text(label) }
+                                            }
                                         }
-                                    }
                                 }
                             }
                             PassDetailSection.CALENDAR -> pass.calendarEvent?.let {
@@ -805,7 +814,6 @@ fun PassDetailLayoutSettingsScreen(
                     color = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
                     ListItem(
-                        supportingContent = { Text(if (section in hidden) "Hidden" else "Shown") },
                         trailingContent = {
                             Row {
                                 IconButton(
@@ -866,7 +874,7 @@ fun HomeCardLayoutSettingsScreen(
         ) {
             item {
                 Text(
-                    "Choose the card image and arrange the text lines. Creator is hidden by default.",
+                    "Choose the card image and arrange the text lines.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
@@ -900,7 +908,6 @@ fun HomeCardLayoutSettingsScreen(
                     color = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
                     ListItem(
-                        supportingContent = { Text(if (section in hidden) "Hidden" else "Shown") },
                         trailingContent = {
                             Row {
                                 IconButton(
