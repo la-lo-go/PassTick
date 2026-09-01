@@ -726,16 +726,6 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                             modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         ) { Text("Categories") }
-                        ListItem(
-                            supportingContent = { Text("Choose the sections shown in each pass") },
-                            modifier = Modifier.clickable { onAction(SettingsAction.OpenPassDetailLayout) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        ) { Text("Pass view") }
-                        ListItem(
-                            supportingContent = { Text("Choose the content and order of pass cards") },
-                            modifier = Modifier.clickable { onAction(SettingsAction.OpenHomeCardLayout) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        ) { Text("Home cards") }
                     }
                 }
                 item {

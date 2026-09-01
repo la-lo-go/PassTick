@@ -31,8 +31,6 @@ sealed interface SettingsAction {
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction
-    data object OpenPassDetailLayout : SettingsAction
-    data object OpenHomeCardLayout : SettingsAction
     data class SetHighlightTodayPasses(val value: Boolean) : SettingsAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : SettingsAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : SettingsAction

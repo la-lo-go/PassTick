@@ -1,6 +1,8 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.DeviceConfigurationOverride
@@ -31,6 +33,7 @@ import org.ligi.passandroid.ui.theme.PassTheme
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import org.assertj.core.api.Assertions.assertThat
+import androidx.test.espresso.Espresso.pressBack
 
 class PassScreensTest {
     @get:Rule val composeRule = createComposeRule()
@@ -147,6 +150,37 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
         composeRule.onNodeWithText("Event ticket").assertDoesNotExist()
+    }
+
+    @Test
+    fun homeSearchBackFirstClearsFocusThenClosesSearch() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
+        }
+
+        composeRule.onNodeWithContentDescription("Search passes").performClick()
+        composeRule.onNodeWithContentDescription("Pass search").assertIsFocused()
+        composeRule.onNodeWithText("All").assertDoesNotExist()
+        composeRule.onNodeWithText("Newest first").assertDoesNotExist()
+
+        pressBack()
+        composeRule.onNodeWithContentDescription("Pass search").assertIsNotFocused()
+
+        pressBack()
+        composeRule.onNodeWithContentDescription("Pass search").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Search passes").assertIsDisplayed()
+    }
+
+    @Test
+    fun homeDrawerContainsPassViewCustomization() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
+        }
+
+        composeRule.onNodeWithContentDescription("Navigation menu").performClick()
+
+        composeRule.onNodeWithText("Pass view").assertIsDisplayed()
+        composeRule.onNodeWithText("Home cards").assertIsDisplayed()
     }
 
     @Test

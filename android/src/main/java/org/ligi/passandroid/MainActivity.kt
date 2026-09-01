@@ -190,6 +190,8 @@ class MainActivity : ComponentActivity() {
                     }
                     HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
                     HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
+                    HomeAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
+                    HomeAction.OpenHomeCardSettings -> backStack.add(AppDestination.HomeCardLayoutSettings)
                     HomeAction.OpenTimeline -> backStack.add(AppDestination.Timeline)
                 }
             }
@@ -434,8 +436,6 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetAutomaticBrightness -> viewModel.onAction(AppAction.SetAutomaticBrightness(action.value))
                                         is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
                                         SettingsAction.OpenCategories -> backStack.add(AppDestination.CategorySettings)
-                                        SettingsAction.OpenPassDetailLayout -> backStack.add(AppDestination.PassDetailLayoutSettings)
-                                        SettingsAction.OpenHomeCardLayout -> backStack.add(AppDestination.HomeCardLayoutSettings)
                                         is SettingsAction.SetHighlightTodayPasses -> viewModel.onAction(
                                             AppAction.SetHighlightTodayPasses(action.value),
                                         )

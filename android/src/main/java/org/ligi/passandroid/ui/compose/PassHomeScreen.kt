@@ -1,5 +1,6 @@
 package org.ligi.passandroid.ui.compose
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -49,6 +50,8 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -84,6 +87,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
@@ -97,6 +103,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalFocusManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -106,6 +113,7 @@ import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.HomeCardSection
+import org.ligi.passandroid.repository.isUserOrganized
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.barcode.PassCodeImage
@@ -128,6 +136,8 @@ sealed interface HomeAction {
     data object ImportPass : HomeAction
     data object OpenTimeline : HomeAction
     data object OpenSettings : HomeAction
+    data object OpenPassViewSettings : HomeAction
+    data object OpenHomeCardSettings : HomeAction
 }
 
 sealed interface UndoOperation {
@@ -151,6 +161,10 @@ fun PassHomeScreen(
     var previewPassId by remember { mutableStateOf<String?>(null) }
     var previewOpeningPassId by remember { mutableStateOf<String?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var searchExpanded by remember { mutableStateOf(false) }
+    var searchHasFocus by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val previewPass = state.passes.firstOrNull { it.id == previewPassId }
     var previewContent by remember { mutableStateOf<PassUiModel?>(null) }
@@ -179,6 +193,18 @@ fun PassHomeScreen(
     val todayPasses = if (showTodayHero) visiblePasses.filter(PassUiModel::occursToday) else emptyList()
     val remainingPasses = if (showTodayHero) visiblePasses.filterNot(PassUiModel::occursToday) else visiblePasses
 
+    BackHandler(enabled = searchExpanded) {
+        if (searchHasFocus) {
+            focusManager.clearFocus()
+        } else {
+            searchExpanded = false
+            searchQuery = ""
+        }
+    }
+    LaunchedEffect(searchExpanded) {
+        if (searchExpanded) searchFocusRequester.requestFocus()
+    }
+
     fun dispatchReversible(action: HomeAction, operation: UndoOperation, message: String) {
         onAction(action)
         undoSnackbarJob?.cancel()
@@ -203,7 +229,9 @@ fun PassHomeScreen(
     }
 
     val visibleCategories = remember(state.categories, state.passes) {
-        state.categories.filter { category -> state.passes.any { it.categoryId == category.id } }
+        state.categories.filter { category ->
+            category.isUserOrganized() && state.passes.any { it.categoryId == category.id }
+        }
     }
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -215,6 +243,20 @@ fun PassHomeScreen(
                     icon = { Icon(Icons.Default.Timeline, null) },
                     onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenTimeline) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Pass view") },
+                    selected = false,
+                    icon = { Icon(Icons.Default.Visibility, null) },
+                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenPassViewSettings) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Home cards") },
+                    selected = false,
+                    icon = { Icon(Icons.Default.ViewAgenda, null) },
+                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenHomeCardSettings) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
                 )
                 NavigationDrawerItem(
                     label = { Text("Settings") },
@@ -233,6 +275,12 @@ fun PassHomeScreen(
                 selectedCategoryId = state.selectedCategoryId,
                 onSelectCategory = { onAction(HomeAction.SelectCategory(it)) },
                 onOpenDrawer = { scope.launch { drawerState.open() } },
+                searchExpanded = searchExpanded,
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                onOpenSearch = { searchExpanded = true },
+                searchFocusRequester = searchFocusRequester,
+                onSearchFocusChanged = { searchHasFocus = it },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -244,22 +292,7 @@ fun PassHomeScreen(
                 contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                if (!state.isContentLoading) {
-                    item(key = "search") {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("Search passes") },
-                            leadingIcon = { Icon(Icons.Default.Search, null) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, "Clear search") }
-                                }
-                            },
-                        )
-                    }
+                if (!state.isContentLoading && !searchExpanded) {
                     item(key = "sort") {
                         HomeSortSelector(
                             selectedSort = state.settings.sortOrder,
@@ -375,13 +408,43 @@ private fun HomeToolbar(
     selectedCategoryId: String?,
     onSelectCategory: (String?) -> Unit,
     onOpenDrawer: () -> Unit,
+    searchExpanded: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onOpenSearch: () -> Unit,
+    searchFocusRequester: FocusRequester,
+    onSearchFocusChanged: (Boolean) -> Unit,
 ) {
     TopAppBar(
         title = {
-            if (categories.isNotEmpty()) CategorySelector(categories, selectedCategoryId, onSelectCategory, Modifier.fillMaxWidth())
+            if (searchExpanded) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester)
+                        .onFocusChanged { onSearchFocusChanged(it.hasFocus) }
+                        .semantics { contentDescription = "Pass search" },
+                    singleLine = true,
+                    placeholder = { Text("Search passes") },
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Close, "Clear search") }
+                        }
+                    },
+                    shape = RoundedCornerShape(50),
+                )
+            } else if (categories.isNotEmpty()) {
+                CategorySelector(categories, selectedCategoryId, onSelectCategory, Modifier.fillMaxWidth())
+            }
         },
         navigationIcon = {
             IconButton(onClick = onOpenDrawer) { Icon(Icons.Default.Menu, "Navigation menu") }
+        },
+        actions = {
+            if (!searchExpanded) {
+                IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, "Search passes") }
+            }
         },
     )
 }
