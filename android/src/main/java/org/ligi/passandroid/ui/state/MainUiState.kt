@@ -163,6 +163,10 @@ sealed interface AppAction {
     data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction
     data class SetRemindersEnabled(val value: Boolean) : AppAction
     data class SetReminderMinutes(val value: Set<Int>) : AppAction
+    data class SetLockAllPasses(val value: Boolean) : AppAction
+    data class SetShowProtectedPassLockIcon(val value: Boolean) : AppAction
+    data class SetBlurProtectedPassCards(val value: Boolean) : AppAction
+    data class SetSeparateProtectedPasses(val value: Boolean) : AppAction
     data class MovePassDetailSection(val section: PassDetailSection, val offset: Int) : AppAction
     data class SetPassDetailSectionVisible(val section: PassDetailSection, val visible: Boolean) : AppAction
     data class MoveHomeCardSection(val section: HomeCardSection, val offset: Int) : AppAction

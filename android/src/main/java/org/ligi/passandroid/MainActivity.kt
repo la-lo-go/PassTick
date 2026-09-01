@@ -571,6 +571,18 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetReminderMinutes -> viewModel.onAction(
                                             AppAction.SetReminderMinutes(action.value),
                                         )
+                                        is SettingsAction.SetLockAllPasses -> viewModel.onAction(
+                                            AppAction.SetLockAllPasses(action.value),
+                                        )
+                                        is SettingsAction.SetShowProtectedPassLockIcon -> viewModel.onAction(
+                                            AppAction.SetShowProtectedPassLockIcon(action.value),
+                                        )
+                                        is SettingsAction.SetBlurProtectedPassCards -> viewModel.onAction(
+                                            AppAction.SetBlurProtectedPassCards(action.value),
+                                        )
+                                        is SettingsAction.SetSeparateProtectedPasses -> viewModel.onAction(
+                                            AppAction.SetSeparateProtectedPasses(action.value),
+                                        )
                                     }
                                 }
                             }

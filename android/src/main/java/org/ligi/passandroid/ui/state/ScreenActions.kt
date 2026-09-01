@@ -37,6 +37,10 @@ sealed interface SettingsAction {
     data class SetOfferCalendarAfterImport(val value: Boolean) : SettingsAction
     data class SetRemindersEnabled(val value: Boolean) : SettingsAction
     data class SetReminderMinutes(val value: Set<Int>) : SettingsAction
+    data class SetLockAllPasses(val value: Boolean) : SettingsAction
+    data class SetShowProtectedPassLockIcon(val value: Boolean) : SettingsAction
+    data class SetBlurProtectedPassCards(val value: Boolean) : SettingsAction
+    data class SetSeparateProtectedPasses(val value: Boolean) : SettingsAction
 }
 
 sealed interface PassDetailLayoutSettingsAction {

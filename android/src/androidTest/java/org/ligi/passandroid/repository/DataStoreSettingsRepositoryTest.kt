@@ -36,6 +36,10 @@ class DataStoreSettingsRepositoryTest {
                 defaultHomeCardSectionOrder,
                 setOf(HomeCardSection.CREATOR),
             )
+            repository.setLockAllPasses(true)
+            repository.setShowProtectedPassLockIcon(true)
+            repository.setBlurProtectedPassCards(true)
+            repository.setSeparateProtectedPasses(true)
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
@@ -45,6 +49,8 @@ class DataStoreSettingsRepositoryTest {
                     it.remindersEnabled && it.reminderMinutes == setOf(15, 30) &&
                     it.reminderExcludedPassIds == setOf("pass-2") &&
                     it.reminderLeadMinutesByPass == mapOf("pass-3" to 45) &&
+                    it.lockAllPasses && it.showProtectedPassLockIcon &&
+                    it.blurProtectedPassCards && it.separateProtectedPasses &&
                     it.passDetailSectionOrder == listOf(
                         PassDetailSection.BARCODE,
                         PassDetailSection.ARTWORK,
@@ -77,6 +83,10 @@ class DataStoreSettingsRepositoryTest {
                         PassDetailSection.CALENDAR,
                     ),
                     hiddenPassDetailSections = setOf(PassDetailSection.ARTWORK),
+                    lockAllPasses = true,
+                    showProtectedPassLockIcon = true,
+                    blurProtectedPassCards = true,
+                    separateProtectedPasses = true,
                 ),
             )
         }

@@ -233,6 +233,18 @@ class MainViewModel(
             is AppAction.SetReminderMinutes -> viewModelScope.launch {
                 settingsRepository.setReminderMinutes(action.value)
             }
+            is AppAction.SetLockAllPasses -> viewModelScope.launch {
+                settingsRepository.setLockAllPasses(action.value)
+            }
+            is AppAction.SetShowProtectedPassLockIcon -> viewModelScope.launch {
+                settingsRepository.setShowProtectedPassLockIcon(action.value)
+            }
+            is AppAction.SetBlurProtectedPassCards -> viewModelScope.launch {
+                settingsRepository.setBlurProtectedPassCards(action.value)
+            }
+            is AppAction.SetSeparateProtectedPasses -> viewModelScope.launch {
+                settingsRepository.setSeparateProtectedPasses(action.value)
+            }
             is AppAction.MovePassDetailSection -> viewModelScope.launch {
                 settingsRepository.movePassDetailSection(action.section, action.offset)
             }

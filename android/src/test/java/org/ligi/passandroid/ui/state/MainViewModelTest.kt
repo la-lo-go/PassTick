@@ -443,6 +443,18 @@ private class FakeSettingsRepository : SettingsRepository {
             hiddenHomeCardSections = settings.value.hiddenHomeCardSections.withVisibilityForTest(section, visible),
         )
     }
+    override suspend fun setLockAllPasses(value: Boolean) {
+        settings.value = settings.value.copy(lockAllPasses = value)
+    }
+    override suspend fun setShowProtectedPassLockIcon(value: Boolean) {
+        settings.value = settings.value.copy(showProtectedPassLockIcon = value)
+    }
+    override suspend fun setBlurProtectedPassCards(value: Boolean) {
+        settings.value = settings.value.copy(blurProtectedPassCards = value)
+    }
+    override suspend fun setSeparateProtectedPasses(value: Boolean) {
+        settings.value = settings.value.copy(separateProtectedPasses = value)
+    }
 }
 
 private fun <T> List<T>.moveForTest(item: T, offset: Int): List<T> {

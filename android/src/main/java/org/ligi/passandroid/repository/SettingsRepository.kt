@@ -102,6 +102,10 @@ data class AppSettings(
     val hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
     val homeCardSectionOrder: List<HomeCardSection> = defaultHomeCardSectionOrder,
     val hiddenHomeCardSections: Set<HomeCardSection> = defaultHiddenHomeCardSections,
+    val lockAllPasses: Boolean = false,
+    val showProtectedPassLockIcon: Boolean = true,
+    val blurProtectedPassCards: Boolean = false,
+    val separateProtectedPasses: Boolean = false,
 )
 
 interface SettingsRepository {
@@ -126,6 +130,10 @@ interface SettingsRepository {
     suspend fun setPassDetailSectionVisible(section: PassDetailSection, visible: Boolean)
     suspend fun moveHomeCardSection(section: HomeCardSection, offset: Int)
     suspend fun setHomeCardSectionVisible(section: HomeCardSection, visible: Boolean)
+    suspend fun setLockAllPasses(value: Boolean)
+    suspend fun setShowProtectedPassLockIcon(value: Boolean)
+    suspend fun setBlurProtectedPassCards(value: Boolean)
+    suspend fun setSeparateProtectedPasses(value: Boolean)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -167,6 +175,10 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 ?.mapNotNull { value -> runCatching { HomeCardSection.valueOf(value) }.getOrNull() }
                 ?.toSet()
                 ?: defaultHiddenHomeCardSections,
+            lockAllPasses = preferences[LOCK_ALL_PASSES] ?: false,
+            showProtectedPassLockIcon = preferences[SHOW_PROTECTED_PASS_LOCK_ICON] ?: true,
+            blurProtectedPassCards = preferences[BLUR_PROTECTED_PASS_CARDS] ?: false,
+            separateProtectedPasses = preferences[SEPARATE_PROTECTED_PASSES] ?: false,
         )
     }
 
@@ -242,6 +254,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         }
     }
 
+    override suspend fun setLockAllPasses(value: Boolean) = update(LOCK_ALL_PASSES, value)
+    override suspend fun setShowProtectedPassLockIcon(value: Boolean) = update(SHOW_PROTECTED_PASS_LOCK_ICON, value)
+    override suspend fun setBlurProtectedPassCards(value: Boolean) = update(BLUR_PROTECTED_PASS_CARDS, value)
+    override suspend fun setSeparateProtectedPasses(value: Boolean) = update(SEPARATE_PROTECTED_PASSES, value)
+
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
     }
@@ -265,6 +282,10 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val HIDDEN_PASS_DETAIL_SECTIONS = stringSetPreferencesKey("hidden_pass_detail_sections")
         val HOME_CARD_SECTION_ORDER = stringPreferencesKey("home_card_section_order")
         val HIDDEN_HOME_CARD_SECTIONS = stringSetPreferencesKey("hidden_home_card_sections")
+        val LOCK_ALL_PASSES = booleanPreferencesKey("lock_all_passes")
+        val SHOW_PROTECTED_PASS_LOCK_ICON = booleanPreferencesKey("show_protected_pass_lock_icon")
+        val BLUR_PROTECTED_PASS_CARDS = booleanPreferencesKey("blur_protected_pass_cards")
+        val SEPARATE_PROTECTED_PASSES = booleanPreferencesKey("separate_protected_passes")
     }
 }
 
