@@ -104,7 +104,7 @@ import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
-import org.ligi.passandroid.ui.barcode.PassCodeBrightnessEffect
+import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
 import org.threeten.bp.Instant
 import org.threeten.bp.ZoneId
@@ -139,7 +139,18 @@ fun PassDetailScreen(
     LaunchedEffect(initialCodeExpanded) {
         if (initialCodeExpanded) onInitialCodeShown()
     }
-    if (codeExpanded && enhanceCodeBrightness) PassCodeBrightnessEffect()
+    if (codeExpanded && pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
+        ExpandedPassCodeDialog(
+            format = pass.barcodeFormat,
+            message = pass.barcodeMessage,
+            alternativeText = pass.barcodeAlternativeText,
+            enhanceBrightness = enhanceCodeBrightness,
+            onDismiss = {
+                codeHeld = false
+                codePinned = false
+            },
+        )
+    }
     DisposableEffect(Unit) {
         onDispose { onAction(PassDetailAction.SetFlashlightEnabled(false)) }
     }
@@ -305,9 +316,8 @@ fun PassDetailScreen(
                                 BarcodeCard(
                                     pass = pass,
                                     emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenPassDetailSections,
-                                    expanded = codeExpanded,
                                     onHoldChanged = { codeHeld = it },
-                                    onPin = { codePinned = !codePinned },
+                                    onPin = { codePinned = true },
                                 )
                             }
                             PassDetailSection.FIELDS -> if (visibleFields.isNotEmpty()) item {
@@ -390,13 +400,12 @@ private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>
 private fun BarcodeCard(
     pass: PassUiModel,
     emphasized: Boolean,
-    expanded: Boolean,
     onHoldChanged: (Boolean) -> Unit,
     onPin: () -> Unit,
 ) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.White, contentColor = Color.Black) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val format = pass.barcodeFormat
@@ -404,17 +413,9 @@ private fun BarcodeCard(
             if (format != null && !message.isNullOrBlank()) {
                 BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val height = if (format.isQuadratic()) {
-                        if (expanded) {
-                            (maxWidth * 0.86f).coerceIn(220.dp, 420.dp)
-                        } else {
-                            (maxWidth * 0.58f).coerceIn(152.dp, if (emphasized) 240.dp else 208.dp)
-                        }
+                        (maxWidth * 0.78f).coerceIn(196.dp, if (emphasized) 300.dp else 264.dp)
                     } else {
-                        if (expanded) {
-                            (maxWidth / 2.2f).coerceIn(164.dp, 300.dp)
-                        } else {
-                            (maxWidth / 2.8f).coerceIn(132.dp, if (emphasized) 240.dp else 200.dp)
-                        }
+                        (maxWidth / 2.6f).coerceIn(144.dp, if (emphasized) 240.dp else 208.dp)
                     }
                     PassCodePreview(format, message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
                 }
