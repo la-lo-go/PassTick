@@ -82,6 +82,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -123,6 +124,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import org.ligi.passandroid.ui.state.searchDocument
 import org.ligi.passandroid.ui.state.searchTerms
+import org.ligi.passandroid.ui.state.AppAction
 
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
@@ -142,11 +144,14 @@ sealed interface HomeAction {
 
 sealed interface UndoOperation {
     val passId: String
+    val originalCategoryId: String
 
-    data class Archive(override val passId: String) : UndoOperation
-    data class Restore(override val passId: String) : UndoOperation
-    data class Delete(override val passId: String) : UndoOperation
+    data class Archive(override val passId: String, override val originalCategoryId: String) : UndoOperation
+    data class Restore(override val passId: String, override val originalCategoryId: String) : UndoOperation
+    data class Delete(override val passId: String, override val originalCategoryId: String) : UndoOperation
 }
+
+internal fun UndoOperation.toAppAction() = AppAction.MovePass(passId, originalCategoryId, announce = false)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -323,11 +328,16 @@ fun PassHomeScreen(
                             sectionOrder = state.settings.homeCardSectionOrder,
                             hiddenSections = state.settings.hiddenHomeCardSections,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
-                            onArchive = { id, restoring ->
-                                if (restoring) dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id), "Pass restored")
-                                else dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id), "Pass archived")
+                            onArchive = { id, restoring, originalCategoryId ->
+                                if (restoring) {
+                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
+                                } else {
+                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                                }
                             },
-                            onDelete = { id -> dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id), "Pass deleted") },
+                            onDelete = { id, originalCategoryId ->
+                                dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id, originalCategoryId), "Pass deleted")
+                            },
                             onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
                             onPreviewChanged = {
                                 previewPassId = it
@@ -350,11 +360,16 @@ fun PassHomeScreen(
                             sectionOrder = state.settings.homeCardSectionOrder,
                             hiddenSections = state.settings.hiddenHomeCardSections,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
-                            onArchive = { id, restoring ->
-                                if (restoring) dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id), "Pass restored")
-                                else dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id), "Pass archived")
+                            onArchive = { id, restoring, originalCategoryId ->
+                                if (restoring) {
+                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
+                                } else {
+                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                                }
                             },
-                            onDelete = { id -> dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id), "Pass deleted") },
+                            onDelete = { id, originalCategoryId ->
+                                dispatchReversible(HomeAction.Delete(id), UndoOperation.Delete(id, originalCategoryId), "Pass deleted")
+                            },
                             onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
                             onPreviewChanged = {
                                 previewPassId = it
@@ -518,8 +533,8 @@ private fun TicketFeed(
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
     onOpen: (String) -> Unit,
-    onArchive: (String, Boolean) -> Unit,
-    onDelete: (String) -> Unit,
+    onArchive: (String, Boolean, String) -> Unit,
+    onDelete: (String, String) -> Unit,
     onReorder: (String, Int) -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
@@ -575,8 +590,8 @@ private fun TicketSwipeContainer(
     hiddenSections: Set<HomeCardSection>,
     modifier: Modifier,
     onOpen: (String) -> Unit,
-    onArchive: (String, Boolean) -> Unit,
-    onDelete: (String) -> Unit,
+    onArchive: (String, Boolean, String) -> Unit,
+    onDelete: (String, String) -> Unit,
     onReorder: (String, Int) -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
@@ -584,10 +599,14 @@ private fun TicketSwipeContainer(
     val restoring = category?.role == PassCategoryRole.ARCHIVE
     val archiveLabel = if (restoring) "Restore" else "Archive"
     val dismissState = rememberSwipeToDismissBoxState()
+    var isReordering by remember(pass.id) { mutableStateOf(false) }
+    LaunchedEffect(isReordering) {
+        if (isReordering) dismissState.reset()
+    }
     LaunchedEffect(dismissState.settledValue) {
         when (dismissState.settledValue) {
-            SwipeToDismissBoxValue.StartToEnd -> onArchive(pass.id, restoring)
-            SwipeToDismissBoxValue.EndToStart -> onDelete(pass.id)
+            SwipeToDismissBoxValue.StartToEnd -> onArchive(pass.id, restoring, pass.categoryId)
+            SwipeToDismissBoxValue.EndToStart -> onDelete(pass.id, pass.categoryId)
             SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
         }
         dismissState.reset()
@@ -595,6 +614,7 @@ private fun TicketSwipeContainer(
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier,
+        gesturesEnabled = !isReordering,
         backgroundContent = {
             val deleting = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
             val background = if (deleting) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
@@ -618,12 +638,13 @@ private fun TicketSwipeContainer(
                 hiddenSections = hiddenSections,
                 modifier = Modifier.semantics {
                     customActions = listOf(
-                        CustomAccessibilityAction(archiveLabel) { onArchive(pass.id, restoring); true },
-                        CustomAccessibilityAction("Delete") { onDelete(pass.id); true },
+                        CustomAccessibilityAction(archiveLabel) { onArchive(pass.id, restoring, pass.categoryId); true },
+                        CustomAccessibilityAction("Delete") { onDelete(pass.id, pass.categoryId); true },
                     )
                 },
                 onOpen = onOpen,
                 onReorder = { offset -> onReorder(pass.id, offset) },
+                onReorderingChanged = { isReordering = it },
                 onPreviewChanged = { visible -> onPreviewChanged(pass.id.takeIf { visible }) },
                 onPreviewOpeningChanged = { opening -> onPreviewOpeningChanged(pass.id.takeIf { opening }) },
             )
@@ -641,18 +662,25 @@ private fun TicketRow(
     modifier: Modifier,
     onOpen: (String) -> Unit,
     onReorder: (Int) -> Unit,
+    onReorderingChanged: (Boolean) -> Unit,
     onPreviewChanged: (Boolean) -> Unit,
     onPreviewOpeningChanged: (Boolean) -> Unit,
 ) {
     var dragOffset by remember(pass.id) { mutableFloatStateOf(0f) }
     var pendingReorder by remember(pass.id) { mutableStateOf(0) }
+    var isReordering by remember(pass.id) { mutableStateOf(false) }
     val interactionSource = remember(pass.id) { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
     Surface(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(ZeroCornerSize),
-        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer { translationY = dragOffset }
+        modifier = modifier.fillMaxWidth().animateContentSize().graphicsLayer {
+            translationY = dragOffset
+            scaleX = if (isReordering) 1.015f else 1f
+            scaleY = if (isReordering) 1.015f else 1f
+            shadowElevation = if (isReordering) 8.dp.toPx() else 0f
+        }
             .indication(interactionSource, LocalIndication.current),
     ) {
         Row(
@@ -697,10 +725,14 @@ private fun TicketRow(
                                 try {
                                     while (true) {
                                         val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
-                                        if (!opening && change != null && down.position.y - change.position.y > 72.dp.toPx()) {
+                                        val aboveOpenThreshold = change != null && down.position.y - change.position.y > 72.dp.toPx()
+                                        if (!opening && aboveOpenThreshold) {
                                             opening = true
                                             interactionSource.tryEmit(PressInteraction.Cancel(press))
                                             onPreviewOpeningChanged(true)
+                                        } else if (opening && !aboveOpenThreshold) {
+                                            opening = false
+                                            onPreviewOpeningChanged(false)
                                         }
                                         change?.consume()
                                         if (change == null || !change.pressed) {
@@ -735,16 +767,32 @@ private fun TicketRow(
                 PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                var titleRendered = false
+                var titleLineCount by remember(pass.id) { mutableIntStateOf(1) }
+                var artworkClearanceAdded = false
                 sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }.forEach { section ->
+                    if (
+                        titleRendered &&
+                        !artworkClearanceAdded &&
+                        HomeCardSection.ARTWORK !in hiddenSections &&
+                        titleLineCount == 1
+                    ) {
+                        Spacer(Modifier.height(if (hero) 14.dp else 2.dp))
+                        artworkClearanceAdded = true
+                    }
                     when (section) {
                         HomeCardSection.ARTWORK -> Unit
-                        HomeCardSection.TITLE -> Text(
-                            pass.description,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        HomeCardSection.TITLE -> {
+                            titleRendered = true
+                            Text(
+                                pass.description,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                onTextLayout = { titleLineCount = it.lineCount },
+                            )
+                        }
                         HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()?.let {
                             Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -754,7 +802,7 @@ private fun TicketRow(
                         HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        HomeCardSection.CATEGORY -> category?.let { CategoryBadge(it) }
+                        HomeCardSection.CATEGORY -> category?.takeIf(PassCategory::isUserOrganized)?.let { CategoryBadge(it) }
                         HomeCardSection.PASS_TYPE -> Text(
                             pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
                             style = MaterialTheme.typography.labelMedium,
@@ -768,13 +816,24 @@ private fun TicketRow(
                 "Reorder ${pass.description}",
                 Modifier.size(40.dp).pointerInput(pass.id) {
                     detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            isReordering = true
+                            onReorderingChanged(true)
+                        },
                         onDragEnd = {
                             val offset = pendingReorder
                             dragOffset = 0f
                             pendingReorder = 0
+                            isReordering = false
+                            onReorderingChanged(false)
                             if (offset != 0) onReorder(offset)
                         },
-                        onDragCancel = { dragOffset = 0f; pendingReorder = 0 },
+                        onDragCancel = {
+                            dragOffset = 0f
+                            pendingReorder = 0
+                            isReordering = false
+                            onReorderingChanged(false)
+                        },
                         onDrag = { change, amount ->
                             change.consume()
                             dragOffset = (dragOffset + amount.y).coerceIn(-224.dp.toPx(), 224.dp.toPx())
@@ -836,6 +895,7 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
             accentColor = pass.accentColor,
             contentDescription = "Pass artwork",
             modifier = modifier,
+            contentPadding = 2.dp,
             cropNearlySquare = true,
         )
     } else {

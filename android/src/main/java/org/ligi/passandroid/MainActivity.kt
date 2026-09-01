@@ -58,7 +58,7 @@ import org.ligi.passandroid.ui.compose.SettingsScreen
 import org.ligi.passandroid.ui.compose.TimelineAction
 import org.ligi.passandroid.ui.compose.TimelineScreen
 import org.ligi.passandroid.ui.compose.TimelineUiState
-import org.ligi.passandroid.ui.compose.UndoOperation
+import org.ligi.passandroid.ui.compose.toAppAction
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
@@ -91,7 +91,6 @@ class MainActivity : ComponentActivity() {
             val snackbarHostState = remember { SnackbarHostState() }
             val coroutineScope = rememberCoroutineScope()
             var showCalendarPermissionWarning by remember { mutableStateOf(false) }
-            val undoCategories = remember { mutableMapOf<String, String>() }
             var expandedCodePassId by remember { mutableStateOf<String?>(null) }
             val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
@@ -153,41 +152,21 @@ class MainActivity : ComponentActivity() {
                     is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
                     is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.id, action.offset))
                     is HomeAction.Archive -> {
-                        state.passes.firstOrNull { it.id == action.id }?.let {
-                            undoCategories["archive:${action.id}"] = it.categoryId
-                        }
                         state.categories.firstOrNull { it.role == PassCategoryRole.ARCHIVE }?.let {
                             viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
                         }
                     }
                     is HomeAction.Restore -> {
-                        state.passes.firstOrNull { it.id == action.id }?.let {
-                            undoCategories["restore:${action.id}"] = it.categoryId
-                        }
                         state.categories.firstOrNull { it.role == PassCategoryRole.INBOX }?.let {
                             viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
                         }
                     }
                     is HomeAction.Delete -> {
-                        state.passes.firstOrNull { it.id == action.id }?.let {
-                            undoCategories["delete:${action.id}"] = it.categoryId
-                        }
                         state.categories.firstOrNull { it.role == PassCategoryRole.TRASH }?.let {
                             viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
                         }
                     }
-                    is HomeAction.Undo -> {
-                        val key = when (action.operation) {
-                            is UndoOperation.Archive -> "archive:${action.operation.passId}"
-                            is UndoOperation.Restore -> "restore:${action.operation.passId}"
-                            is UndoOperation.Delete -> "delete:${action.operation.passId}"
-                        }
-                        undoCategories.remove(key)?.let { categoryId ->
-                            viewModel.onAction(
-                                AppAction.MovePass(action.operation.passId, categoryId, announce = false),
-                            )
-                        }
-                    }
+                    is HomeAction.Undo -> viewModel.onAction(action.operation.toAppAction())
                     HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
                     HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
                     HomeAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
