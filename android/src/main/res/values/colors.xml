@@ -9,4 +9,5 @@
     <color name="card_view_background">#f9f9f9</color>
 
     <color name="icon_green">#ffbfdf00</color>
+    <color name="launcher_icon_background">#102F4F</color>
 </resources>
