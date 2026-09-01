@@ -81,6 +81,20 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `protects a pass through the repository and exposes the updated state`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.SetPassProtected("pass-1", true))
+        advanceUntilIdle()
+
+        assertThat(repository.protectionChanges).containsExactly("pass-1" to true)
+        assertThat(viewModel.uiState.value.passes.single().isProtected).isTrue()
+    }
+
+    @Test
     fun `keeps content loading until passes and settings are ready`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
@@ -321,6 +335,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val exports = mutableListOf<Pair<String, Uri>>()
     val created = mutableListOf<PassUpdate>()
     val moved = mutableListOf<Pair<String, String>>()
+    val protectionChanges = mutableListOf<Pair<String, Boolean>>()
     val moveDelayMillis = mutableMapOf<String, Long>()
 
     override fun observePasses() = passes.asStateFlow()
@@ -334,6 +349,10 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
         delay(moveDelayMillis[categoryId] ?: 0)
         moved += id to categoryId
         passes.value = passes.value.map { if (it.id == id) it.copy(categoryId = categoryId) else it }
+    }
+    override suspend fun setProtected(id: String, isProtected: Boolean) {
+        protectionChanges += id to isProtected
+        passes.value = passes.value.map { if (it.id == id) it.copy(isProtected = isProtected) else it }
     }
     override suspend fun delete(id: String): Boolean {
         deletedIds += id

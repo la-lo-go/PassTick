@@ -60,6 +60,7 @@ data class PassSnapshot(
     val calendarTimeSpan: PassTimeSpanSnapshot?,
     val categoryId: String = DEFAULT_PASS_CATEGORY_ID,
     val artwork: List<PassArtworkSnapshot> = emptyList(),
+    val isProtected: Boolean = false,
 )
 
 data class PassUpdate(
@@ -87,6 +88,8 @@ interface PassRepository {
 
     suspend fun moveToCategory(id: String, categoryId: String)
 
+    suspend fun setProtected(id: String, isProtected: Boolean)
+
     suspend fun delete(id: String): Boolean
 
     suspend fun export(id: String, destination: Uri): Result<Unit>
@@ -99,6 +102,9 @@ class FilePassRepository(
     private val passStore: PassStore,
     private val tracker: Tracker,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val protectionStore: FilePassProtectionStore = FilePassProtectionStore(
+        File(context.filesDir, "pass-protection.json"),
+    ),
 ) : PassRepository {
     override fun observePasses(): Flow<List<PassSnapshot>> = flow {
         passStore.syncPassStoreWithClassifier(context.getString(R.string.topic_new))
@@ -159,6 +165,12 @@ class FilePassRepository(
         passStore.classifier.moveToTopic(pass, targetCategoryId)
     }
 
+    override suspend fun setProtected(id: String, isProtected: Boolean) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        protectionStore.setProtected(id, isProtected)
+        passStore.notifyChange()
+    }
+
     private fun applyUpdate(pass: org.ligi.passandroid.model.pass.PassImpl, update: PassUpdate) {
         pass.description = update.description
         pass.creator = update.creator
@@ -196,7 +208,9 @@ class FilePassRepository(
     }
 
     override suspend fun delete(id: String) = withContext(ioDispatcher) {
-        passStore.deletePassWithId(id)
+        passStore.deletePassWithId(id).also { deleted ->
+            if (deleted) protectionStore.remove(id)
+        }
     }
 
     override suspend fun export(id: String, destination: Uri): Result<Unit> = withContext(ioDispatcher) {
@@ -230,13 +244,14 @@ class FilePassRepository(
         pass.toSnapshot(
             passStore.getPathForID(pass.id),
             passStore.classifier.getTopic(pass.id, context.getString(R.string.topic_new)),
+            protectionStore.isProtected(pass.id),
         )
     }
 
     private fun visibleSnapshots() = snapshot().filterNot { it.categoryId == "trash" }
 }
 
-private fun Pass.toSnapshot(path: File, categoryId: String) = PassSnapshot(
+private fun Pass.toSnapshot(path: File, categoryId: String, isProtected: Boolean = false) = PassSnapshot(
     id = id,
     description = description.orEmpty(),
     creator = creator,
@@ -256,4 +271,5 @@ private fun Pass.toSnapshot(path: File, categoryId: String) = PassSnapshot(
             ?.readBytes()
             ?.let { PassArtworkSnapshot(kind, it) }
     },
+    isProtected = isProtected,
 )

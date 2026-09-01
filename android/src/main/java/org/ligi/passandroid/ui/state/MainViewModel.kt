@@ -161,6 +161,11 @@ class MainViewModel(
             is AppAction.SetPassPendingDeletion -> pendingDeletionIds.update { pendingIds ->
                 if (action.pending) pendingIds + action.id else pendingIds - action.id
             }
+            is AppAction.SetPassProtected -> launchOperation(
+                if (action.isProtected) "Pass protected" else "Protection removed",
+            ) {
+                passRepository.setProtected(action.id, action.isProtected)
+            }
             is AppAction.SavePass -> launchOperation("Pass saved") { save(action) }
             is AppAction.MovePass -> check(categoryMoves.trySend(action).isSuccess) { "Pass move queue is closed" }
             is AppAction.SelectCategory -> selectedCategoryId.value = action.categoryId
