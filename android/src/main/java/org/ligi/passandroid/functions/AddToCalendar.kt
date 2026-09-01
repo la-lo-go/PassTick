@@ -6,7 +6,7 @@ import androidx.annotation.VisibleForTesting
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassImpl
 
-const val DEFAULT_EVENT_LENGTH_IN_HOURS = 8L
+const val DEFAULT_EVENT_LENGTH_IN_HOURS = 2L
 
 data class CalendarEvent(
     val title: String?,

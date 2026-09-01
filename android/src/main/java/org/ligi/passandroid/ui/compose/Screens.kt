@@ -106,8 +106,6 @@ import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
-import org.threeten.bp.Instant
-import org.threeten.bp.ZoneId
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -930,16 +928,13 @@ private fun HomeCardSection.displayName() = when (this) {
     HomeCardSection.PASS_TYPE -> "Pass type"
 }
 
-private fun PassUiModel.calendarDateTimeLines(): List<String> {
+internal fun PassUiModel.calendarDateTimeLines(): List<String> {
     val formatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm z")
-    val event = calendarEvent ?: return emptyList()
-    val zone = calendarTimeSpan?.from?.zone ?: calendarTimeSpan?.to?.zone ?: ZoneId.systemDefault()
-    val starts = Instant.ofEpochMilli(event.beginTimeMillis).atZone(zone)
-    val ends = Instant.ofEpochMilli(event.endTimeMillis).atZone(zone)
-    return listOf(
-        "Starts: ${starts.format(formatter)}",
-        "Ends: ${ends.format(formatter)}",
-    )
+    val span = calendarTimeSpan ?: return emptyList()
+    return buildList {
+        span.from?.let { add("Starts: ${it.format(formatter)}") }
+        span.to?.let { add("Ends: ${it.format(formatter)}") }
+    }
 }
 
 private fun String.containsDateAndTime(): Boolean = DATE_AND_TIME_PATTERN.containsMatchIn(this)
