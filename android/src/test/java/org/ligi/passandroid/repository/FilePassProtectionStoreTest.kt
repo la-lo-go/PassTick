@@ -1,6 +1,7 @@
 package org.ligi.passandroid.repository
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.Test
 import java.nio.file.Files
 
@@ -43,6 +44,16 @@ class FilePassProtectionStoreTest {
         val file = temporaryFile().apply { writeText("not-json") }
 
         assertThat(FilePassProtectionStore(file).isProtected("pass-1")).isFalse()
+    }
+
+    @Test
+    fun `failed persistence does not change protection in memory`() {
+        val parentFile = temporaryFile().apply { writeText("not-a-directory") }
+        val store = FilePassProtectionStore(parentFile.resolve("pass-protection.json"))
+
+        assertThatThrownBy { store.setProtected("pass-1", true) }
+            .isInstanceOf(IllegalStateException::class.java)
+        assertThat(store.isProtected("pass-1")).isFalse()
     }
 
     private fun temporaryFile() = Files.createTempFile("pass-protection", ".json").toFile().apply { delete() }

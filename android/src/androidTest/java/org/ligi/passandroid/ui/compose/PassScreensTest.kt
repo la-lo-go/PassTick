@@ -212,9 +212,9 @@ class PassScreensTest {
         composeRule.onNodeWithText("Private ticket").performTouchInput { longClick() }
         composeRule.onNodeWithContentDescription("Pass preview scrim").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Search passes").performClick()
+        composeRule.onNodeWithText("Private ticket").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Pass search").performTextInput("Private")
 
-        composeRule.onNodeWithText("Private ticket").assertDoesNotExist()
         composeRule.onNodeWithText("No matching passes").assertIsDisplayed()
     }
 

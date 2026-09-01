@@ -201,8 +201,8 @@ fun PassHomeScreen(
             .associate { pass -> pass.id to pass.searchDocument(categoryNames[pass.categoryId]) }
     }
     val searchTerms = remember(searchQuery) { searchQuery.searchTerms() }
-    val visiblePasses = remember(categoryPasses, searchDocuments, searchTerms) {
-        if (searchTerms.isEmpty()) categoryPasses
+    val visiblePasses = remember(categoryPasses, searchDocuments, searchTerms, searchExpanded) {
+        if (!searchExpanded) categoryPasses
         else categoryPasses.filterNot(PassUiModel::isProtected).filter { pass ->
             val document = searchDocuments[pass.id].orEmpty()
             searchTerms.all(document::contains)

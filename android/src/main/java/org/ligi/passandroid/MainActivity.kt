@@ -68,6 +68,7 @@ import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.state.PassDetailAction
+import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction
 import org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction
@@ -96,6 +97,7 @@ class MainActivity : ComponentActivity() {
             val protectedContentVisible = when (val destination = backStack.lastOrNull()) {
                 is AppDestination.PassDetail -> state.passes.any { it.id == destination.passId && it.isProtected }
                 is AppDestination.EditPass -> state.passes.any { it.id == destination.passId && it.isProtected }
+                AppDestination.PassList, AppDestination.Timeline -> state.passes.any(PassUiModel::isProtected)
                 else -> false
             }
             DisposableEffect(protectedContentVisible) {
@@ -266,15 +268,15 @@ class MainActivity : ComponentActivity() {
                         AppAction.MovePass(passId, action.categoryId),
                     )
                     is PassDetailAction.SetProtected -> {
-                        if (action.protected && !passAuthenticator.canAuthenticate()) {
+                        if (action.isProtected && !passAuthenticator.canAuthenticate()) {
                             coroutineScope.launch {
                                 snackbarHostState.currentSnackbarData?.dismiss()
                                 snackbarHostState.showSnackbar("Set a screen lock before protecting passes")
                             }
                         } else {
-                            if (action.protected) authenticatedPassIds = authenticatedPassIds + passId
+                            if (action.isProtected) authenticatedPassIds = authenticatedPassIds + passId
                             else authenticatedPassIds = authenticatedPassIds - passId
-                            viewModel.onAction(AppAction.SetPassProtected(passId, action.protected))
+                            viewModel.onAction(AppAction.SetPassProtected(passId, action.isProtected))
                         }
                     }
                     PassDetailAction.Delete -> {
