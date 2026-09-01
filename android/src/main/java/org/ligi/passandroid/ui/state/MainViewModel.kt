@@ -202,11 +202,14 @@ class MainViewModel(
             is AppAction.SetSortOrder -> viewModelScope.launch { settingsRepository.setSortOrder(action.value) }
             is AppAction.ReorderPass -> viewModelScope.launch {
                 val currentIds = uiState.value.passes.map(PassUiModel::id).toMutableList()
-                val from = currentIds.indexOf(action.passId)
-                val to = (from + action.offset).coerceIn(currentIds.indices)
-                if (from >= 0 && from != to) {
-                    currentIds.add(to, currentIds.removeAt(from))
-                    settingsRepository.setPassOrder(currentIds)
+                val visibleIds = action.orderedVisibleIds.distinct().filter(currentIds::contains)
+                val visibleIdSet = visibleIds.toSet()
+                val reorderedIds = visibleIds.iterator()
+                val mergedIds = currentIds.map { id ->
+                    if (id in visibleIdSet) reorderedIds.next() else id
+                }
+                if (mergedIds != currentIds) {
+                    settingsRepository.setPassOrder(mergedIds)
                     settingsRepository.setSortOrder(PassSortOrder.MANUAL)
                 }
             }

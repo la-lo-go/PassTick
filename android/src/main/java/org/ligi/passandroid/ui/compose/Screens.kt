@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Visibility
@@ -80,6 +81,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -132,6 +134,7 @@ fun PassDetailScreen(
     onAction: (PassDetailAction) -> Unit,
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
+    var tagMenuOpen by remember { mutableStateOf(false) }
     var configureReminder by remember { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
@@ -222,16 +225,14 @@ fun PassDetailScreen(
                                     }
                                 },
                             )
-                            categories.filterNot { it.role == PassCategoryRole.TRASH }.forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text("Move to ${category.name}") },
-                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, null) },
-                                    onClick = {
+                            DropdownMenuItem(
+                                text = { Text("Manage tag") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
+                                onClick = {
                                     overflowOpen = false
-                                    onAction(PassDetailAction.MoveToCategory(category.id))
-                                    },
-                                )
-                            }
+                                    tagMenuOpen = true
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Delete pass") },
                                 leadingIcon = { Icon(Icons.Default.Delete, null) },
@@ -240,6 +241,43 @@ fun PassDetailScreen(
                                     onAction(PassDetailAction.Delete)
                                 },
                             )
+                        }
+                        DropdownMenu(expanded = tagMenuOpen, onDismissRequest = { tagMenuOpen = false }) {
+                            categories.filter(PassCategory::isUserOrganized).forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category.name) },
+                                    leadingIcon = {
+                                        Box(
+                                            Modifier.size(10.dp).background(
+                                                Color(category.colorArgb.toInt()),
+                                                CircleShape,
+                                            ),
+                                        )
+                                    },
+                                    trailingIcon = if (pass?.categoryId == category.id) {
+                                        { Icon(Icons.Default.Check, "Current tag") }
+                                    } else {
+                                        null
+                                    },
+                                    onClick = {
+                                        tagMenuOpen = false
+                                        onAction(PassDetailAction.MoveToCategory(category.id))
+                                    },
+                                )
+                            }
+                            if (categories.firstOrNull { it.id == pass?.categoryId }?.isUserOrganized() == true) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Delete tag") },
+                                    leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                    onClick = {
+                                        tagMenuOpen = false
+                                        categories.firstOrNull { it.role == PassCategoryRole.INBOX }?.let {
+                                            onAction(PassDetailAction.MoveToCategory(it.id))
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 },
@@ -323,11 +361,12 @@ fun PassDetailScreen(
                                         pass.locations.forEachIndexed { index, location ->
                                             val label = location.name?.takeIf(String::isNotBlank)
                                                 ?: "${location.latitude}, ${location.longitude}"
+                                            val locationShape = RoundedCornerShape(28.dp)
                                             Surface(
-                                                modifier = Modifier.fillMaxWidth().clickable {
+                                                modifier = Modifier.fillMaxWidth().clip(locationShape).clickable {
                                                     onAction(PassDetailAction.OpenLocation(index))
                                                 },
-                                                shape = RoundedCornerShape(28.dp),
+                                                shape = locationShape,
                                                 color = MaterialTheme.colorScheme.surfaceContainer,
                                             ) {
                                                 ListItem(
@@ -712,10 +751,10 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
                             onAction(SettingsAction.SetAutomaticallyMarkPast(it))
                         }
                         ListItem(
-                            supportingContent = { Text("Manage names, colors, and order") },
+                            supportingContent = { Text("Manage tag names, colors, and order") },
                             modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        ) { Text("Categories") }
+                        ) { Text("Tags") }
                     }
                 }
                 item {
@@ -980,8 +1019,8 @@ fun CategorySettingsScreen(
     deleting?.let { category ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete category?") },
-            text = { Text("Passes in ${category.name} will move to Inbox.") },
+            title = { Text("Delete tag?") },
+            text = { Text("The tag will be removed from passes in ${category.name}.") },
             confirmButton = {
                 TextButton(onClick = {
                     onAction(CategorySettingsAction.Delete(category.id))
@@ -994,7 +1033,7 @@ fun CategorySettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Categories") },
+                title = { Text("Tags") },
                 navigationIcon = {
                     IconButton(onClick = { onAction(CategorySettingsAction.Back) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -1011,9 +1050,9 @@ fun CategorySettingsScreen(
                         colorArgb = 0xFF6750A4,
                     )
                 },
-                modifier = Modifier.semantics { contentDescription = "Add category" },
+                modifier = Modifier.semantics { contentDescription = "Add tag" },
                 icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Add category") },
+                text = { Text("Add tag") },
             )
         },
     ) { padding ->
@@ -1047,7 +1086,7 @@ fun CategorySettingsScreen(
                             }
                             if (category.role == PassCategoryRole.CUSTOM) {
                                 IconButton(onClick = { deleting = category }) {
-                                    Icon(Icons.Default.Delete, "Delete ${category.name}")
+                                    Icon(Icons.Default.Delete, "Delete ${category.name} tag")
                                 }
                             }
                         }
@@ -1071,11 +1110,11 @@ private fun CategoryEditorDialog(
     var color by remember(category.id) { mutableStateOf(category.colorArgb.toInt()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (category.name.isBlank()) "Add category" else "Edit category") },
+        title = { Text(if (category.name.isBlank()) "Add tag" else "Edit tag") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
-                ColorPickerField("Category color", color, { color = it }, Modifier.fillMaxWidth())
+                ColorPickerField("Tag color", color, { color = it }, Modifier.fillMaxWidth())
             }
         },
         confirmButton = {

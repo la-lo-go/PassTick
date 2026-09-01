@@ -176,7 +176,7 @@ class MainActivity : ComponentActivity() {
                     is HomeAction.OpenPass -> backStack.add(AppDestination.PassDetail(action.id))
                     is HomeAction.SelectCategory -> viewModel.onAction(AppAction.SelectCategory(action.categoryId))
                     is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
-                    is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.id, action.offset))
+                    is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.orderedVisibleIds))
                     is HomeAction.Archive -> {
                         state.categories.firstOrNull { it.role == PassCategoryRole.ARCHIVE }?.let {
                             viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))

@@ -1,6 +1,7 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.captureToImage
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.then
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performClick
@@ -26,7 +28,9 @@ import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.ui.state.PassFieldUiModel
+import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.EditPassAction
@@ -181,6 +185,53 @@ class PassScreensTest {
     }
 
     @Test
+    fun expandedSearchUsesOnlyTheTextFieldWithoutASecondSearchIcon() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
+        }
+
+        composeRule.onNodeWithContentDescription("Search passes").performClick()
+
+        composeRule.onNodeWithContentDescription("Pass search").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Search passes").assertDoesNotExist()
+        composeRule.onNodeWithText("Search passes").assertIsDisplayed()
+    }
+
+    @Test
+    fun inactiveDateSortSelectsNewestBeforeItCanToggleToOldest() {
+        val actions = mutableListOf<HomeAction>()
+        val state = sampleState().copy(settings = AppSettings(sortOrder = PassSortOrder.TYPE))
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, actions::add) }
+        }
+
+        composeRule.onNodeWithText("Newest first").performClick()
+
+        assertThat(actions).containsExactly(HomeAction.SetSortOrder(PassSortOrder.DATE_DESC))
+    }
+
+    @Test
+    fun manualOrderAppearsBeforeTheDateSortControl() {
+        val state = sampleState().copy(settings = AppSettings(sortOrder = PassSortOrder.MANUAL))
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
+        }
+
+        val manualLeft = composeRule.onNodeWithText("Manual order").fetchSemanticsNode().boundsInRoot.left
+        val newestLeft = composeRule.onNodeWithText("Newest first").fetchSemanticsNode().boundsInRoot.left
+        assertThat(manualLeft).isLessThan(newestLeft)
+    }
+
+    @Test
+    fun passWithoutArtworkUsesTheCardArtworkPlaceholder() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
+        }
+
+        composeRule.onAllNodesWithContentDescription("Pass artwork").assertCountEquals(2)
+    }
+
+    @Test
     fun homeDrawerContainsPassViewCustomization() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
@@ -201,7 +252,7 @@ class PassScreensTest {
         composeRule.onNodeWithText("Inbox").assertDoesNotExist()
         composeRule.onNodeWithText("Trash").assertDoesNotExist()
         composeRule.onNodeWithText("Favorites").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Add category").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Add tag").assertIsDisplayed()
     }
 
     @Test
@@ -243,6 +294,25 @@ class PassScreensTest {
     }
 
     @Test
+    fun passTagMenuRemovesTagWithoutExposingInboxAsATag() {
+        val actions = mutableListOf<PassDetailAction>()
+        val taggedPass = pass("one", "Boarding pass", PassType.BOARDING).copy(categoryId = "favorites")
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(taggedPass, categories = defaultPassCategories, onAction = actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Move to Inbox").assertDoesNotExist()
+        composeRule.onNodeWithText("Manage tag").performClick()
+        composeRule.onNodeWithText("Inbox").assertDoesNotExist()
+        composeRule.onNodeWithText("Delete tag").performClick()
+
+        assertThat(actions).contains(PassDetailAction.MoveToCategory("new"))
+    }
+
+    @Test
     fun expandedPassCodeUsesModalPresentation() {
         val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
             barcodeFormat = PassBarCodeFormat.QR_CODE,
@@ -276,6 +346,7 @@ class PassScreensTest {
             pass("one", "Boarding pass", PassType.BOARDING),
             pass("two", "Event ticket", PassType.EVENT),
         ),
+        isContentLoading = false,
     )
 
     private fun pass(id: String, description: String, type: PassType) = PassUiModel(

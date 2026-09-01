@@ -202,11 +202,28 @@ class MainViewModelTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
-        viewModel.onAction(AppAction.ReorderPass("three", -1))
+        viewModel.onAction(AppAction.ReorderPass(listOf("one", "three", "two")))
         advanceUntilIdle()
 
         assertThat(settings.settings.value.sortOrder).isEqualTo(PassSortOrder.MANUAL)
         assertThat(viewModel.uiState.value.passes.map(PassUiModel::id)).containsExactly("one", "three", "two")
+    }
+
+    @Test
+    fun `reorders only the visible subset without disturbing passes between it`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository()
+        val repository = FakePassRepository(
+            listOf(snapshot("one", "One"), snapshot("hidden", "Hidden"), snapshot("three", "Three")),
+        )
+        val viewModel = MainViewModel(repository, settings, FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.ReorderPass(listOf("three", "one")))
+        advanceUntilIdle()
+
+        assertThat(settings.settings.value.passOrder).containsExactly("three", "hidden", "one")
+        assertThat(settings.settings.value.sortOrder).isEqualTo(PassSortOrder.MANUAL)
     }
 
     @Test

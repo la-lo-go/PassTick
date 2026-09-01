@@ -3,6 +3,7 @@ package org.ligi.passandroid.ui.compose
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
@@ -10,8 +11,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -48,6 +51,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
@@ -67,7 +71,6 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -83,7 +86,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -96,7 +99,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
@@ -109,6 +115,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
@@ -127,7 +134,6 @@ import org.ligi.passandroid.ui.barcode.PassCodeImage
 import org.threeten.bp.LocalDate
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.roundToInt
 import org.ligi.passandroid.ui.state.searchDocument
 import org.ligi.passandroid.ui.state.searchTerms
 import org.ligi.passandroid.ui.state.AppAction
@@ -136,7 +142,7 @@ sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
     data class SelectCategory(val categoryId: String?) : HomeAction
     data class SetSortOrder(val order: PassSortOrder) : HomeAction
-    data class ReorderPass(val id: String, val offset: Int) : HomeAction
+    data class ReorderPass(val orderedVisibleIds: List<String>) : HomeAction
     data class Archive(val id: String) : HomeAction
     data class Restore(val id: String) : HomeAction
     data class Delete(val id: String) : HomeAction
@@ -173,6 +179,7 @@ fun PassHomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchHasFocus by remember { mutableStateOf(false) }
+    var searchFocusClearedByBack by remember { mutableStateOf(false) }
     var searchImeWasVisible by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -205,11 +212,13 @@ fun PassHomeScreen(
     val remainingPasses = if (showTodayHero) visiblePasses.filterNot(PassUiModel::occursToday) else visiblePasses
 
     BackHandler(enabled = searchExpanded) {
-        if (searchHasFocus) {
+        if (searchHasFocus || !searchFocusClearedByBack) {
             focusManager.clearFocus()
+            searchFocusClearedByBack = true
         } else {
             searchExpanded = false
             searchQuery = ""
+            searchFocusClearedByBack = false
         }
     }
     LaunchedEffect(searchExpanded) {
@@ -223,6 +232,7 @@ fun PassHomeScreen(
             searchImeWasVisible = true
         } else if (searchImeWasVisible) {
             focusManager.clearFocus()
+            searchFocusClearedByBack = true
             searchImeWasVisible = false
         }
     }
@@ -310,7 +320,10 @@ fun PassHomeScreen(
                 onSearchQueryChange = { searchQuery = it },
                 onOpenSearch = { searchExpanded = true },
                 searchFocusRequester = searchFocusRequester,
-                onSearchFocusChanged = { searchHasFocus = it },
+                onSearchFocusChanged = {
+                    searchHasFocus = it
+                    if (it) searchFocusClearedByBack = false
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -361,7 +374,7 @@ fun PassHomeScreen(
                                 }
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
-                            onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
+                            onReorder = { onAction(HomeAction.ReorderPass(it)) },
                             onPreviewChanged = {
                                 previewPassId = it
                                 if (it == null) previewOpeningPassId = null
@@ -391,7 +404,7 @@ fun PassHomeScreen(
                                 }
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
-                            onReorder = { id, offset -> onAction(HomeAction.ReorderPass(id, offset)) },
+                            onReorder = { onAction(HomeAction.ReorderPass(it)) },
                             onPreviewChanged = {
                                 previewPassId = it
                                 if (it == null) previewOpeningPassId = null
@@ -454,23 +467,37 @@ private fun HomeToolbar(
     TopAppBar(
         title = {
             if (searchExpanded) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester)
-                        .height(48.dp)
-                        .onFocusChanged { onSearchFocusChanged(it.hasFocus) }
-                        .semantics { contentDescription = "Pass search" },
-                    singleLine = true,
-                    placeholder = { Text("Search passes") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    trailingIcon = {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f).padding(start = 16.dp), contentAlignment = Alignment.CenterStart) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    "Search passes",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = onSearchQueryChange,
+                                modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester)
+                                    .onFocusChanged { onSearchFocusChanged(it.hasFocus) }
+                                    .semantics { contentDescription = "Pass search" },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            )
+                        }
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Close, "Clear search") }
                         }
-                    },
-                    shape = RoundedCornerShape(50),
-                )
+                    }
+                }
             } else if (categories.isNotEmpty()) {
                 CategorySelector(categories, selectedCategoryId, onSelectCategory, Modifier.fillMaxWidth())
             }
@@ -511,12 +538,24 @@ private fun CategorySelector(
 @Composable
 private fun HomeSortSelector(selectedSort: PassSortOrder, onSort: (PassSortOrder) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (selectedSort == PassSortOrder.MANUAL) {
+            item { FilterChip(selected = true, onClick = {}, label = { Text("Manual order") }) }
+        }
         item {
             val ascending = selectedSort == PassSortOrder.DATE_ASC
+            val dateSelected = ascending || selectedSort == PassSortOrder.DATE_DESC
             val label = if (ascending) "Oldest first" else "Newest first"
             FilterChip(
-                selected = selectedSort == PassSortOrder.DATE_ASC || selectedSort == PassSortOrder.DATE_DESC,
-                onClick = { onSort(if (ascending) PassSortOrder.DATE_DESC else PassSortOrder.DATE_ASC) },
+                selected = dateSelected,
+                onClick = {
+                    onSort(
+                        when {
+                            !dateSelected -> PassSortOrder.DATE_DESC
+                            ascending -> PassSortOrder.DATE_DESC
+                            else -> PassSortOrder.DATE_ASC
+                        },
+                    )
+                },
                 label = { Text(label) },
                 leadingIcon = {
                     Icon(
@@ -540,9 +579,6 @@ private fun HomeSortSelector(selectedSort: PassSortOrder, onSort: (PassSortOrder
                 label = { Text("Pass type") },
             )
         }
-        if (selectedSort == PassSortOrder.MANUAL) {
-            item { FilterChip(selected = true, onClick = {}, label = { Text("Manual order") }) }
-        }
     }
 }
 
@@ -557,7 +593,7 @@ private fun TicketFeed(
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
     onDelete: (String, String) -> Unit,
-    onReorder: (String, Int) -> Unit,
+    onReorder: (List<String>) -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
 ) {
@@ -567,35 +603,224 @@ private fun TicketFeed(
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         feeds.forEach { feed ->
             if (feed.isNotEmpty()) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        feed.forEachIndexed { index, pass ->
-                            val category = categories.firstOrNull { it.id == pass.categoryId }
-                            val radius = if (hero) 28.dp else 20.dp
-                            val shape = RoundedCornerShape(
-                                topStart = if (index == 0) radius else 0.dp,
-                                topEnd = if (index == 0) radius else 0.dp,
-                                bottomStart = if (index == feed.lastIndex) radius else 0.dp,
-                                bottomEnd = if (index == feed.lastIndex) radius else 0.dp,
-                            )
-                            TicketSwipeContainer(
-                                pass = pass,
-                                category = category,
-                                hero = hero,
-                                sectionOrder = sectionOrder,
-                                hiddenSections = hiddenSections,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = shape,
-                                onOpen = onOpen,
-                                onArchive = onArchive,
-                                onDelete = onDelete,
-                                onReorder = onReorder,
-                                onPreviewChanged = onPreviewChanged,
-                                onPreviewOpeningChanged = onPreviewOpeningChanged,
-                            )
-                        }
-                    }
+                ReorderableTicketColumn(
+                    passes = feed,
+                    categories = categories,
+                    hero = hero,
+                    sectionOrder = sectionOrder,
+                    hiddenSections = hiddenSections,
+                    modifier = Modifier.weight(1f),
+                    onOpen = onOpen,
+                    onArchive = onArchive,
+                    onDelete = onDelete,
+                    onReorder = onReorder,
+                    onPreviewChanged = onPreviewChanged,
+                    onPreviewOpeningChanged = onPreviewOpeningChanged,
+                )
             } else {
                 Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+private data class FeedItemBounds(val top: Float, val height: Int) {
+    val center: Float get() = top + height / 2f
+}
+
+@Composable
+private fun ReorderableTicketColumn(
+    passes: List<PassUiModel>,
+    categories: List<PassCategory>,
+    hero: Boolean,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
+    modifier: Modifier,
+    onOpen: (String) -> Unit,
+    onArchive: (String, Boolean, String) -> Unit,
+    onDelete: (String, String) -> Unit,
+    onReorder: (List<String>) -> Unit,
+    onPreviewChanged: (String?) -> Unit,
+    onPreviewOpeningChanged: (String?) -> Unit,
+) {
+    var visualPasses by remember { mutableStateOf(passes) }
+    var measuredBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
+    var frozenBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
+    var draggedId by remember { mutableStateOf<String?>(null) }
+    var draggedFromIndex by remember { mutableStateOf(-1) }
+    var draggedTargetIndex by remember { mutableStateOf(-1) }
+    var draggedOffset by remember { mutableStateOf(0f) }
+    var pendingCommitIds by remember { mutableStateOf<List<String>?>(null) }
+    var settlingId by remember { mutableStateOf<String?>(null) }
+    val settlingOffset = remember { Animatable(0f) }
+    val hapticFeedback = LocalHapticFeedback.current
+    val reorderScope = rememberCoroutineScope()
+    val targetHysteresis = with(LocalDensity.current) { 8.dp.toPx() }
+
+    LaunchedEffect(passes.map(PassUiModel::id), draggedId) {
+        if (draggedId == null) {
+            val incomingIds = passes.map(PassUiModel::id)
+            if (pendingCommitIds == incomingIds) pendingCommitIds = null
+            if (pendingCommitIds == null || incomingIds.toSet() != visualPasses.map(PassUiModel::id).toSet()) {
+                visualPasses = passes
+            }
+        }
+    }
+
+    fun clearDrag() {
+        draggedId = null
+        draggedFromIndex = -1
+        draggedTargetIndex = -1
+        draggedOffset = 0f
+        frozenBounds = emptyMap()
+    }
+
+    val simulatedOrder = if (
+        draggedFromIndex in visualPasses.indices && draggedTargetIndex in visualPasses.indices
+    ) {
+        visualPasses.toMutableList().apply {
+            add(draggedTargetIndex, removeAt(draggedFromIndex))
+        }
+    } else {
+        visualPasses
+    }
+    val itemGap = visualPasses.zipWithNext().firstNotNullOfOrNull { (current, next) ->
+        val currentBounds = frozenBounds[current.id] ?: return@firstNotNullOfOrNull null
+        val nextBounds = frozenBounds[next.id] ?: return@firstNotNullOfOrNull null
+        nextBounds.top - currentBounds.top - currentBounds.height
+    } ?: 0f
+    var nextSimulatedTop = frozenBounds[visualPasses.firstOrNull()?.id]?.top ?: 0f
+    val simulatedTops = buildMap {
+        simulatedOrder.forEach { item ->
+            put(item.id, nextSimulatedTop)
+            nextSimulatedTop += (frozenBounds[item.id]?.height ?: 0) + itemGap
+        }
+    }
+
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        visualPasses.forEachIndexed { index, pass ->
+            key(pass.id) {
+                val category = categories.firstOrNull { it.id == pass.categoryId }
+                val radius = if (hero) 28.dp else 20.dp
+                val shape = RoundedCornerShape(
+                    topStart = if (index == 0) radius else 0.dp,
+                    topEnd = if (index == 0) radius else 0.dp,
+                    bottomStart = if (index == visualPasses.lastIndex) radius else 0.dp,
+                    bottomEnd = if (index == visualPasses.lastIndex) radius else 0.dp,
+                )
+                val siblingTargetOffset = if (pass.id != draggedId) {
+                    val original = frozenBounds[pass.id]?.top
+                    val target = simulatedTops[pass.id]
+                    if (original != null && target != null) target - original else 0f
+                } else {
+                    0f
+                }
+                val siblingOffset by animateFloatAsState(
+                    targetValue = siblingTargetOffset,
+                    animationSpec = tween(120),
+                    label = "reorderSiblingOffset",
+                )
+                val isDragged = pass.id == draggedId
+                val isSettling = pass.id == settlingId
+                val visualOffset = when {
+                    isDragged -> draggedOffset
+                    isSettling -> settlingOffset.value
+                    else -> siblingOffset
+                }
+                val isLifted = isDragged || isSettling
+
+                TicketSwipeContainer(
+                    pass = pass,
+                    category = category,
+                    hero = hero,
+                    sectionOrder = sectionOrder,
+                    hiddenSections = hiddenSections,
+                    modifier = Modifier.fillMaxWidth()
+                        .onGloballyPositioned { coordinates ->
+                            if (draggedId == null) {
+                                measuredBounds = measuredBounds + (
+                                    pass.id to FeedItemBounds(coordinates.positionInParent().y, coordinates.size.height)
+                                )
+                            }
+                        }
+                        .zIndex(if (isLifted) 2f else 0f)
+                        .graphicsLayer {
+                            translationY = visualOffset
+                            scaleX = if (isLifted) 1.025f else 1f
+                            scaleY = if (isLifted) 1.025f else 1f
+                            shadowElevation = if (isLifted) 12.dp.toPx() else 0f
+                        },
+                    shape = shape,
+                    reorderingActive = draggedId != null,
+                    onOpen = onOpen,
+                    onArchive = onArchive,
+                    onDelete = onDelete,
+                    onReorderStart = {
+                        draggedId = pass.id
+                        draggedFromIndex = index
+                        draggedTargetIndex = index
+                        draggedOffset = 0f
+                        frozenBounds = measuredBounds
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                    onReorderDrag = { delta ->
+                        draggedOffset += delta
+                        val origin = frozenBounds[pass.id]
+                        if (origin != null) {
+                            val draggedCenter = origin.center + draggedOffset
+                            var nextTarget = draggedTargetIndex
+                            while (nextTarget < visualPasses.lastIndex) {
+                                val currentCenter = frozenBounds[visualPasses[nextTarget].id]?.center ?: break
+                                val followingCenter = frozenBounds[visualPasses[nextTarget + 1].id]?.center ?: break
+                                if (draggedCenter > (currentCenter + followingCenter) / 2f + targetHysteresis) {
+                                    nextTarget++
+                                } else {
+                                    break
+                                }
+                            }
+                            while (nextTarget > 0) {
+                                val currentCenter = frozenBounds[visualPasses[nextTarget].id]?.center ?: break
+                                val precedingCenter = frozenBounds[visualPasses[nextTarget - 1].id]?.center ?: break
+                                if (draggedCenter < (currentCenter + precedingCenter) / 2f - targetHysteresis) {
+                                    nextTarget--
+                                } else {
+                                    break
+                                }
+                            }
+                            if (nextTarget != draggedTargetIndex) {
+                                draggedTargetIndex = nextTarget
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                        }
+                    },
+                    onReorderEnd = {
+                        val from = draggedFromIndex
+                        val to = draggedTargetIndex
+                        val id = draggedId
+                        if (id != null && from in visualPasses.indices && to in visualPasses.indices && from != to) {
+                            val reorderedPasses = visualPasses.toMutableList().apply { add(to, removeAt(from)) }
+                            val reorderedIds = reorderedPasses.map(PassUiModel::id)
+                            val originTop = frozenBounds[id]?.top ?: 0f
+                            val targetTop = simulatedTops[id] ?: originTop
+                            val releaseOffset = originTop + draggedOffset - targetTop
+                            reorderScope.launch {
+                                settlingOffset.snapTo(releaseOffset)
+                                settlingId = id
+                                pendingCommitIds = reorderedIds
+                                visualPasses = reorderedPasses
+                                clearDrag()
+                                onReorder(reorderedIds)
+                                settlingOffset.animateTo(0f, tween(180))
+                                settlingId = null
+                            }
+                        } else {
+                            clearDrag()
+                        }
+                    },
+                    onReorderCancel = ::clearDrag,
+                    onPreviewChanged = onPreviewChanged,
+                    onPreviewOpeningChanged = onPreviewOpeningChanged,
+                )
             }
         }
     }
@@ -611,19 +836,22 @@ private fun TicketSwipeContainer(
     hiddenSections: Set<HomeCardSection>,
     modifier: Modifier,
     shape: Shape,
+    reorderingActive: Boolean,
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
     onDelete: (String, String) -> Unit,
-    onReorder: (String, Int) -> Unit,
+    onReorderStart: () -> Unit,
+    onReorderDrag: (Float) -> Unit,
+    onReorderEnd: () -> Unit,
+    onReorderCancel: () -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
 ) {
     val restoring = category?.role == PassCategoryRole.ARCHIVE
     val archiveLabel = if (restoring) "Restore" else "Archive"
     val dismissState = rememberSwipeToDismissBoxState()
-    var isReordering by remember(pass.id) { mutableStateOf(false) }
-    LaunchedEffect(isReordering) {
-        if (isReordering) dismissState.reset()
+    LaunchedEffect(reorderingActive) {
+        if (reorderingActive) dismissState.reset()
     }
     LaunchedEffect(dismissState.settledValue) {
         when (dismissState.settledValue) {
@@ -636,19 +864,27 @@ private fun TicketSwipeContainer(
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier.clip(shape),
-        gesturesEnabled = !isReordering,
+        gesturesEnabled = !reorderingActive,
         backgroundContent = {
-            val deleting = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
-            val background = if (deleting) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
-            val foreground = if (deleting) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
-            Row(
-                Modifier.fillMaxSize().background(background).padding(horizontal = 20.dp),
-                horizontalArrangement = if (deleting) Arrangement.End else Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(if (deleting) Icons.Default.Delete else if (restoring) Icons.Default.Restore else Icons.Default.Archive, null, tint = foreground)
-                Spacer(Modifier.size(8.dp))
-                Text(if (deleting) "Delete" else archiveLabel, color = foreground, fontWeight = FontWeight.SemiBold)
+            if (reorderingActive) {
+                Box(
+                    Modifier.fillMaxSize().background(
+                        if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                )
+            } else {
+                val deleting = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
+                val background = if (deleting) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
+                val foreground = if (deleting) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                Row(
+                    Modifier.fillMaxSize().background(background).padding(horizontal = 20.dp),
+                    horizontalArrangement = if (deleting) Arrangement.End else Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(if (deleting) Icons.Default.Delete else if (restoring) Icons.Default.Restore else Icons.Default.Archive, null, tint = foreground)
+                    Spacer(Modifier.size(8.dp))
+                    Text(if (deleting) "Delete" else archiveLabel, color = foreground, fontWeight = FontWeight.SemiBold)
+                }
             }
         },
         content = {
@@ -666,8 +902,10 @@ private fun TicketSwipeContainer(
                 },
                 shape = shape,
                 onOpen = onOpen,
-                onReorder = { offset -> onReorder(pass.id, offset) },
-                onReorderingChanged = { isReordering = it },
+                onReorderStart = onReorderStart,
+                onReorderDrag = onReorderDrag,
+                onReorderEnd = onReorderEnd,
+                onReorderCancel = onReorderCancel,
                 onPreviewChanged = { visible -> onPreviewChanged(pass.id.takeIf { visible }) },
                 onPreviewOpeningChanged = { opening -> onPreviewOpeningChanged(pass.id.takeIf { opening }) },
             )
@@ -685,26 +923,20 @@ private fun TicketRow(
     modifier: Modifier,
     shape: Shape,
     onOpen: (String) -> Unit,
-    onReorder: (Int) -> Unit,
-    onReorderingChanged: (Boolean) -> Unit,
+    onReorderStart: () -> Unit,
+    onReorderDrag: (Float) -> Unit,
+    onReorderEnd: () -> Unit,
+    onReorderCancel: () -> Unit,
     onPreviewChanged: (Boolean) -> Unit,
     onPreviewOpeningChanged: (Boolean) -> Unit,
 ) {
-    var dragOffset by remember(pass.id) { mutableFloatStateOf(0f) }
-    var isReordering by remember(pass.id) { mutableStateOf(false) }
     val interactionSource = remember(pass.id) { MutableInteractionSource() }
-    val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     Surface(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = shape,
-        modifier = modifier.fillMaxWidth().animateContentSize().zIndex(if (isReordering) 1f else 0f).graphicsLayer {
-            translationY = dragOffset
-            scaleX = if (isReordering) 1.025f else 1f
-            scaleY = if (isReordering) 1.025f else 1f
-            shadowElevation = if (isReordering) 12.dp.toPx() else 0f
-        }
+        modifier = modifier.fillMaxWidth().animateContentSize()
             .indication(interactionSource, LocalIndication.current),
     ) {
         Row(
@@ -791,6 +1023,7 @@ private fun TicketRow(
                 PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                var metadataShown = false
                 sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }.forEach { section ->
                     when (section) {
                         HomeCardSection.ARTWORK -> Unit
@@ -812,19 +1045,29 @@ private fun TicketRow(
                         HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        HomeCardSection.CATEGORY -> category?.takeIf(PassCategory::isUserOrganized)?.let {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                                CategoryBadge(it)
+                        HomeCardSection.CATEGORY,
+                        HomeCardSection.PASS_TYPE,
+                        -> if (!metadataShown) {
+                            val showType = HomeCardSection.PASS_TYPE !in hiddenSections
+                            val visibleTag = category
+                                ?.takeIf(PassCategory::isUserOrganized)
+                                ?.takeIf { HomeCardSection.CATEGORY !in hiddenSections }
+                            if (showType || visibleTag != null) {
+                                metadataShown = true
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    if (showType) {
+                                        Text(
+                                            pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    }
+                                    visibleTag?.let { CategoryBadge(it) }
+                                }
                             }
                         }
-                        HomeCardSection.PASS_TYPE -> if (category?.isUserOrganized() != true) Text(
-                            pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
                     }
                 }
             }
@@ -835,29 +1078,13 @@ private fun TicketRow(
                 Modifier.size(40.dp).pointerInput(pass.id) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = {
-                            isReordering = true
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onReorderingChanged(true)
+                            onReorderStart()
                         },
-                        onDragEnd = {
-                            dragOffset = 0f
-                            isReordering = false
-                            onReorderingChanged(false)
-                        },
-                        onDragCancel = {
-                            dragOffset = 0f
-                            isReordering = false
-                            onReorderingChanged(false)
-                        },
+                        onDragEnd = onReorderEnd,
+                        onDragCancel = onReorderCancel,
                         onDrag = { change, amount ->
                             change.consume()
-                            dragOffset = (dragOffset + amount.y).coerceIn(-224.dp.toPx(), 224.dp.toPx())
-                            val offset = (dragOffset / 72.dp.toPx()).roundToInt()
-                            if (offset != 0) {
-                                onReorder(offset)
-                                dragOffset -= offset * 72.dp.toPx()
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            }
+                            onReorderDrag(amount.y)
                         },
                     )
                 }.padding(8.dp),
@@ -919,9 +1146,15 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
             cropNearlySquare = true,
         )
     } else {
-        Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
+        Surface(
+            modifier = modifier,
+            shape = RoundedCornerShape(16),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.primary,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(pass.description.take(1).uppercase(Locale.ROOT), style = MaterialTheme.typography.titleLarge)
+                Icon(Icons.Default.ConfirmationNumber, "Pass artwork", Modifier.fillMaxSize().padding(6.dp))
             }
         }
     }
@@ -930,7 +1163,7 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
 @Composable
 private fun CategoryBadge(category: PassCategory) {
     Surface(color = Color(category.colorArgb.toInt()).copy(alpha = 0.18f), shape = RoundedCornerShape(50)) {
-        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             CategoryDot(category.colorArgb)
             Spacer(Modifier.size(6.dp))
             Text(category.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
