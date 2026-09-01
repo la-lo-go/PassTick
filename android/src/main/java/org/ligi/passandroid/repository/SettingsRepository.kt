@@ -65,6 +65,17 @@ data class PassCategory(
     val role: PassCategoryRole = PassCategoryRole.CUSTOM,
 )
 
+fun PassCategory.isUserOrganized(): Boolean = when (role) {
+    PassCategoryRole.INBOX,
+    PassCategoryRole.TRASH,
+    -> false
+    PassCategoryRole.FAVORITES,
+    PassCategoryRole.ARCHIVE,
+    PassCategoryRole.PAST,
+    PassCategoryRole.CUSTOM,
+    -> true
+}
+
 val defaultPassCategories = listOf(
     PassCategory("new", "Inbox", 0xFF3F51B5, PassCategoryRole.INBOX),
     PassCategory("favorites", "Favorites", 0xFFC2185B, PassCategoryRole.FAVORITES),
