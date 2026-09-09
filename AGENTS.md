@@ -40,7 +40,7 @@ The maintained application is a private, offline-first Android app for Android 1
 - Use short, literal technical English.
 - Use ASD-STE100 Simplified Technical English for documentation and plans.
 - Follow YAGNI (You Aren't Gonna Need It). Prefer clear one-line solutions when they do not reduce readability.
-- Make atomic English commits as `Lalo <gonzalo.alvalon@gmail.com>`. Do not add co-author trailers or tool references.
+- Make atomic English commits as `Lalo`. Do not add co-author trailers or tool references.
 
 ## Required validation
 
