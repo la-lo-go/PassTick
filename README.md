@@ -1,12 +1,27 @@
-# PassTick
-
 <p align="center">
-  <img src="android/src/main/assets/ic_ticket_primary.svg" width="160" alt="PassTick ticket icon">
+  <img src="docs/assets/passtick-wordmark.svg" width="390" alt="PassTick">
 </p>
 
 This repository is an independent modernization of the original [PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its contributors. It preserves the complete project history, original copyright, and GNU GPL version 3 license.
 
 PassTick is a private, offline-first Android pass wallet. It uses the application ID `dev.lalogo.passtick`. It supports Android 10 and later and does not contain analytics.
+
+## PassTick in use
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/assets/screenshots/coastal-express.png" width="280" alt="A train pass with travel artwork and an Aztec code"></td>
+    <td align="center"><img src="docs/assets/screenshots/lumen-live.png" width="280" alt="A concert pass with event artwork and a QR code"></td>
+    <td align="center"><img src="docs/assets/screenshots/glass-horizons.png" width="280" alt="A museum pass with exhibition artwork and a PDF417 code"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Travel</strong><br>Aztec code</td>
+    <td align="center"><strong>Events</strong><br>QR code</td>
+    <td align="center"><strong>Admission</strong><br>PDF417 code</td>
+  </tr>
+</table>
+
+The examples use fictional passes and original demonstration artwork. The screenshots come from PassTick running on a physical Android device.
 
 ## Features
 
