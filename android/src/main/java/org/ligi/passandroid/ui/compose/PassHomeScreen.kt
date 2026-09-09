@@ -73,6 +73,7 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -106,6 +107,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -381,8 +383,22 @@ fun PassHomeScreen(
                 NavigationDrawerItem(
                     label = { Text("All") },
                     selected = state.selectedCategoryId == null,
+                    icon = { Icon(Icons.Default.ViewAgenda, null) },
                     onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(null)) },
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_all"),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Protected") },
+                    selected = state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID,
+                    icon = { Icon(Icons.Default.Lock, null) },
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onAction(
+                            if (protectedPassesUnlocked) HomeAction.SelectCategory(PROTECTED_PASSES_CATEGORY_ID)
+                            else HomeAction.UnlockProtectedPasses,
+                        )
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_protected"),
                 )
                 NavigationDrawerItem(
                     label = { Text("Pinned") },
@@ -398,6 +414,14 @@ fun PassHomeScreen(
                     onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
                     modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
                 )
+                if (visibleCategories.isNotEmpty()) {
+                    Text(
+                        "Tags",
+                        modifier = Modifier.padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 4.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 visibleCategories.forEach { category ->
                     NavigationDrawerItem(
                         label = { Text(category.name) },
@@ -1085,7 +1109,6 @@ private fun TicketSwipeContainer(
     val startRevealWidth = passActionButtonGroupWidth(1)
     val endRevealWidth = passActionButtonGroupWidth(3)
     val cardActionGap = PassActionButtonGap
-    var measuredStartRevealWidthPx by remember { mutableIntStateOf(0) }
     var measuredEndRevealWidthPx by remember { mutableIntStateOf(0) }
     var measuredCardWidthPx by remember { mutableIntStateOf(0) }
     val revealState = remember {
@@ -1100,8 +1123,7 @@ private fun TicketSwipeContainer(
     }
     SideEffect {
         val gapPx = with(density) { cardActionGap.toPx() }
-        val startAnchor = (measuredStartRevealWidthPx.takeIf { it > 0 }?.toFloat()
-            ?: with(density) { startRevealWidth.toPx() }) + gapPx
+        val startAnchor = with(density) { startRevealWidth.toPx() } + gapPx
         val endAnchor = (measuredEndRevealWidthPx.takeIf { it > 0 }?.toFloat()
             ?: with(density) { endRevealWidth.toPx() }) + gapPx
         val commitAnchor = maxOf(
@@ -1118,6 +1140,21 @@ private fun TicketSwipeContainer(
         )
     }
     SyncSwipeReveal(pass.id, reorderingActive, openSwipePassId, revealState)
+    val hapticFeedback = LocalHapticFeedback.current
+    LaunchedEffect(revealState, measuredCardWidthPx) {
+        if (measuredCardWidthPx == 0) return@LaunchedEffect
+        val commitThreshold = measuredCardWidthPx * FULL_SWIPE_COMMIT_FRACTION
+        var wasActionable = false
+        snapshotFlow {
+            val offset = revealState.offset
+            !offset.isNaN() && offset >= commitThreshold
+        }.collect { isActionable ->
+            if (isActionable && !wasActionable) {
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+            }
+            wasActionable = isActionable
+        }
+    }
     LaunchedEffect(revealState.currentValue) {
         if (revealState.currentValue == SwipeRevealAnchor.StartCommit) {
             onArchive(pass.id, restoring, pass.categoryId)
@@ -1138,30 +1175,39 @@ private fun TicketSwipeContainer(
                 Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth()
                     .background(MaterialTheme.colorScheme.secondaryContainer),
             )
-            PassActionButtonGroup(
-                modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().wrapContentWidth()
-                    .onSizeChanged { measuredStartRevealWidthPx = it.width }
+            val gapPx = with(density) { cardActionGap.toPx() }
+            val minimumActionWidthPx = with(density) { startRevealWidth.toPx() }
+            val rawOffset = revealState.offset.let { if (it.isNaN()) 0f else it.coerceAtLeast(0f) }
+            val actionWidthPx = maxOf(minimumActionWidthPx, rawOffset - gapPx)
+                .coerceAtMost(measuredCardWidthPx.takeIf { it > 0 }?.toFloat() ?: minimumActionWidthPx)
+            val commitThresholdPx = measuredCardWidthPx * FULL_SWIPE_COMMIT_FRACTION
+            val iconScale = if (commitThresholdPx > 0f) {
+                1f + 0.16f * (rawOffset / commitThresholdPx).coerceIn(0f, 1f)
+            } else {
+                1f
+            }
+            Box(
+                modifier = Modifier.align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .width(with(density) { actionWidthPx.toDp() })
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable { runSwipeAction { onArchive(pass.id, restoring, pass.categoryId) } }
                     .then(
                         if (revealState.currentValue == SwipeRevealAnchor.StartActions ||
                             revealState.currentValue == SwipeRevealAnchor.StartCommit
                         ) Modifier
                         else Modifier.clearAndSetSemantics {},
                     ),
+                contentAlignment = Alignment.Center,
             ) {
-                customItem(
-                    buttonGroupContent = {
-                        PassActionButton(
-                            icon = if (restoring) Icons.Default.Restore else Icons.Default.Archive,
-                            label = archiveLabel,
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            index = 0,
-                            count = 1,
-                            fillHeight = true,
-                            onClick = { runSwipeAction { onArchive(pass.id, restoring, pass.categoryId) } },
-                        )
+                Icon(
+                    imageVector = if (restoring) Icons.Default.Restore else Icons.Default.Archive,
+                    contentDescription = archiveLabel,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp).graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
                     },
-                    menuContent = { _ -> },
                 )
             }
             PassActionButtonGroup(
