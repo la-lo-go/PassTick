@@ -14,6 +14,7 @@ import org.ligi.passandroid.model.createPassMoshi
 import org.ligi.passandroid.platform.AndroidPlatformActions
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.repository.DataStoreSettingsRepository
+import org.ligi.passandroid.repository.FilePinnedStore
 import org.ligi.passandroid.repository.FilePassRepository
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.SettingsRepository
@@ -31,7 +32,13 @@ open class App : Application() {
         return module {
             single { AndroidFileSystemPassStore(this@App, moshi) as PassStore }
             single<Tracker> { LocalTracker() }
-            single<PassRepository> { FilePassRepository(this@App, get(), get()) }
+            single<org.ligi.passandroid.repository.FileFavoriteStore> {
+                FilePinnedStore(
+                    java.io.File(filesDir, "pass-pinned.json"),
+                    java.io.File(filesDir, "pass-favorites.json"),
+                )
+            }
+            single<PassRepository> { FilePassRepository(this@App, get(), get(), favoriteStore = get()) }
             single<SettingsRepository> { DataStoreSettingsRepository(this@App) }
             single<PlatformActions> { AndroidPlatformActions(this@App) }
             single<ReminderScheduler> { AndroidReminderScheduler(this@App) }

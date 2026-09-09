@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.withContext
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.model.comparator.PassSortOrder
@@ -28,7 +29,6 @@ import org.threeten.bp.Duration
 import org.threeten.bp.LocalDateTime
 import org.threeten.bp.Instant
 import org.threeten.bp.ZoneId
-import org.ligi.passandroid.domain.timeline.EventTemporalState
 import org.ligi.passandroid.domain.timeline.buildPassTimeline
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.reminder.buildPassReminders
@@ -42,6 +42,7 @@ class MainViewModel(
     private val reminderScheduler: ReminderScheduler = ReminderScheduler.None,
     private val widgetPublisher: PassWidgetSnapshotPublisher? = null,
 ) : ViewModel() {
+    private var reminderActionOverrides: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>>? = null
     suspend fun isCalendarEventPresent(pass: PassUiModel): Boolean = withContext(Dispatchers.IO) {
         pass.calendarEvent?.let(platformActions::isCalendarEventPresent) == true
     }
@@ -68,7 +69,13 @@ class MainViewModel(
             isBusy = isBusy,
             message = currentMessage,
             categories = categories,
-            selectedCategoryId = requestedCategoryId?.takeIf { requested -> categories.any { it.id == requested } },
+            selectedCategoryId = requestedCategoryId?.takeIf { requested ->
+                requested in setOf(
+                    PROTECTED_PASSES_CATEGORY_ID,
+                    PINNED_PASSES_CATEGORY_ID,
+                    ARCHIVED_PASSES_CATEGORY_ID,
+                ) || categories.any { it.id == requested }
+            },
             timeline = timeline,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
@@ -86,23 +93,6 @@ class MainViewModel(
                 .collectLatest { (currentPasses, settings) ->
                     val now = Instant.now()
                     val timeline = buildPassTimeline(currentPasses, now, ZoneId.systemDefault())
-                    if (settings.automaticallyMarkPast) {
-                        val pastCategoryId = settings.categories.firstOrNull { it.role == PassCategoryRole.PAST }?.id
-                        if (pastCategoryId != null) {
-                            val excludedRoles = setOf(
-                                PassCategoryRole.PAST,
-                                PassCategoryRole.ARCHIVE,
-                                PassCategoryRole.TRASH,
-                            )
-                            val excludedIds = settings.categories.filter { it.role in excludedRoles }
-                                .mapTo(mutableSetOf()) { it.id }
-                            val pastPassIds = timeline.days.flatMap { it.events }
-                                .filter { it.temporalState == EventTemporalState.PAST }
-                                .mapTo(mutableSetOf()) { it.pass.passId }
-                            currentPasses.filter { it.id in pastPassIds && it.categoryId !in excludedIds }
-                                .forEach { pass -> passRepository.moveToCategory(pass.id, pastCategoryId) }
-                        }
-                    }
                     reminderScheduler.sync(
                         if (settings.remindersEnabled) {
                             val overrides = buildMap {
@@ -110,11 +100,19 @@ class MainViewModel(
                                 settings.reminderLeadMinutesByPass.forEach { (passId, minutes) ->
                                     put(passId, PassReminderOverride.LeadTime(minutes))
                                 }
+                                settings.reminderExactPassIds.forEach { put(it, PassReminderOverride.ExactAtEvent) }
                             }
-                            buildPassReminders(timeline, now, settings.reminderMinutes, overrides)
+                            buildPassReminders(
+                                timeline,
+                                now,
+                                settings.reminderMinutes,
+                                overrides,
+                                settings.reminderActionsByPass,
+                            )
                         } else {
                             emptyList()
                         },
+                        settings.notificationPolicySettings,
                     )
                     val widgetExcludedIds = settings.categories
                         .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
@@ -127,6 +125,11 @@ class MainViewModel(
     }
 
     fun onAction(action: AppAction) {
+        if (action is AppAction.SetPassReminderActions) {
+            viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) { setPassReminderActions(action) }
+            return
+        }
+        if (handlePassMetadataAction(action)) return
         when (action) {
             is AppAction.Import -> launchOperation("Pass imported") {
                 val imported = passRepository.import(action.uri).getOrThrow()
@@ -176,19 +179,18 @@ class MainViewModel(
                 )
             }
             is AppAction.DeleteCategory -> launchOperation("Category deleted") {
-                val category = uiState.value.settings.categories.firstOrNull { it.id == action.categoryId }
+                val category = uiState.value.categories.firstOrNull { it.id == action.categoryId }
                     ?: error("Category not found")
                 require(category.role == PassCategoryRole.CUSTOM) { "Built-in categories cannot be deleted" }
-                val inboxId = uiState.value.settings.categories.first { it.role == PassCategoryRole.INBOX }.id
-                uiState.value.passes.filter { it.categoryId == action.categoryId }.forEach { pass ->
-                    passRepository.moveToCategory(pass.id, inboxId)
+                uiState.value.passes.filter { action.categoryId in it.tagIds }.forEach { pass ->
+                    passRepository.setTags(pass.id, pass.tagIds - action.categoryId)
                 }
                 settingsRepository.setCategories(
                     uiState.value.settings.categories.filterNot { it.id == action.categoryId },
                 )
             }
             is AppAction.MoveCategory -> viewModelScope.launch {
-                val categories = uiState.value.settings.categories.toMutableList()
+                val categories = uiState.value.categories.toMutableList()
                 val from = categories.indexOfFirst { it.id == action.categoryId }
                 val to = (from + action.offset).coerceIn(categories.indices)
                 if (from >= 0 && from != to) {
@@ -233,6 +235,24 @@ class MainViewModel(
             is AppAction.SetReminderMinutes -> viewModelScope.launch {
                 settingsRepository.setReminderMinutes(action.value)
             }
+            is AppAction.SetNotificationAccessWindow -> viewModelScope.launch {
+                settingsRepository.setNotificationAccessWindowMinutes(action.minutes)
+            }
+            is AppAction.SetNotificationExactTiming -> viewModelScope.launch {
+                settingsRepository.setNotificationExactTiming(action.value)
+            }
+            is AppAction.SetNotificationActionsEnabled -> viewModelScope.launch {
+                settingsRepository.setNotificationActionsEnabled(action.value)
+            }
+            is AppAction.SetNotificationSnoozeEnabled -> viewModelScope.launch {
+                settingsRepository.setNotificationSnoozeEnabled(action.value)
+            }
+            is AppAction.SetNotificationLockScreenDetail -> viewModelScope.launch {
+                settingsRepository.setNotificationLockScreenDetail(action.value)
+            }
+            is AppAction.SetUpdateNotificationAtEventStart -> viewModelScope.launch {
+                settingsRepository.setUpdateNotificationAtEventStart(action.value)
+            }
             is AppAction.SetLockAllPasses -> viewModelScope.launch {
                 settingsRepository.setLockAllPasses(action.value)
             }
@@ -244,6 +264,9 @@ class MainViewModel(
             }
             is AppAction.SetSeparateProtectedPasses -> viewModelScope.launch {
                 settingsRepository.setSeparateProtectedPasses(action.value)
+            }
+            is AppAction.SetBlockScreenshots -> viewModelScope.launch {
+                settingsRepository.setBlockScreenshots(action.value)
             }
             is AppAction.MovePassDetailSection -> viewModelScope.launch {
                 settingsRepository.movePassDetailSection(action.section, action.offset)
@@ -277,13 +300,59 @@ class MainViewModel(
                 }
                 settingsRepository.setReminderExcludedPassIds(excluded)
                 settingsRepository.setReminderLeadMinutesByPass(leads)
+                settingsRepository.setReminderExactPassIds(
+                    settings.reminderExactPassIds.toMutableSet().apply {
+                        if (action.enabled && action.exactAtEvent) add(action.passId) else remove(action.passId)
+                    },
+                )
             }
+            is AppAction.SetPassReminderActions -> Unit
             AppAction.ClearMessage -> message.value = null
+            else -> Unit
         }
+    }
+
+    internal suspend fun setPassReminderActions(action: AppAction.SetPassReminderActions) {
+        val current = reminderActionOverrides ?: uiState.value.settings.reminderActionsByPass
+        val updated = action.actions?.let { current + (action.passId to it) } ?: (current - action.passId)
+        reminderActionOverrides = updated
+        settingsRepository.setReminderActionsByPass(updated)
     }
 
     private suspend fun save(action: AppAction.SavePass) {
         passRepository.update(action.id, action.draft.toPassUpdate())
+    }
+
+    private fun handlePassMetadataAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetPassFavorite -> {
+            launchOperation(if (action.isFavorite) "Pass pinned" else "Pass unpinned") {
+                passRepository.setPinned(action.id, action.isFavorite)
+            }
+            true
+        }
+        is AppAction.SetPassPinned -> {
+            launchOperation(if (action.isPinned) "Pass pinned" else "Pass unpinned") {
+                passRepository.setPinned(action.id, action.isPinned)
+            }
+            true
+        }
+        is AppAction.SetPassTags -> {
+            launchOperation("Tags updated") { passRepository.setTags(action.id, action.tagIds) }
+            true
+        }
+        is AppAction.SetPassArchived -> {
+            launchOperation(if (action.isArchived) "Pass archived" else "Pass restored") {
+                passRepository.setArchived(action.id, action.isArchived)
+            }
+            true
+        }
+        is AppAction.SetPreferredArtwork -> {
+            launchOperation("Pass image updated") {
+                passRepository.setPreferredArtwork(action.id, action.kind)
+            }
+            true
+        }
+        else -> false
     }
 
     private fun addCalendarEventsAfterImport(imported: List<PassSnapshot>) {
@@ -340,7 +409,11 @@ private fun List<PassSnapshot>.sortedForDisplay(
 
 private fun List<PassCategory>.withLegacyCategories(passes: List<PassSnapshot>): List<PassCategory> {
     val knownIds = mapTo(mutableSetOf(), PassCategory::id)
-    val legacy = passes.map(PassSnapshot::categoryId).distinct().filterNot(knownIds::contains).map { id ->
+    val legacy = (passes.flatMap { it.tagIds } + passes.map(PassSnapshot::categoryId))
+        .distinct()
+        .filter { it.isNotBlank() && it != DEFAULT_PASS_CATEGORY_ID && it != "trash" }
+        .filterNot(knownIds::contains)
+        .map { id ->
         PassCategory(
             id = id,
             name = id.replace('_', ' ').replaceFirstChar(Char::uppercase),

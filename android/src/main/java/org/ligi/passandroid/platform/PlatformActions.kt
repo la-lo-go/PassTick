@@ -87,12 +87,13 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
     override fun print(pass: PrintablePass) = doPrint(context, pass)
 
     override fun openLocation(location: PlatformLocation) {
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW, geoUri(location.address, location.latitude, location.longitude).toUri())
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        context.startActivity(createLocationIntent(location).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
+
+@VisibleForTesting
+internal fun createLocationIntent(location: PlatformLocation): Intent =
+    Intent(Intent.ACTION_VIEW, geoUri(location.address, location.latitude, location.longitude).toUri())
 
 @VisibleForTesting
 internal fun geoUri(address: String?, latitude: Double?, longitude: Double?): String {

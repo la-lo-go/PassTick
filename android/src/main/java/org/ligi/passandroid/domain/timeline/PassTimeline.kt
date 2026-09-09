@@ -29,6 +29,10 @@ data class PassEvent(
     val endsAt: Instant,
     val location: String?,
     val temporalState: EventTemporalState,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val hasBarcode: Boolean = false,
+    val isProtected: Boolean = false,
 )
 
 data class NormalizedPassTimeSpan(val startsAt: Instant, val endsAt: Instant)
@@ -85,8 +89,10 @@ private fun PassSnapshot.toEvent(todayStart: Instant, tomorrowStart: Instant): P
     val span = normalizedTimeSpan() ?: return null
     val startInstant = span.startsAt
     val endInstant = span.endsAt
+    val eventLocation = locations.firstOrNull { !it.name.isNullOrBlank() } ?: locations.firstOrNull()
+    // The start date defines the day of an event. An event that ends today is still a today event.
     val temporalState = when {
-        !endInstant.isAfter(todayStart) -> EventTemporalState.PAST
+        startInstant.isBefore(todayStart) -> EventTemporalState.PAST
         !startInstant.isBefore(tomorrowStart) -> EventTemporalState.UPCOMING
         else -> EventTemporalState.TODAY
     }
@@ -97,8 +103,12 @@ private fun PassSnapshot.toEvent(todayStart: Instant, tomorrowStart: Instant): P
         title = description,
         startsAt = startInstant,
         endsAt = endInstant,
-        location = locations.firstNotNullOfOrNull { it.name?.takeIf(String::isNotBlank) },
+        location = eventLocation?.name?.takeIf(String::isNotBlank),
         temporalState = temporalState,
+        latitude = eventLocation?.latitude,
+        longitude = eventLocation?.longitude,
+        hasBarcode = barcodeFormat != null && !barcodeMessage.isNullOrBlank(),
+        isProtected = isProtected,
     )
 }
 

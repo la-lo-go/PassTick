@@ -42,7 +42,12 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -83,6 +88,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -101,8 +108,9 @@ import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
+import org.ligi.passandroid.reminder.NotificationLockScreenDetail
+import org.ligi.passandroid.reminder.NotificationAction
 import org.ligi.passandroid.repository.defaultPassDetailSectionOrder
-import org.ligi.passandroid.repository.isUserOrganized
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.PassDetailAction
@@ -110,6 +118,9 @@ import org.ligi.passandroid.ui.state.PassDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.displayArtwork
+import org.ligi.passandroid.platform.PassImageExportMode
+import org.ligi.passandroid.platform.PassImageExportSelection
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
@@ -121,10 +132,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun PassDetailScreen(
     pass: PassUiModel?,
+    allPassesProtected: Boolean = false,
     categories: List<PassCategory> = emptyList(),
     passReminderEnabled: Boolean = false,
     remindersGloballyEnabled: Boolean = false,
     reminderLeadMinutes: Int? = null,
+    reminderExactAtEvent: Boolean = false,
+    reminderActionOverride: Set<NotificationAction>? = null,
     initialCodeExpanded: Boolean = false,
     onInitialCodeShown: () -> Unit = {},
     flashlightAvailable: Boolean = false,
@@ -137,7 +151,13 @@ fun PassDetailScreen(
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
     var tagMenuOpen by remember { mutableStateOf(false) }
+    var imageExportOpen by remember { mutableStateOf(false) }
+    var customExportOpen by remember { mutableStateOf(false) }
+    var customArtwork by remember { mutableStateOf(true) }
+    var customText by remember { mutableStateOf(true) }
+    var customBarcode by remember { mutableStateOf(true) }
     var configureReminder by remember { mutableStateOf(false) }
+    var advancedReminderActions by remember(pass?.id) { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
     val codeExpanded = codeHeld || codePinned
@@ -167,10 +187,14 @@ fun PassDetailScreen(
                 Column {
                     ReminderChoice(
                         label = "Use default reminder times",
-                        selected = passReminderEnabled && reminderLeadMinutes == null,
+                        selected = passReminderEnabled && reminderLeadMinutes == null && !reminderExactAtEvent,
                     ) {
                         configureReminder = false
                         onAction(PassDetailAction.ConfigureReminder(true, null))
+                    }
+                    ReminderChoice("At event time", passReminderEnabled && reminderExactAtEvent) {
+                        configureReminder = false
+                        onAction(PassDetailAction.ConfigureReminder(true, 0, exactAtEvent = true))
                     }
                     listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before")
                         .forEach { (minutes, label) ->
@@ -183,12 +207,72 @@ fun PassDetailScreen(
                         configureReminder = false
                         onAction(PassDetailAction.ConfigureReminder(false, null))
                     }
+                    TextButton(onClick = { advancedReminderActions = !advancedReminderActions }) {
+                        Text(if (advancedReminderActions) "Hide actions" else "Notification actions")
+                    }
+                    if (advancedReminderActions) {
+                        val available = buildSet {
+                            if (pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) add(NotificationAction.OPEN_CODE)
+                            if (pass?.locations?.isNotEmpty() == true) add(NotificationAction.DIRECTIONS)
+                            add(NotificationAction.SNOOZE)
+                        }
+                        val selected = reminderActionOverride ?: available
+                        if (reminderActionOverride != null) {
+                            TextButton(onClick = { onAction(PassDetailAction.SetReminderActions(null)) }) {
+                                Text("Use default actions")
+                            }
+                        }
+                        available.forEach { action ->
+                            ReminderActionSetting(action, action in selected) { enabled ->
+                                onAction(
+                                    PassDetailAction.SetReminderActions(
+                                        selected.toMutableSet().apply { if (enabled) add(action) else remove(action) },
+                                    ),
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { configureReminder = false }) { Text("Cancel") }
             },
+        )
+    }
+    if (imageExportOpen) {
+        AlertDialog(
+            onDismissRequest = { imageExportOpen = false },
+            title = { Text("Export as image") },
+            text = { Text("Choose the content to include in the PNG image.") },
+            confirmButton = {
+                Column {
+                    TextButton(onClick = { imageExportOpen = false; onAction(PassDetailAction.ExportImage(PassImageExportMode.FULL)) }) { Text("Full pass") }
+                    TextButton(onClick = { imageExportOpen = false; onAction(PassDetailAction.ExportImage(PassImageExportMode.BARCODE)) }) { Text("Barcode only") }
+                    TextButton(onClick = { imageExportOpen = false; customExportOpen = true }) { Text("Custom") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { imageExportOpen = false }) { Text("Cancel") } },
+        )
+    }
+    if (customExportOpen) {
+        AlertDialog(
+            onDismissRequest = { customExportOpen = false },
+            title = { Text("Custom image") },
+            text = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(customArtwork, { customArtwork = it }); Text("Artwork") }
+                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(customText, { customText = it }); Text("Pass details") }
+                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(customBarcode, { customBarcode = it }); Text("Barcode") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    customExportOpen = false
+                    onAction(PassDetailAction.ExportImage(PassImageExportMode.CUSTOM, PassImageExportSelection(customArtwork, customText, customBarcode)))
+                }, enabled = customArtwork || customText || customBarcode) { Text("Export") }
+            },
+            dismissButton = { TextButton(onClick = { customExportOpen = false }) { Text("Cancel") } },
         )
     }
     Scaffold(
@@ -215,6 +299,19 @@ fun PassDetailScreen(
                                 },
                             )
                             DropdownMenuItem(
+                                text = { Text("Export as image") },
+                                leadingIcon = { Icon(Icons.Default.Image, null) },
+                                onClick = { overflowOpen = false; imageExportOpen = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Customize pass") },
+                                leadingIcon = { Icon(Icons.Default.Visibility, null) },
+                                onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.OpenPassCustomization)
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Configure reminder") },
                                 leadingIcon = { Icon(Icons.Default.Notifications, null) },
                                 enabled = pass?.calendarEvent != null,
@@ -228,7 +325,7 @@ fun PassDetailScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Manage tag") },
+                                text = { Text("Manage tags") },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
                                 onClick = {
                                     overflowOpen = false
@@ -236,10 +333,23 @@ fun PassDetailScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text(if (pass?.isProtected == true) "Remove protection" else "Protect pass") },
-                                leadingIcon = {
-                                    Icon(if (pass?.isProtected == true) Icons.Default.LockOpen else Icons.Default.Lock, null)
+                                text = {
+                                    Text(
+                                        when {
+                                            allPassesProtected -> "Protected by privacy settings"
+                                            pass?.isProtected == true -> "Remove protection"
+                                            else -> "Protect pass"
+                                        },
+                                    )
                                 },
+                                leadingIcon = {
+                                    Icon(
+                                        if (pass?.isProtected == true && !allPassesProtected) Icons.Default.LockOpen
+                                        else Icons.Default.Lock,
+                                        null,
+                                    )
+                                },
+                                enabled = !allPassesProtected,
                                 onClick = {
                                     overflowOpen = false
                                     onAction(PassDetailAction.SetProtected(pass?.isProtected != true))
@@ -255,41 +365,33 @@ fun PassDetailScreen(
                             )
                         }
                         DropdownMenu(expanded = tagMenuOpen, onDismissRequest = { tagMenuOpen = false }) {
-                            categories.filter(PassCategory::isUserOrganized).forEach { category ->
+                            val tags = categories.filter { it.role == PassCategoryRole.CUSTOM }
+                            tags.forEach { category ->
                                 DropdownMenuItem(
                                     text = { Text(category.name) },
                                     leadingIcon = {
-                                        Box(
-                                            Modifier.size(10.dp).background(
-                                                Color(category.colorArgb.toInt()),
-                                                CircleShape,
-                                            ),
+                                        Icon(
+                                            categoryIcon(category.icon),
+                                            null,
+                                            tint = Color(category.colorArgb.toInt()),
                                         )
                                     },
-                                    trailingIcon = if (pass?.categoryId == category.id) {
-                                        { Icon(Icons.Default.Check, "Current tag") }
-                                    } else {
-                                        null
-                                    },
+                                    trailingIcon = { Checkbox(category.id in (pass?.tagIds ?: emptySet()), null) },
                                     onClick = {
-                                        tagMenuOpen = false
-                                        onAction(PassDetailAction.MoveToCategory(category.id))
+                                        val selected = pass?.tagIds ?: emptySet()
+                                        onAction(PassDetailAction.SetTags(if (category.id in selected) selected - category.id else selected + category.id))
                                     },
                                 )
                             }
-                            if (categories.firstOrNull { it.id == pass?.categoryId }?.isUserOrganized() == true) {
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text("Delete tag") },
-                                    leadingIcon = { Icon(Icons.Default.Delete, null) },
-                                    onClick = {
-                                        tagMenuOpen = false
-                                        categories.firstOrNull { it.role == PassCategoryRole.INBOX }?.let {
-                                            onAction(PassDetailAction.MoveToCategory(it.id))
-                                        }
-                                    },
-                                )
-                            }
+                            if (tags.isNotEmpty()) HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Add new tag") },
+                                leadingIcon = { Icon(Icons.Default.Add, null) },
+                                onClick = {
+                                    tagMenuOpen = false
+                                    onAction(PassDetailAction.OpenTagSettings)
+                                },
+                            )
                         }
                     }
                 },
@@ -338,6 +440,20 @@ fun PassDetailScreen(
                     ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
                 val visibleFields = pass.fields.filterNot { field ->
                     field.hidden || (pass.calendarEvent != null && field.value.containsDateAndTime())
+                }
+                if (pass.isProtected || allPassesProtected) item {
+                    Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                        ListItem(
+                            leadingContent = { Icon(Icons.Default.Lock, null) },
+                            supportingContent = {
+                                Text(
+                                    if (allPassesProtected) "Locked by app protection"
+                                    else "Unlocked with fingerprint or screen lock",
+                                )
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        ) { Text("Protected pass") }
+                    }
                 }
                 passDetailSectionOrder
                     .filterNot(hiddenPassDetailSections::contains)
@@ -394,11 +510,14 @@ fun PassDetailScreen(
                                 item {
                                     Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                                         ListItem(
-                                            leadingContent = { Icon(if (calendarEventPresent) Icons.Default.CheckCircle else Icons.Default.CalendarMonth, null) },
+                                            leadingContent = { Icon(Icons.Default.CalendarMonth, null) },
                                             supportingContent = {
                                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                                     pass.calendarDateTimeLines().forEach { Text(it) }
-                                                    Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar")
+                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar")
+                                                        if (calendarEventPresent) Icon(Icons.Default.Check, "In calendar", Modifier.size(18.dp))
+                                                    }
                                                 }
                                             },
                                             modifier = Modifier.fillMaxWidth().clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
@@ -416,6 +535,19 @@ fun PassDetailScreen(
 }
 
 @Composable
+private fun ReminderActionSetting(action: NotificationAction, enabled: Boolean, onEnabled: (Boolean) -> Unit) {
+    val label = when (action) {
+        NotificationAction.OPEN_CODE -> "Open code"
+        NotificationAction.DIRECTIONS -> "Directions"
+        NotificationAction.SNOOZE -> "Snooze"
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(enabled, onCheckedChange = onEnabled)
+        Text(label)
+    }
+}
+
+@Composable
 private fun ReminderChoice(label: String, selected: Boolean, onClick: () -> Unit) {
     ListItem(
         trailingContent = { RadioButton(selected, onClick) },
@@ -426,10 +558,10 @@ private fun ReminderChoice(label: String, selected: Boolean, onClick: () -> Unit
 
 @Composable
 private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>, modifier: Modifier) {
-    val artwork = preferredKinds.firstNotNullOfOrNull { kind -> pass.artwork.firstOrNull { it.kind == kind } }
-        ?: return
+    val artwork = pass.displayArtwork(preferredKinds) ?: return
     AdaptivePassArtwork(
         bytes = artwork.bytes,
+        kind = artwork.kind,
         accentColor = pass.accentColor,
         contentDescription = "Pass artwork",
         modifier = modifier,
@@ -494,6 +626,7 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
     var editorMenuOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val hapticFeedback = LocalHapticFeedback.current
     fun currentDraft() = PassDraft(
         description = description,
         creator = creator,
@@ -635,6 +768,20 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
                                         label = { Text("Label") },
                                         modifier = Modifier.weight(1f),
                                     )
+                                    IconButton(
+                                        enabled = index > 0,
+                                        onClick = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            fields = fields.moveItem(index, -1)
+                                        },
+                                    ) { Icon(Icons.Default.ArrowUpward, "Move field up") }
+                                    IconButton(
+                                        enabled = index < fields.lastIndex,
+                                        onClick = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            fields = fields.moveItem(index, 1)
+                                        },
+                                    ) { Icon(Icons.Default.ArrowDownward, "Move field down") }
                                     IconToggleButton(
                                         checked = field.hidden,
                                         onCheckedChange = { hidden -> fields = fields.replace(index, field.copy(hidden = hidden)) },
@@ -723,6 +870,12 @@ private fun EditorSection(title: String, content: @Composable ColumnScope.() -> 
 
 private fun <T> List<T>.replace(index: Int, value: T) = toMutableList().also { it[index] = value }
 
+private fun <T> List<T>.moveItem(index: Int, offset: Int): List<T> {
+    val to = (index + offset).coerceIn(indices)
+    if (to == index) return this
+    return toMutableList().apply { add(to, removeAt(index)) }
+}
+
 private fun PassType.displayName() = name.lowercase().replaceFirstChar(Char::uppercase)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -731,87 +884,204 @@ fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
-                Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter),
+                Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter).testTag("settings_list"),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                item {
-                    SettingsGroup("Appearance") {
-                        Text("Theme", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-                        ThemeMode.entries.forEach { mode ->
-                            ListItem(
-                                trailingContent = { androidx.compose.material3.RadioButton(mode == settings.themeMode, { onAction(SettingsAction.SetTheme(mode)) }) },
-                                modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            ) { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) }
-                        }
-                        if (settings.themeMode == ThemeMode.DARK) {
-                            SettingSwitch("Use AMOLED black background", settings.amoledBlackBackground) {
-                                onAction(SettingsAction.SetAmoledBlackBackground(it))
-                            }
-                        }
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                        SettingSwitch("Use HDR and maximum code brightness", settings.automaticBrightness) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
-                    }
-                }
-                item {
-                    SettingsGroup("Pass list") {
-                        SettingSwitch("Show today's passes prominently", settings.highlightTodayPasses) {
-                            onAction(SettingsAction.SetHighlightTodayPasses(it))
-                        }
-                        SettingSwitch("Automatically move past passes", settings.automaticallyMarkPast) {
-                            onAction(SettingsAction.SetAutomaticallyMarkPast(it))
-                        }
-                        ListItem(
-                            supportingContent = { Text("Manage tag names, colors, and order") },
-                            modifier = Modifier.clickable { onAction(SettingsAction.OpenCategories) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        ) { Text("Tags") }
-                    }
-                }
-                item {
-                    SettingsGroup("Calendar") {
-                        SettingSwitch("Automatically add imported passes", settings.offerCalendarAfterImport) {
-                            onAction(SettingsAction.SetOfferCalendarAfterImport(it))
-                        }
-                    }
-                }
-                item {
-                    SettingsGroup("Notifications") {
-                        SettingSwitch("Pass reminders", settings.remindersEnabled) {
-                            onAction(SettingsAction.SetRemindersEnabled(it))
-                        }
-                        Text("Reminder times", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-                        listOf(15 to "15 minutes before", 30 to "30 minutes before", 60 to "1 hour before", 1440 to "1 day before").forEach { (minutes, label) ->
-                            val selected = minutes in settings.reminderMinutes
-                            fun toggle() {
-                                val updated = settings.reminderMinutes.toMutableSet()
-                                if (!updated.add(minutes)) updated.remove(minutes)
-                                onAction(SettingsAction.SetReminderMinutes(updated))
-                            }
-                            ListItem(
-                                trailingContent = {
-                                    Checkbox(
-                                        checked = selected,
-                                        enabled = settings.remindersEnabled,
-                                        onCheckedChange = { toggle() },
-                                    )
-                                },
-                                modifier = Modifier.clickable(enabled = settings.remindersEnabled, onClick = ::toggle),
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            ) {
-                                Text(
-                                    label,
-                                    color = if (settings.remindersEnabled) Color.Unspecified
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                                )
-                            }
-                        }
-                    }
-                }
+                item { AppearanceSettings(settings, onAction) }
+                item { HomeSettings(settings, onAction) }
+                item { PassListSettings(onAction) }
+                item { PrivacySettings(settings, onAction) }
+                item { CalendarSettings(settings, onAction) }
+                item { NotificationSettings(settings, onAction) }
             }
         }
     }
+}
+
+@Composable
+private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    SettingsGroup("Appearance") {
+        Text("Theme", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        ThemeMode.entries.forEach { mode -> ThemeSetting(mode, settings.themeMode, onAction) }
+        if (settings.themeMode == ThemeMode.DARK) {
+            SettingSwitch("Use AMOLED black background", settings.amoledBlackBackground) {
+                onAction(SettingsAction.SetAmoledBlackBackground(it))
+            }
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        SettingSwitch("Use HDR and maximum code brightness", settings.automaticBrightness) {
+            onAction(SettingsAction.SetAutomaticBrightness(it))
+        }
+    }
+}
+
+@Composable
+private fun ThemeSetting(mode: ThemeMode, selectedMode: ThemeMode, onAction: (SettingsAction) -> Unit) {
+    ListItem(
+        trailingContent = { RadioButton(mode == selectedMode, { onAction(SettingsAction.SetTheme(mode)) }) },
+        modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    ) { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) }
+}
+
+@Composable
+private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    SettingsGroup("Home") {
+        SettingSwitch(
+            "Highlight today's passes",
+            settings.highlightTodayPasses,
+            supportingText = "Show today's passes before other passes",
+        ) { onAction(SettingsAction.SetHighlightTodayPasses(it)) }
+    }
+}
+
+@Composable
+private fun PassListSettings(onAction: (SettingsAction) -> Unit) {
+    SettingsGroup("Customize pass list") {
+        PassListSetting(Icons.Default.ViewAgenda, "Home cards") {
+            onAction(SettingsAction.OpenHomeCardSettings)
+        }
+        PassListSetting(Icons.Default.Visibility, "Pass view") {
+            onAction(SettingsAction.OpenPassViewSettings)
+        }
+        PassListSetting(Icons.AutoMirrored.Filled.Label, "Tags") {
+            onAction(SettingsAction.OpenCategories)
+        }
+    }
+}
+
+@Composable
+private fun PassListSetting(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        leadingContent = { Icon(icon, null) },
+        modifier = Modifier.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    ) { Text(title) }
+}
+
+@Composable
+private fun PrivacySettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    SettingsGroup("Privacy") {
+        SettingSwitch(
+            "Protect the app",
+            settings.lockAllPasses,
+            supportingText = "Require fingerprint or screen lock to open the app",
+        ) { onAction(SettingsAction.SetLockAllPasses(it)) }
+        SettingSwitch("Show a lock icon on protected passes", settings.showProtectedPassLockIcon) {
+            onAction(SettingsAction.SetShowProtectedPassLockIcon(it))
+        }
+        SettingSwitch("Blur protected pass information", settings.blurProtectedPassCards) {
+            onAction(SettingsAction.SetBlurProtectedPassCards(it))
+        }
+        SettingSwitch("Keep protected passes in a locked section", settings.separateProtectedPasses) {
+            onAction(SettingsAction.SetSeparateProtectedPasses(it))
+        }
+        SettingSwitch(
+            "Block screenshots",
+            settings.blockScreenshots,
+            supportingText = "Prevent screenshots on protected content",
+        ) { onAction(SettingsAction.SetBlockScreenshots(it)) }
+    }
+}
+
+@Composable
+private fun CalendarSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    SettingsGroup("Calendar") {
+        SettingSwitch("Automatically add imported passes", settings.offerCalendarAfterImport) {
+            onAction(SettingsAction.SetOfferCalendarAfterImport(it))
+        }
+    }
+}
+
+@Composable
+private fun NotificationSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    SettingsGroup("Notifications") {
+        SettingSwitch("Pass reminders", settings.remindersEnabled) {
+            onAction(SettingsAction.SetRemindersEnabled(it))
+        }
+        Text("Reminder times", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        reminderOptions.forEach { (minutes, label) ->
+            ReminderSetting(minutes, label, settings, onAction)
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+        Text("Event access", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour").forEach { (minutes, label) ->
+            ReminderChoice(label, settings.notificationAccessWindowMinutes == minutes) {
+                onAction(SettingsAction.SetNotificationAccessWindow(minutes))
+            }
+        }
+        SettingSwitch(
+            "Exact reminders",
+            settings.notificationExactTiming,
+            supportingText = "Use exact alarms when Android allows them",
+        ) { onAction(SettingsAction.SetNotificationExactTiming(it)) }
+        SettingSwitch("Notification actions", settings.notificationActionsEnabled) {
+            onAction(SettingsAction.SetNotificationActionsEnabled(it))
+        }
+        if (settings.notificationActionsEnabled) {
+            SettingSwitch("Snooze action", settings.notificationSnoozeEnabled) {
+                onAction(SettingsAction.SetNotificationSnoozeEnabled(it))
+            }
+        }
+        SettingSwitch("Update when event starts", settings.updateNotificationAtEventStart) {
+            onAction(SettingsAction.SetUpdateNotificationAtEventStart(it))
+        }
+        Text("Lock screen", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        NotificationLockScreenDetail.entries.forEach { detail ->
+            ReminderChoice(detail.displayName(), settings.notificationLockScreenDetail == detail) {
+                onAction(SettingsAction.SetNotificationLockScreenDetail(detail))
+            }
+        }
+    }
+}
+
+private fun NotificationLockScreenDetail.displayName() = when (this) {
+    NotificationLockScreenDetail.FULL -> "Show all"
+    NotificationLockScreenDetail.HIDE_SENSITIVE -> "Hide protected details"
+    NotificationLockScreenDetail.HIDDEN -> "Hide on lock screen"
+}
+
+private val reminderOptions = listOf(
+    15 to "15 minutes before",
+    30 to "30 minutes before",
+    60 to "1 hour before",
+    1440 to "1 day before",
+)
+
+@Composable
+private fun ReminderSetting(
+    minutes: Int,
+    label: String,
+    settings: AppSettings,
+    onAction: (SettingsAction) -> Unit,
+) {
+    val toggle = { onAction(SettingsAction.SetReminderMinutes(settings.reminderMinutes.toggle(minutes))) }
+    ListItem(
+        trailingContent = {
+            Checkbox(
+                checked = minutes in settings.reminderMinutes,
+                enabled = settings.remindersEnabled,
+                onCheckedChange = { toggle() },
+            )
+        },
+        modifier = Modifier.clickable(enabled = settings.remindersEnabled, onClick = toggle),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    ) {
+        Text(
+            label,
+            color = if (settings.remindersEnabled) Color.Unspecified
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        )
+    }
+}
+
+private fun Set<Int>.toggle(value: Int) = toMutableSet().apply {
+    if (!add(value)) remove(value)
 }
 
 @Composable
@@ -991,7 +1261,7 @@ private fun HomeCardSection.displayName() = when (this) {
     HomeCardSection.PRIMARY_FIELD -> "Primary field"
     HomeCardSection.DATE -> "Date and time"
     HomeCardSection.CREATOR -> "Creator"
-    HomeCardSection.CATEGORY -> "Category"
+    HomeCardSection.CATEGORY -> "Tag"
     HomeCardSection.PASS_TYPE -> "Pass type"
 }
 
@@ -1072,21 +1342,19 @@ fun CategorySettingsScreen(
             Modifier.fillMaxSize().padding(padding),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp),
         ) {
-            items(categories.filter(PassCategory::isUserOrganized), key = PassCategory::id) { category ->
+            items(categories.filter { it.role == PassCategoryRole.CUSTOM }, key = PassCategory::id) { category ->
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
                     ListItem(
-                    supportingContent = {
-                        Text(category.role.name.lowercase().replaceFirstChar(Char::uppercase))
-                    },
+                    supportingContent = null,
                     leadingContent = {
                         Box(
                             Modifier.size(32.dp)
                                 .background(Color(category.colorArgb.toInt()), RoundedCornerShape(12.dp)),
-                        )
+                        ) { Icon(categoryIcon(category.icon), category.icon, tint = Color.White, modifier = Modifier.padding(7.dp)) }
                     },
                     trailingContent = {
                         Row {
@@ -1120,6 +1388,7 @@ private fun CategoryEditorDialog(
 ) {
     var name by remember(category.id) { mutableStateOf(category.name) }
     var color by remember(category.id) { mutableStateOf(category.colorArgb.toInt()) }
+    var icon by remember(category.id) { mutableStateOf(category.icon) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (category.name.isBlank()) "Add tag" else "Edit tag") },
@@ -1127,13 +1396,21 @@ private fun CategoryEditorDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
                 ColorPickerField("Tag color", color, { color = it }, Modifier.fillMaxWidth())
+                Text("Tag icon", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("label", "star", "event", "flight").forEach { option ->
+                        IconButton(onClick = { icon = option }) {
+                            Icon(categoryIcon(option), option, tint = if (icon == option) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
                 enabled = name.isNotBlank(),
                 onClick = {
-                    onSave(category.copy(name = name.trim(), colorArgb = color.toUInt().toLong()))
+                    onSave(category.copy(name = name.trim(), colorArgb = color.toUInt().toLong(), icon = icon))
                 },
             ) { Text("Save") }
         },
@@ -1141,9 +1418,22 @@ private fun CategoryEditorDialog(
     )
 }
 
+internal fun categoryIcon(name: String) = when (name) {
+    "star" -> Icons.Default.Star
+    "event" -> Icons.Default.Event
+    "flight" -> Icons.Default.FlightTakeoff
+    else -> Icons.AutoMirrored.Filled.Label
+}
+
 @Composable
-private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun SettingSwitch(
+    label: String,
+    checked: Boolean,
+    supportingText: String? = null,
+    onChange: (Boolean) -> Unit,
+) {
     ListItem(
+        supportingContent = supportingText?.let { text -> { Text(text) } },
         trailingContent = { Switch(checked, onChange) },
         modifier = Modifier.clickable { onChange(!checked) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

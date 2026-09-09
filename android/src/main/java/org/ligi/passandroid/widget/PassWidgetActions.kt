@@ -7,7 +7,7 @@ import org.ligi.passandroid.MainActivity
 
 internal fun openPassIntent(context: Context, passId: String, showCode: Boolean = false): Intent {
     val uri = Uri.Builder()
-        .scheme("passandroid")
+        .scheme("passtick")
         .authority("pass")
         .appendPath(passId)
         .apply { if (showCode) appendQueryParameter("view", "code") }

@@ -2,24 +2,35 @@ package org.ligi.passandroid.ui.compose
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,12 +44,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -50,18 +63,17 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -72,19 +84,21 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -101,19 +115,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
@@ -130,14 +148,21 @@ import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.isUserOrganized
 import org.ligi.passandroid.ui.state.MainUiState
+import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.displayArtwork
 import org.ligi.passandroid.ui.barcode.PassCodeImage
 import org.threeten.bp.LocalDate
+import org.threeten.bp.temporal.ChronoUnit
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.Locale
 import org.ligi.passandroid.ui.state.searchDocument
 import org.ligi.passandroid.ui.state.searchTerms
 import org.ligi.passandroid.ui.state.AppAction
+import org.ligi.passandroid.ui.theme.PassActionButtonGroup
+import org.ligi.passandroid.ui.theme.PassActionButton
+import org.ligi.passandroid.ui.theme.PassActionButtonGap
+import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
 
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
@@ -147,12 +172,15 @@ sealed interface HomeAction {
     data class Archive(val id: String) : HomeAction
     data class Restore(val id: String) : HomeAction
     data class Delete(val id: String) : HomeAction
+    data class ToggleFavorite(val id: String) : HomeAction
+    data class ToggleProtected(val id: String) : HomeAction
     data class Undo(val operation: UndoOperation) : HomeAction
     data object ImportPass : HomeAction
     data object OpenTimeline : HomeAction
     data object OpenSettings : HomeAction
     data object OpenPassViewSettings : HomeAction
     data object OpenHomeCardSettings : HomeAction
+    data object UnlockProtectedPasses : HomeAction
 }
 
 sealed interface UndoOperation {
@@ -163,7 +191,10 @@ sealed interface UndoOperation {
     data class Restore(override val passId: String, override val originalCategoryId: String) : UndoOperation
 }
 
-internal fun UndoOperation.toAppAction() = AppAction.MovePass(passId, originalCategoryId, announce = false)
+internal fun UndoOperation.toAppAction() = when (this) {
+    is UndoOperation.Archive -> AppAction.SetPassArchived(passId, false)
+    is UndoOperation.Restore -> AppAction.SetPassArchived(passId, true)
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -171,6 +202,7 @@ fun PassHomeScreen(
     state: MainUiState,
     onAction: (HomeAction) -> Unit,
     showTodayHero: Boolean = true,
+    protectedPassesUnlocked: Boolean = false,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -185,33 +217,91 @@ fun PassHomeScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val previewPass = state.passes.firstOrNull { it.id == previewPassId }
+    val openSwipePassId = remember { mutableStateOf<String?>(null) }
+    val protectedPassIds = remember(state.passes, state.settings.lockAllPasses) {
+        state.passes.filter { state.settings.lockAllPasses || it.isProtected }.mapTo(mutableSetOf(), PassUiModel::id)
+    }
+    val previewPass = state.passes.firstOrNull { it.id == previewPassId }?.let { pass ->
+        pass.copy(isProtected = pass.id in protectedPassIds && !protectedPassesUnlocked)
+    }
     var previewContent by remember { mutableStateOf<PassUiModel?>(null) }
     LaunchedEffect(previewPass) { if (previewPass != null) previewContent = previewPass }
-    val categoryPasses = remember(state.passes, state.categories, state.selectedCategoryId) {
-        state.selectedCategoryId?.let { selected -> state.passes.filter { it.categoryId == selected } }
-            ?: run {
+    val categoryPasses = remember(
+        state.passes,
+        state.categories,
+        state.selectedCategoryId,
+        protectedPassIds,
+        protectedPassesUnlocked,
+    ) {
+        val selectedPasses = when (state.selectedCategoryId) {
+            PROTECTED_PASSES_CATEGORY_ID -> state.passes.filter { it.id in protectedPassIds }
+            "pinned" -> state.passes.filter(PassUiModel::isFavorite)
+            "archived" -> state.passes.filter(PassUiModel::isArchived)
+            null -> run {
                 val hiddenCategoryIds = state.categories
                     .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
                     .mapTo(mutableSetOf(), PassCategory::id)
-                state.passes.filterNot { it.categoryId in hiddenCategoryIds }
+                state.passes.filterNot { it.categoryId in hiddenCategoryIds || it.isArchived }
             }
+            else -> state.passes.filter {
+                it.categoryId == state.selectedCategoryId || state.selectedCategoryId in it.tagIds
+            }
+        }
+        selectedPasses.map { pass ->
+            pass.copy(isProtected = pass.id in protectedPassIds && !protectedPassesUnlocked)
+        }
     }
     val categoryNames = remember(state.categories) { state.categories.associate { it.id to it.name } }
-    val searchDocuments = remember(state.passes, categoryNames) {
-        state.passes.filterNot(PassUiModel::isProtected)
-            .associate { pass -> pass.id to pass.searchDocument(categoryNames[pass.categoryId]) }
+    val searchDocuments = remember(state.passes, categoryNames, protectedPassIds, protectedPassesUnlocked) {
+        state.passes.filter { protectedPassesUnlocked || it.id !in protectedPassIds }
+            .associate { pass ->
+                val tags = pass.tagIds.mapNotNull(categoryNames::get).joinToString(" ")
+                pass.id to "${pass.searchDocument(categoryNames[pass.categoryId])} $tags".trim()
+            }
     }
     val searchTerms = remember(searchQuery) { searchQuery.searchTerms() }
-    val visiblePasses = remember(categoryPasses, searchDocuments, searchTerms, searchExpanded) {
-        if (!searchExpanded) categoryPasses
-        else categoryPasses.filterNot(PassUiModel::isProtected).filter { pass ->
+    val visiblePasses = remember(
+        categoryPasses,
+        searchDocuments,
+        searchTerms,
+        searchExpanded,
+        protectedPassIds,
+        protectedPassesUnlocked,
+        state.settings.separateProtectedPasses,
+        state.selectedCategoryId,
+    ) {
+        if (!searchExpanded) {
+            if (state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID && !protectedPassesUnlocked) {
+                emptyList()
+            } else if (
+                state.settings.separateProtectedPasses && state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID
+            ) {
+                categoryPasses.filterNot { it.id in protectedPassIds }
+            } else categoryPasses
+        } else categoryPasses.filter { protectedPassesUnlocked || it.id !in protectedPassIds }.filter { pass ->
             val document = searchDocuments[pass.id].orEmpty()
             searchTerms.all(document::contains)
         }
     }
-    val todayPasses = if (showTodayHero) visiblePasses.filter(PassUiModel::occursToday) else emptyList()
-    val remainingPasses = if (showTodayHero) visiblePasses.filterNot(PassUiModel::occursToday) else visiblePasses
+    val separatedProtectedPasses = if (
+        state.settings.separateProtectedPasses && protectedPassesUnlocked && !searchExpanded &&
+        state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID
+    ) {
+        categoryPasses.filter { it.id in protectedPassIds }
+    } else {
+        emptyList()
+    }
+    val showLockedSection = state.settings.separateProtectedPasses &&
+        !protectedPassesUnlocked && protectedPassIds.isNotEmpty() && !searchExpanded
+    val homeSections = deriveHomePassSections(
+        passes = visiblePasses,
+        highlightTodayPasses = showTodayHero,
+        isToday = PassUiModel::occursToday,
+        isPinned = PassUiModel::isFavorite,
+    )
+    val todayPasses = homeSections.today
+    val pinnedPasses = homeSections.pinned
+    val remainingPasses = homeSections.other
 
     BackHandler(enabled = searchExpanded) {
         if (searchHasFocus || !searchFocusClearedByBack) {
@@ -264,7 +354,7 @@ fun PassHomeScreen(
 
     val visibleCategories = remember(state.categories, state.passes) {
         state.categories.filter { category ->
-            category.isUserOrganized() && state.passes.any { it.categoryId == category.id }
+            category.role == PassCategoryRole.CUSTOM && state.passes.any { category.id in it.tagIds }
         }
     }
     ModalNavigationDrawer(
@@ -279,27 +369,36 @@ fun PassHomeScreen(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
                 HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                Text(
-                    "Customize",
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 NavigationDrawerItem(
-                    label = { Text("Pass view") },
-                    selected = false,
-                    icon = { Icon(Icons.Default.Visibility, null) },
-                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenPassViewSettings) },
+                    label = { Text("All") },
+                    selected = state.selectedCategoryId == null,
+                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(null)) },
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
+                NavigationDrawerItem(
+                    label = { Text("Pinned") },
+                    selected = state.selectedCategoryId == "pinned",
+                    icon = { Icon(Icons.Default.PushPin, null) },
+                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("pinned")) },
+                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_pinned"),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Archived") },
+                    selected = state.selectedCategoryId == "archived",
+                    icon = { Icon(Icons.Default.Archive, null) },
+                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
+                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
+                )
+                visibleCategories.forEach { category ->
+                    NavigationDrawerItem(
+                        label = { Text(category.name) },
+                        selected = state.selectedCategoryId == category.id,
+                        icon = { Icon(categoryIcon(category.icon), category.icon) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(category.id)) },
+                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_${category.id}"),
+                    )
+                }
                 HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                NavigationDrawerItem(
-                    label = { Text("Home cards") },
-                    selected = false,
-                    icon = { Icon(Icons.Default.ViewAgenda, null) },
-                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenHomeCardSettings) },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
                 NavigationDrawerItem(
                     label = { Text("Settings") },
                     selected = false,
@@ -313,9 +412,6 @@ fun PassHomeScreen(
     Scaffold(
         topBar = {
             HomeToolbar(
-                categories = visibleCategories,
-                selectedCategoryId = state.selectedCategoryId,
-                onSelectCategory = { onAction(HomeAction.SelectCategory(it)) },
                 onOpenDrawer = { scope.launch { drawerState.open() } },
                 searchExpanded = searchExpanded,
                 searchQuery = searchQuery,
@@ -334,8 +430,8 @@ fun PassHomeScreen(
             val expanded = maxWidth >= 840.dp
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 104.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
+                contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!state.isContentLoading && !searchExpanded) {
                     item(key = "sort") {
@@ -352,9 +448,16 @@ fun PassHomeScreen(
                         }
                     }
                 }
-                if (visiblePasses.isEmpty() && !state.isContentLoading && !state.isBusy) {
+                if (visiblePasses.isEmpty() && separatedProtectedPasses.isEmpty() && !showLockedSection &&
+                    !state.isContentLoading && !state.isBusy
+                ) {
                     item(key = "empty") {
                         if (searchTerms.isEmpty()) EmptyHome() else EmptySearch(searchQuery)
+                    }
+                }
+                if (showLockedSection) {
+                    item(key = "locked-passes") {
+                        LockedPassSection(protectedPassIds.size) { onAction(HomeAction.UnlockProtectedPasses) }
                     }
                 }
                 if (todayPasses.isNotEmpty()) {
@@ -371,6 +474,35 @@ fun PassHomeScreen(
                             blurProtectedPassCards = state.settings.blurProtectedPassCards,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring, originalCategoryId ->
+                                if (restoring) dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
+                                else dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                            },
+                            onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
+                            onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
+                            onToggleProtected = { onAction(HomeAction.ToggleProtected(it)) },
+                            onReorder = { onAction(HomeAction.ReorderPass(it)) },
+                            onPreviewChanged = { previewPassId = it },
+                            onPreviewOpeningChanged = { previewOpeningPassId = it },
+                            onProtectedPreviewRequested = {},
+                            openSwipePassId = openSwipePassId,
+                            tagCategories = state.categories,
+                        )
+                    }
+                }
+                if (pinnedPasses.isNotEmpty()) {
+                    item(key = "pinned-heading") { SectionHeading("Pinned") }
+                    item(key = "pinned-feed") {
+                        TicketFeed(
+                            passes = pinnedPasses,
+                            categories = state.categories,
+                            columns = if (expanded) 2 else 1,
+                            hero = false,
+                            sectionOrder = state.settings.homeCardSectionOrder,
+                            hiddenSections = state.settings.hiddenHomeCardSections,
+                            showProtectedPassLockIcon = state.settings.showProtectedPassLockIcon,
+                            blurProtectedPassCards = state.settings.blurProtectedPassCards,
+                            onOpen = { onAction(HomeAction.OpenPass(it)) },
+                            onArchive = { id, restoring, originalCategoryId ->
                                 if (restoring) {
                                     dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
                                 } else {
@@ -378,6 +510,8 @@ fun PassHomeScreen(
                                 }
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
+                            onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
+                            onToggleProtected = { onAction(HomeAction.ToggleProtected(it)) },
                             onReorder = { onAction(HomeAction.ReorderPass(it)) },
                             onPreviewChanged = {
                                 previewPassId = it
@@ -387,11 +521,13 @@ fun PassHomeScreen(
                             onProtectedPreviewRequested = {
                                 scope.launch { snackbarHostState.showSnackbar("Unlock the pass to preview it") }
                             },
+                            openSwipePassId = openSwipePassId,
+                            tagCategories = state.categories,
                         )
                     }
                 }
                 if (remainingPasses.isNotEmpty()) {
-                    if (todayPasses.isNotEmpty()) {
+                    if (homeSections.showOtherHeading) {
                         item(key = "passes-heading") { SectionHeading("Other passes") }
                     }
                     item(key = "pass-feed") {
@@ -413,6 +549,8 @@ fun PassHomeScreen(
                                 }
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
+                            onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
+                            onToggleProtected = { onAction(HomeAction.ToggleProtected(it)) },
                             onReorder = { onAction(HomeAction.ReorderPass(it)) },
                             onPreviewChanged = {
                                 previewPassId = it
@@ -422,6 +560,43 @@ fun PassHomeScreen(
                             onProtectedPreviewRequested = {
                                 scope.launch { snackbarHostState.showSnackbar("Unlock the pass to preview it") }
                             },
+                            openSwipePassId = openSwipePassId,
+                            tagCategories = state.categories,
+                        )
+                    }
+                }
+                if (separatedProtectedPasses.isNotEmpty()) {
+                    item(key = "protected-heading") { SectionHeading("Protected passes") }
+                    item(key = "protected-feed") {
+                        TicketFeed(
+                            passes = separatedProtectedPasses,
+                            categories = state.categories,
+                            columns = if (expanded) 2 else 1,
+                            hero = false,
+                            sectionOrder = state.settings.homeCardSectionOrder,
+                            hiddenSections = state.settings.hiddenHomeCardSections,
+                            showProtectedPassLockIcon = state.settings.showProtectedPassLockIcon,
+                            blurProtectedPassCards = false,
+                            onOpen = { onAction(HomeAction.OpenPass(it)) },
+                            onArchive = { id, restoring, originalCategoryId ->
+                                if (restoring) {
+                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
+                                } else {
+                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                                }
+                            },
+                            onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
+                            onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
+                            onToggleProtected = { onAction(HomeAction.ToggleProtected(it)) },
+                            onReorder = { onAction(HomeAction.ReorderPass(it)) },
+                            onPreviewChanged = {
+                                previewPassId = it
+                                if (it == null) previewOpeningPassId = null
+                            },
+                            onPreviewOpeningChanged = { previewOpeningPassId = it },
+                            onProtectedPreviewRequested = {},
+                            openSwipePassId = openSwipePassId,
+                            tagCategories = state.categories,
                         )
                     }
                 }
@@ -465,9 +640,6 @@ fun PassHomeScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeToolbar(
-    categories: List<PassCategory>,
-    selectedCategoryId: String?,
-    onSelectCategory: (String?) -> Unit,
     onOpenDrawer: () -> Unit,
     searchExpanded: Boolean,
     searchQuery: String,
@@ -510,8 +682,6 @@ private fun HomeToolbar(
                         }
                     }
                 }
-            } else if (categories.isNotEmpty()) {
-                CategorySelector(categories, selectedCategoryId, onSelectCategory, Modifier.fillMaxWidth())
             }
         },
         navigationIcon = {
@@ -526,72 +696,63 @@ private fun HomeToolbar(
 }
 
 @Composable
-private fun CategorySelector(
-    categories: List<PassCategory>,
-    selectedId: String?,
-    onSelect: (String?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LazyRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item {
-            FilterChip(selected = selectedId == null, onClick = { onSelect(null) }, label = { Text("All") })
-        }
-        items(categories, key = PassCategory::id) { category ->
-            FilterChip(
-                selected = category.id == selectedId,
-                onClick = { onSelect(category.id) },
-                label = { Text(category.name) },
-                leadingIcon = { CategoryDot(category.colorArgb) },
-            )
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+private fun HomeSortSelector(selectedSort: PassSortOrder, onSort: (PassSortOrder) -> Unit) {
+    AnimatedContent(
+        targetState = selectedSort == PassSortOrder.MANUAL,
+        modifier = Modifier.fillMaxWidth(),
+        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+        label = "Manual sort option",
+    ) { showManual ->
+        val options = homeSortOptions(selectedSort, showManual)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
+            options.forEachIndexed { index, option ->
+                ToggleButton(
+                    checked = option.matches(selectedSort),
+                    onCheckedChange = { onSort(option.nextOrder(selectedSort)) },
+                    modifier = Modifier.weight(1f).height(40.dp).semantics { role = Role.RadioButton },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    shapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    },
+                    colors = ToggleButtonDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+                ) {
+                    Text(option.label, maxLines = 1)
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun HomeSortSelector(selectedSort: PassSortOrder, onSort: (PassSortOrder) -> Unit) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (selectedSort == PassSortOrder.MANUAL) {
-            item { FilterChip(selected = true, onClick = {}, label = { Text("Manual order") }) }
-        }
-        item {
-            val ascending = selectedSort == PassSortOrder.DATE_ASC
-            val dateSelected = ascending || selectedSort == PassSortOrder.DATE_DESC
-            val label = if (ascending) "Oldest first" else "Newest first"
-            FilterChip(
-                selected = dateSelected,
-                onClick = {
-                    onSort(
-                        when {
-                            !dateSelected -> PassSortOrder.DATE_DESC
-                            ascending -> PassSortOrder.DATE_DESC
-                            else -> PassSortOrder.DATE_ASC
-                        },
-                    )
-                },
-                label = { Text(label) },
-                leadingIcon = {
-                    Icon(
-                        if (ascending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                        label,
-                    )
-                },
-            )
-        }
-        item {
-            FilterChip(
-                selected = selectedSort == PassSortOrder.DATE_DIFF,
-                onClick = { onSort(PassSortOrder.DATE_DIFF) },
-                label = { Text("Nearest date") },
-            )
-        }
-        item {
-            FilterChip(
-                selected = selectedSort == PassSortOrder.TYPE,
-                onClick = { onSort(PassSortOrder.TYPE) },
-                label = { Text("Pass type") },
-            )
-        }
+private data class HomeSortOption(val order: PassSortOrder, val label: String) {
+    fun matches(selectedSort: PassSortOrder) = if (order == PassSortOrder.DATE_DESC) {
+        selectedSort == PassSortOrder.DATE_DESC || selectedSort == PassSortOrder.DATE_ASC
+    } else {
+        selectedSort == order
     }
+
+    fun nextOrder(selectedSort: PassSortOrder) = if (order == PassSortOrder.DATE_DESC && selectedSort == PassSortOrder.DATE_DESC) {
+        PassSortOrder.DATE_ASC
+    } else {
+        order
+    }
+}
+
+private fun homeSortOptions(selectedSort: PassSortOrder, showManual: Boolean) = buildList {
+    if (showManual) add(HomeSortOption(PassSortOrder.MANUAL, "Manual"))
+    add(HomeSortOption(PassSortOrder.DATE_DESC, if (selectedSort == PassSortOrder.DATE_ASC) "Oldest" else "Newest"))
+    add(HomeSortOption(PassSortOrder.DATE_DIFF, "Nearest"))
+    add(HomeSortOption(PassSortOrder.TYPE, "Type"))
 }
 
 @Composable
@@ -607,10 +768,14 @@ private fun TicketFeed(
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
     onDelete: (String, String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    onToggleProtected: (String) -> Unit,
     onReorder: (List<String>) -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
     onProtectedPreviewRequested: () -> Unit,
+    openSwipePassId: androidx.compose.runtime.MutableState<String?>,
+    tagCategories: List<PassCategory>,
 ) {
     val feeds = remember(passes, columns) {
         List(columns) { column -> passes.filterIndexed { index, _ -> index % columns == column } }
@@ -630,10 +795,14 @@ private fun TicketFeed(
                     onOpen = onOpen,
                     onArchive = onArchive,
                     onDelete = onDelete,
+                    onToggleFavorite = onToggleFavorite,
+                    onToggleProtected = onToggleProtected,
                     onReorder = onReorder,
                     onPreviewChanged = onPreviewChanged,
                     onPreviewOpeningChanged = onPreviewOpeningChanged,
                     onProtectedPreviewRequested = onProtectedPreviewRequested,
+                    openSwipePassId = openSwipePassId,
+                    tagCategories = tagCategories,
                 )
             } else {
                 Spacer(Modifier.weight(1f))
@@ -659,10 +828,14 @@ private fun ReorderableTicketColumn(
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
     onDelete: (String, String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    onToggleProtected: (String) -> Unit,
     onReorder: (List<String>) -> Unit,
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
     onProtectedPreviewRequested: () -> Unit,
+    openSwipePassId: androidx.compose.runtime.MutableState<String?>,
+    tagCategories: List<PassCategory>,
 ) {
     var visualPasses by remember { mutableStateOf(passes) }
     var measuredBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
@@ -678,11 +851,18 @@ private fun ReorderableTicketColumn(
     val reorderScope = rememberCoroutineScope()
     val targetHysteresis = with(LocalDensity.current) { 8.dp.toPx() }
 
-    LaunchedEffect(passes.map(PassUiModel::id), draggedId) {
+    LaunchedEffect(passes, draggedId, pendingCommitIds) {
         if (draggedId == null) {
             val incomingIds = passes.map(PassUiModel::id)
-            if (pendingCommitIds == incomingIds) pendingCommitIds = null
-            if (pendingCommitIds == null || incomingIds.toSet() != visualPasses.map(PassUiModel::id).toSet()) {
+            val latestById = passes.associateBy(PassUiModel::id)
+            if (pendingCommitIds == incomingIds) {
+                pendingCommitIds = null
+                visualPasses = passes
+            } else if (pendingCommitIds != null && pendingCommitIds!!.toSet() == incomingIds.toSet()) {
+                // Keep a locally committed reorder until the repository emits that order.
+                visualPasses = pendingCommitIds!!.mapNotNull(latestById::get)
+            } else {
+                // A new sort or metadata update owns the incoming order.
                 visualPasses = passes
             }
         }
@@ -778,6 +958,8 @@ private fun ReorderableTicketColumn(
                     onOpen = onOpen,
                     onArchive = onArchive,
                     onDelete = onDelete,
+                    onToggleFavorite = onToggleFavorite,
+                    onToggleProtected = onToggleProtected,
                     onReorderStart = {
                         draggedId = pass.id
                         draggedFromIndex = index
@@ -844,13 +1026,17 @@ private fun ReorderableTicketColumn(
                     onPreviewChanged = onPreviewChanged,
                     onPreviewOpeningChanged = onPreviewOpeningChanged,
                     onProtectedPreviewRequested = onProtectedPreviewRequested,
+                    openSwipePassId = openSwipePassId,
+                    tagCategories = tagCategories,
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class SwipeRevealAnchor { Closed, StartActions, EndActions }
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TicketSwipeContainer(
     pass: PassUiModel,
@@ -866,6 +1052,8 @@ private fun TicketSwipeContainer(
     onOpen: (String) -> Unit,
     onArchive: (String, Boolean, String) -> Unit,
     onDelete: (String, String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    onToggleProtected: (String) -> Unit,
     onReorderStart: () -> Unit,
     onReorderDrag: (Float) -> Unit,
     onReorderEnd: () -> Unit,
@@ -873,48 +1061,149 @@ private fun TicketSwipeContainer(
     onPreviewChanged: (String?) -> Unit,
     onPreviewOpeningChanged: (String?) -> Unit,
     onProtectedPreviewRequested: () -> Unit,
+    openSwipePassId: androidx.compose.runtime.MutableState<String?>,
+    tagCategories: List<PassCategory>,
 ) {
-    val restoring = category?.role == PassCategoryRole.ARCHIVE
+    val restoring = pass.isArchived
     val archiveLabel = if (restoring) "Restore" else "Archive"
-    val dismissState = rememberSwipeToDismissBoxState()
-    LaunchedEffect(reorderingActive) {
-        if (reorderingActive) dismissState.reset()
+    val pinnedLabel = if (pass.isPinned) "Unpin pass" else "Pin pass"
+    val protectLabel = if (pass.isProtected) "Remove protection" else "Protect pass"
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val startRevealWidth = passActionButtonGroupWidth(1)
+    val endRevealWidth = passActionButtonGroupWidth(3)
+    val cardActionGap = PassActionButtonGap
+    var measuredStartRevealWidthPx by remember { mutableIntStateOf(0) }
+    var measuredEndRevealWidthPx by remember { mutableIntStateOf(0) }
+    val revealState = remember {
+        AnchoredDraggableState(
+            initialValue = SwipeRevealAnchor.Closed,
+            anchors = DraggableAnchors {
+                SwipeRevealAnchor.StartActions at with(density) { (startRevealWidth + cardActionGap).toPx() }
+                SwipeRevealAnchor.Closed at 0f
+                SwipeRevealAnchor.EndActions at -with(density) { (endRevealWidth + cardActionGap).toPx() }
+            },
+        )
     }
-    LaunchedEffect(dismissState.settledValue) {
-        when (dismissState.settledValue) {
-            SwipeToDismissBoxValue.StartToEnd -> onArchive(pass.id, restoring, pass.categoryId)
-            SwipeToDismissBoxValue.EndToStart -> onDelete(pass.id, pass.categoryId)
-            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
-        }
-        dismissState.reset()
+    SideEffect {
+        val gapPx = with(density) { cardActionGap.toPx() }
+        val startAnchor = (measuredStartRevealWidthPx.takeIf { it > 0 }?.toFloat()
+            ?: with(density) { startRevealWidth.toPx() }) + gapPx
+        val endAnchor = (measuredEndRevealWidthPx.takeIf { it > 0 }?.toFloat()
+            ?: with(density) { endRevealWidth.toPx() }) + gapPx
+        revealState.updateAnchors(
+            DraggableAnchors {
+                SwipeRevealAnchor.StartActions at startAnchor
+                SwipeRevealAnchor.Closed at 0f
+                SwipeRevealAnchor.EndActions at -endAnchor
+            },
+        )
     }
-    SwipeToDismissBox(
-        state = dismissState,
-        modifier = modifier.clip(shape),
-        gesturesEnabled = !reorderingActive,
-        backgroundContent = {
-            if (reorderingActive) {
-                Box(
-                    Modifier.fillMaxSize().background(
-                        if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+    SyncSwipeReveal(pass.id, reorderingActive, openSwipePassId, revealState)
+
+    fun runSwipeAction(action: () -> Unit) {
+        action()
+        if (openSwipePassId.value == pass.id) openSwipePassId.value = null
+        scope.launch { revealState.animateTo(SwipeRevealAnchor.Closed) }
+    }
+
+    Box(modifier.clip(shape)) {
+        Box(Modifier.matchParentSize()) {
+            PassActionButtonGroup(
+                modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().wrapContentWidth()
+                    .onSizeChanged { measuredStartRevealWidthPx = it.width }
+                    .then(
+                        if (revealState.currentValue == SwipeRevealAnchor.StartActions) Modifier
+                        else Modifier.clearAndSetSemantics {},
                     ),
+            ) {
+                customItem(
+                    buttonGroupContent = {
+                        PassActionButton(
+                            icon = if (restoring) Icons.Default.Restore else Icons.Default.Archive,
+                            label = archiveLabel,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            index = 0,
+                            count = 1,
+                            fillHeight = true,
+                            onClick = { runSwipeAction { onArchive(pass.id, restoring, pass.categoryId) } },
+                        )
+                    },
+                    menuContent = { _ -> },
                 )
-            } else {
-                val deleting = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
-                val background = if (deleting) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
-                val foreground = if (deleting) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
-                Row(
-                    Modifier.fillMaxSize().background(background).padding(horizontal = 20.dp),
-                    horizontalArrangement = if (deleting) Arrangement.End else Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(if (deleting) Icons.Default.Delete else if (restoring) Icons.Default.Restore else Icons.Default.Archive, null, tint = foreground)
-                    Spacer(Modifier.size(8.dp))
-                    Text(if (deleting) "Delete" else archiveLabel, color = foreground, fontWeight = FontWeight.SemiBold)
-                }
             }
-        },
-        content = {
+            PassActionButtonGroup(
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().wrapContentWidth()
+                    .onSizeChanged { measuredEndRevealWidthPx = it.width }
+                    .testTag("pass_end_actions_${pass.id}")
+                    .then(
+                        if (revealState.currentValue == SwipeRevealAnchor.EndActions) Modifier
+                        else Modifier.clearAndSetSemantics {},
+                    ),
+            ) {
+                customItem(
+                    buttonGroupContent = {
+                        PassActionButton(
+                            icon = Icons.Default.PushPin,
+                            label = pinnedLabel,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            index = 0,
+                            count = 3,
+                            fillHeight = true,
+                            onClick = { runSwipeAction { onToggleFavorite(pass.id) } },
+                        )
+                    },
+                    menuContent = { _ -> },
+                )
+                customItem(
+                    buttonGroupContent = {
+                        PassActionButton(
+                            icon = if (pass.isProtected) Icons.Default.LockOpen else Icons.Default.Lock,
+                            label = protectLabel,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            index = 1,
+                            count = 3,
+                            fillHeight = true,
+                            onClick = { runSwipeAction { onToggleProtected(pass.id) } },
+                        )
+                    },
+                    menuContent = { _ -> },
+                )
+                customItem(
+                    buttonGroupContent = {
+                        PassActionButton(
+                            icon = Icons.Default.Delete,
+                            label = "Delete",
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            index = 2,
+                            count = 3,
+                            fillHeight = true,
+                            onClick = { runSwipeAction { onDelete(pass.id, pass.categoryId) } },
+                        )
+                    },
+                    menuContent = { _ -> },
+                )
+            }
+        }
+        Box(
+            Modifier.testTag("pass_card_${pass.id}").offset {
+                val swipeOffset = revealState.offset
+                IntOffset(if (swipeOffset.isNaN()) 0 else swipeOffset.roundToInt(), 0)
+            }.pointerInput(pass.id) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    openSwipePassId.value = pass.id
+                }
+            }.anchoredDraggable(
+                state = revealState,
+                orientation = Orientation.Horizontal,
+                enabled = !reorderingActive,
+            ),
+        ) {
             TicketRow(
                 pass = pass,
                 category = category,
@@ -925,8 +1214,22 @@ private fun TicketSwipeContainer(
                 blurProtectedPassCards = blurProtectedPassCards,
                 modifier = Modifier.semantics {
                     customActions = listOf(
-                        CustomAccessibilityAction(archiveLabel) { onArchive(pass.id, restoring, pass.categoryId); true },
-                        CustomAccessibilityAction("Delete") { onDelete(pass.id, pass.categoryId); true },
+                        CustomAccessibilityAction(archiveLabel) {
+                            runSwipeAction { onArchive(pass.id, restoring, pass.categoryId) }
+                            true
+                        },
+                        CustomAccessibilityAction("Delete") {
+                            runSwipeAction { onDelete(pass.id, pass.categoryId) }
+                            true
+                        },
+                        CustomAccessibilityAction(pinnedLabel) {
+                            runSwipeAction { onToggleFavorite(pass.id) }
+                            true
+                        },
+                        CustomAccessibilityAction(protectLabel) {
+                            runSwipeAction { onToggleProtected(pass.id) }
+                            true
+                        },
                     )
                 },
                 shape = shape,
@@ -938,9 +1241,35 @@ private fun TicketSwipeContainer(
                 onPreviewChanged = { visible -> onPreviewChanged(pass.id.takeIf { visible }) },
                 onPreviewOpeningChanged = { opening -> onPreviewOpeningChanged(pass.id.takeIf { opening }) },
                 onProtectedPreviewRequested = onProtectedPreviewRequested,
+                tagCategories = tagCategories,
             )
-        },
-    )
+        }
+    }
+}
+
+@Composable
+private fun SyncSwipeReveal(
+    passId: String,
+    reorderingActive: Boolean,
+    openPassId: androidx.compose.runtime.MutableState<String?>,
+    state: AnchoredDraggableState<SwipeRevealAnchor>,
+) {
+    LaunchedEffect(reorderingActive) {
+        if (reorderingActive) {
+            state.animateTo(SwipeRevealAnchor.Closed)
+            if (openPassId.value == passId) openPassId.value = null
+        }
+    }
+    LaunchedEffect(state.currentValue) {
+        if (state.currentValue == SwipeRevealAnchor.Closed) {
+            if (openPassId.value == passId) openPassId.value = null
+        } else {
+            openPassId.value = passId
+        }
+    }
+    LaunchedEffect(openPassId.value) {
+        if (openPassId.value != null && openPassId.value != passId) state.animateTo(SwipeRevealAnchor.Closed)
+    }
 }
 
 @Composable
@@ -962,6 +1291,7 @@ private fun TicketRow(
     onPreviewChanged: (Boolean) -> Unit,
     onPreviewOpeningChanged: (Boolean) -> Unit,
     onProtectedPreviewRequested: () -> Unit,
+    tagCategories: List<PassCategory>,
 ) {
     val interactionSource = remember(pass.id) { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
@@ -977,9 +1307,11 @@ private fun TicketRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val contentBlurred = pass.isProtected && blurProtectedPassCards
+            Box(Modifier.weight(1f)) {
             Row(
-                Modifier.weight(1f)
-                    .then(if (pass.isProtected && blurProtectedPassCards) Modifier.blur(8.dp) else Modifier)
+                Modifier.fillMaxWidth()
+                    .softProtectedBlur(contentBlurred)
                     .semantics(mergeDescendants = true) {
                         role = Role.Button
                         if (pass.isProtected && blurProtectedPassCards) {
@@ -1082,7 +1414,9 @@ private fun TicketRow(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()?.let {
+                        HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()
+                            ?.takeUnless { hero && it == pass.todayStartTimeLabel() }
+                            ?.let {
                             Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let {
@@ -1095,10 +1429,12 @@ private fun TicketRow(
                         HomeCardSection.PASS_TYPE,
                         -> if (!metadataShown) {
                             val showType = HomeCardSection.PASS_TYPE !in hiddenSections
-                            val visibleTag = category
-                                ?.takeIf(PassCategory::isUserOrganized)
-                                ?.takeIf { HomeCardSection.CATEGORY !in hiddenSections }
-                            if (showType || visibleTag != null) {
+                            val visibleTags = if (HomeCardSection.CATEGORY !in hiddenSections) {
+                                tagCategories.filter { it.role == PassCategoryRole.CUSTOM && it.id in pass.tagIds }
+                            } else {
+                                emptyList()
+                            }
+                            if (showType || visibleTags.isNotEmpty()) {
                                 metadataShown = true
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1110,7 +1446,7 @@ private fun TicketRow(
                                             style = MaterialTheme.typography.labelMedium,
                                         )
                                     }
-                                    visibleTag?.let { CategoryBadge(it) }
+                                    visibleTags.forEach { CategoryBadge(it) }
                                 }
                             }
                         }
@@ -1118,26 +1454,29 @@ private fun TicketRow(
                 }
             }
             }
-            if (pass.isProtected && showProtectedPassLockIcon) {
-                Icon(Icons.Default.Lock, "Protected pass", Modifier.size(20.dp))
             }
-            Icon(
-                Icons.Default.DragHandle,
-                "Reorder ${pass.description}",
-                Modifier.size(40.dp).pointerInput(pass.id) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = {
-                            onReorderStart()
-                        },
-                        onDragEnd = onReorderEnd,
-                        onDragCancel = onReorderCancel,
-                        onDrag = { change, amount ->
-                            change.consume()
-                            onReorderDrag(amount.y)
-                        },
-                    )
-                }.padding(8.dp),
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (pass.isProtected && showProtectedPassLockIcon) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Icon(Icons.Default.Lock, "Protected pass", Modifier.size(18.dp))
+                    }
+                }
+                Icon(
+                    Icons.Default.DragHandle,
+                    "Reorder ${pass.description}",
+                    Modifier.size(40.dp).pointerInput(pass.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { onReorderStart() },
+                            onDragEnd = onReorderEnd,
+                            onDragCancel = onReorderCancel,
+                            onDrag = { change, amount ->
+                                change.consume()
+                                onReorderDrag(amount.y)
+                            },
+                        )
+                    }.padding(8.dp),
+                )
+            }
         }
     }
 }
@@ -1183,16 +1522,15 @@ private fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modif
 
 @Composable
 private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
-    val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
-        ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
+    val artwork = pass.displayArtwork(listOf(PassArtworkKind.ICON, PassArtworkKind.THUMBNAIL, PassArtworkKind.LOGO))
     if (artwork != null) {
         AdaptivePassArtwork(
             bytes = artwork.bytes,
+            kind = artwork.kind,
             accentColor = pass.accentColor,
             contentDescription = "Pass artwork",
             modifier = modifier,
-            contentPadding = 2.dp,
-            cropNearlySquare = true,
+            context = PassArtworkContext.HOME_THUMBNAIL,
         )
     } else {
         Surface(
@@ -1229,6 +1567,32 @@ private fun CategoryDot(colorArgb: Long) {
 }
 
 @Composable
+private fun LockedPassSection(passCount: Int, onUnlock: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onUnlock)
+            .semantics { contentDescription = "Unlock protected passes" },
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f)) {
+                Text("Protected passes", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "$passCount ${if (passCount == 1) "pass" else "passes"} · Tap to unlock",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SectionHeading(title: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
@@ -1259,23 +1623,48 @@ private fun EmptySearch(query: String) {
     }
 }
 
+internal data class HomePassSections<T>(
+    val today: List<T>,
+    val pinned: List<T>,
+    val other: List<T>,
+) {
+    val showOtherHeading: Boolean get() = other.isNotEmpty() && (today.isNotEmpty() || pinned.isNotEmpty())
+}
+
+internal fun <T> deriveHomePassSections(
+    passes: List<T>,
+    highlightTodayPasses: Boolean,
+    isToday: (T) -> Boolean,
+    isPinned: (T) -> Boolean,
+): HomePassSections<T> {
+    val today = passes.filter { highlightTodayPasses && isToday(it) }
+    val pinned = passes.filter { !(highlightTodayPasses && isToday(it)) && isPinned(it) }
+    val other = passes.filter { !(highlightTodayPasses && isToday(it)) && !isPinned(it) }
+    return HomePassSections(today, pinned, other)
+}
+
 private fun PassUiModel.occursToday(): Boolean {
     val zone = calendarTimeSpan?.from?.zone ?: calendarTimeSpan?.to?.zone ?: return false
     val date = LocalDate.now(zone)
     val from = calendarTimeSpan?.from?.withZoneSameInstant(zone)?.toLocalDate()
-    val to = calendarTimeSpan?.to?.withZoneSameInstant(zone)?.toLocalDate()
-    return when {
-        from != null && to != null -> !from.isAfter(date) && !to.isBefore(date)
-        from != null -> from == date
-        to != null -> to == date
-        else -> false
-    }
+    // The start date defines the Today section. An event ending today is not a new Today item.
+    return from == date
 }
 
+private fun PassUiModel.todayStartTimeLabel(): String? =
+    calendarTimeSpan?.from?.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+
 private fun PassUiModel.dateLabel(compactForToday: Boolean = false): String? {
-    val value = calendarTimeSpan?.from ?: calendarTimeSpan?.to ?: return null
-    if (compactForToday && occursToday()) {
-        return value.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+    val from = calendarTimeSpan?.from
+    val to = calendarTimeSpan?.to
+    val value = from ?: to ?: return null
+    if (!compactForToday || !occursToday()) {
+        return value.format(DateTimeFormatter.ofPattern("EEE, MMM d · HH:mm", Locale.getDefault()))
     }
-    return value.format(DateTimeFormatter.ofPattern("EEE, MMM d · HH:mm", Locale.getDefault()))
+    val timePattern = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
+    if (from == null || to == null) return value.format(timePattern)
+    val endInStartZone = to.withZoneSameInstant(from.zone)
+    val dayGap = ChronoUnit.DAYS.between(from.toLocalDate(), endInStartZone.toLocalDate())
+    val daySuffix = if (dayGap >= 1) " (+$dayGap)" else ""
+    return "${from.format(timePattern)} > ${endInStartZone.format(timePattern)}$daySuffix"
 }

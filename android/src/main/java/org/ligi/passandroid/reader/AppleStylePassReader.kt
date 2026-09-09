@@ -277,12 +277,14 @@ object AppleStylePassReader {
 
         val searchList = ArrayList<File>()
         if (localizedPath != null) {
+            searchList.add(File(localizedPath, "$bitmap@3x.png"))
             searchList.add(File(localizedPath, "$bitmap@2x.png"))
             searchList.add(File(localizedPath, "$bitmap.png"))
         }
 
+        searchList.add(File(path, "$bitmap@3x.png"))
         searchList.add((File(path, "$bitmap@2x.png")))
-        searchList.add((File(path, "$bitmap@2x.png")))
+        searchList.add(File(path, "$bitmap.png"))
 
         for (current in searchList) {
 

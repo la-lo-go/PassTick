@@ -29,11 +29,14 @@ import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.defaultPassCategories
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.PassDetailSection
+import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassDetailAction
+import org.ligi.passandroid.ui.state.PassArtworkUiModel
+import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.EditPassAction
@@ -71,6 +74,51 @@ class PassScreensTest {
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
         composeRule.onNodeWithText("Use AMOLED black background").assertIsDisplayed()
         composeRule.onNodeWithText("Use HDR and maximum code brightness").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsExposeProtectedPassPrivacyOptions() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), {}) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(3)
+        composeRule.onNodeWithText("Privacy").assertIsDisplayed()
+        composeRule.onNodeWithText("Protect the app").assertIsDisplayed()
+        composeRule.onNodeWithText("Show a lock icon on protected passes").assertIsDisplayed()
+        composeRule.onNodeWithText("Blur protected pass information").assertIsDisplayed()
+        composeRule.onNodeWithText("Keep protected passes in a locked section").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsExposeNotificationPolicyOptions() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(remindersEnabled = true), {}) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(5)
+        composeRule.onNodeWithText("Exact reminders").assertIsDisplayed()
+        composeRule.onNodeWithText("Notification actions").assertIsDisplayed()
+        composeRule.onNodeWithText("Snooze action").assertIsDisplayed()
+        composeRule.onNodeWithText("Update when event starts").assertIsDisplayed()
+        composeRule.onNodeWithText("Hide protected details").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsGroupPassListCustomizationLinks() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), {}) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(2)
+        composeRule.onNodeWithText("Customize pass list").assertIsDisplayed()
+        composeRule.onNodeWithText("Pass view").assertIsDisplayed()
+        composeRule.onNodeWithText("Home cards").assertIsDisplayed()
+        composeRule.onNodeWithText("Tags").assertIsDisplayed()
+        composeRule.onNodeWithText("Choose sections and their order").assertDoesNotExist()
+        composeRule.onNodeWithText("Choose card content and order").assertDoesNotExist()
+        composeRule.onNodeWithText("Manage names, icons, colors, and order").assertDoesNotExist()
+        composeRule.onNodeWithText("Highlight today's passes").assertDoesNotExist()
     }
 
     @Test
@@ -171,7 +219,7 @@ class PassScreensTest {
         search.performClick()
         search.assertIsFocused()
         composeRule.onNodeWithText("All").assertDoesNotExist()
-        composeRule.onNodeWithText("Newest first").assertDoesNotExist()
+        composeRule.onNodeWithText("Newest").assertDoesNotExist()
 
         pressBack()
         composeRule.waitUntil(timeoutMillis = 2_000) {
@@ -238,6 +286,50 @@ class PassScreensTest {
     }
 
     @Test
+    fun lockAllCanMovePassesBehindOneUnlockableSection() {
+        val actions = mutableListOf<HomeAction>()
+        val settings = AppSettings(lockAllPasses = true, separateProtectedPasses = true)
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassHomeScreen(
+                    MainUiState(
+                        passes = listOf(pass("one", "Boarding pass", PassType.BOARDING)),
+                        settings = settings,
+                        isContentLoading = false,
+                    ),
+                    actions::add,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Boarding pass").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Unlock protected passes").performClick()
+        assertThat(actions).containsExactly(HomeAction.UnlockProtectedPasses)
+    }
+
+    @Test
+    fun unlockedProtectedSectionShowsItsPassesFreely() {
+        val settings = AppSettings(lockAllPasses = true, separateProtectedPasses = true)
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassHomeScreen(
+                    MainUiState(
+                        passes = listOf(pass("one", "Boarding pass", PassType.BOARDING)),
+                        settings = settings,
+                        isContentLoading = false,
+                    ),
+                    {},
+                    protectedPassesUnlocked = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Protected passes").assertIsDisplayed()
+        composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Protected pass information blurred").assertDoesNotExist()
+    }
+
+    @Test
     fun inactiveDateSortSelectsNewestBeforeItCanToggleToOldest() {
         val actions = mutableListOf<HomeAction>()
         val state = sampleState().copy(settings = AppSettings(sortOrder = PassSortOrder.TYPE))
@@ -245,9 +337,32 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, actions::add) }
         }
 
-        composeRule.onNodeWithText("Newest first").performClick()
+        composeRule.onNodeWithText("Newest").performClick()
 
         assertThat(actions).containsExactly(HomeAction.SetSortOrder(PassSortOrder.DATE_DESC))
+    }
+
+    @Test
+    fun activeDateSortTogglesBetweenNewestAndOldest() {
+        val actions = mutableListOf<HomeAction>()
+        val state = sampleState().copy(settings = AppSettings(sortOrder = PassSortOrder.DATE_ASC))
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, actions::add) }
+        }
+
+        composeRule.onNodeWithText("Oldest").performClick()
+
+        assertThat(actions).containsExactly(HomeAction.SetSortOrder(PassSortOrder.DATE_DESC))
+    }
+
+    @Test
+    fun manualOrderIsHiddenUntilManualSortingIsActive() {
+        val state = sampleState().copy(settings = AppSettings(sortOrder = PassSortOrder.TYPE))
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
+        }
+
+        composeRule.onNodeWithText("Manual").assertDoesNotExist()
     }
 
     @Test
@@ -257,8 +372,8 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
         }
 
-        val manualLeft = composeRule.onNodeWithText("Manual order").fetchSemanticsNode().boundsInRoot.left
-        val newestLeft = composeRule.onNodeWithText("Newest first").fetchSemanticsNode().boundsInRoot.left
+        val manualLeft = composeRule.onNodeWithText("Manual").fetchSemanticsNode().boundsInRoot.left
+        val newestLeft = composeRule.onNodeWithText("Newest").fetchSemanticsNode().boundsInRoot.left
         assertThat(manualLeft).isLessThan(newestLeft)
     }
 
@@ -272,26 +387,28 @@ class PassScreensTest {
     }
 
     @Test
-    fun homeDrawerContainsPassViewCustomization() {
+    fun homeDrawerShowsDynamicTagsAndKeepsCustomizationInSettings() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
         }
 
         composeRule.onNodeWithContentDescription("Navigation menu").performClick()
 
-        composeRule.onNodeWithText("Pass view").assertIsDisplayed()
-        composeRule.onNodeWithText("Home cards").assertIsDisplayed()
+        composeRule.onNodeWithText("Pass view").assertDoesNotExist()
+        composeRule.onNodeWithText("Home cards").assertDoesNotExist()
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
     }
 
     @Test
     fun categorySettingsExposeColorsAndManagementActions() {
+        val customTag = org.ligi.passandroid.repository.PassCategory("travel", "Travel", 0xFF6750A4, org.ligi.passandroid.repository.PassCategoryRole.CUSTOM)
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { CategorySettingsScreen(defaultPassCategories, {}) }
+            PassTheme(ThemeMode.LIGHT) { CategorySettingsScreen(listOf(customTag), {}) }
         }
 
         composeRule.onNodeWithText("Inbox").assertDoesNotExist()
         composeRule.onNodeWithText("Trash").assertDoesNotExist()
-        composeRule.onNodeWithText("Favorites").assertIsDisplayed()
+        composeRule.onNodeWithText("Travel").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Add tag").assertIsDisplayed()
     }
 
@@ -334,22 +451,72 @@ class PassScreensTest {
     }
 
     @Test
-    fun passTagMenuRemovesTagWithoutExposingInboxAsATag() {
+    fun passTagMenuSupportsMultipleCustomTagsWithoutExposingInbox() {
         val actions = mutableListOf<PassDetailAction>()
-        val taggedPass = pass("one", "Boarding pass", PassType.BOARDING).copy(categoryId = "favorites")
+        val taggedPass = pass("one", "Boarding pass", PassType.BOARDING).copy(tagIds = setOf("travel"))
+        val tags = listOf(
+            org.ligi.passandroid.repository.PassCategory("travel", "Travel", 0xFF6750A4, org.ligi.passandroid.repository.PassCategoryRole.CUSTOM),
+            org.ligi.passandroid.repository.PassCategory("work", "Work", 0xFF3F51B5, org.ligi.passandroid.repository.PassCategoryRole.CUSTOM),
+        )
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) {
-                PassDetailScreen(taggedPass, categories = defaultPassCategories, onAction = actions::add)
+                PassDetailScreen(taggedPass, categories = tags, onAction = actions::add)
             }
         }
 
         composeRule.onNodeWithContentDescription("Pass actions").performClick()
-        composeRule.onNodeWithText("Move to Inbox").assertDoesNotExist()
-        composeRule.onNodeWithText("Manage tag").performClick()
+        composeRule.onNodeWithText("Manage tags").performClick()
         composeRule.onNodeWithText("Inbox").assertDoesNotExist()
-        composeRule.onNodeWithText("Delete tag").performClick()
+        composeRule.onNodeWithText("Work").performClick()
 
-        assertThat(actions).contains(PassDetailAction.MoveToCategory("new"))
+        assertThat(actions).contains(PassDetailAction.SetTags(setOf("travel", "work")))
+    }
+
+    @Test
+    fun passTagMenuAlwaysOffersTagCreation() {
+        val actions = mutableListOf<PassDetailAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Manage tags").performClick()
+        composeRule.onNodeWithText("Add new tag").performClick()
+
+        assertThat(actions).contains(PassDetailAction.OpenTagSettings)
+    }
+
+    @Test
+    fun passActionsOpenPassCustomization() {
+        val actions = mutableListOf<PassDetailAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Customize pass").performClick()
+
+        assertThat(actions).contains(PassDetailAction.OpenPassCustomization)
+    }
+
+    @Test
+    fun passCustomizationSelectsAnEmbeddedImage() {
+        val actions = mutableListOf<PassCustomizationAction>()
+        val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
+            artwork = listOf(PassArtworkUiModel(PassArtworkKind.LOGO, byteArrayOf(1))),
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassCustomizationScreen(pass, actions::add) }
+        }
+
+        composeRule.onNodeWithText("Automatic").assertIsDisplayed()
+        composeRule.onNodeWithText("Logo").performClick()
+
+        assertThat(actions).contains(PassCustomizationAction.SelectArtwork(PassArtworkKind.LOGO))
     }
 
     @Test

@@ -9,7 +9,14 @@ class HomeUndoOperationTest {
     fun `undo archive restores a Today pass to its original category`() {
         val action = UndoOperation.Archive("today-pass", "favorites").toAppAction()
 
-        assertThat(action).isEqualTo(AppAction.MovePass("today-pass", "favorites", announce = false))
+        assertThat(action).isEqualTo(AppAction.SetPassArchived("today-pass", false))
+    }
+
+    @Test
+    fun `undo restore sets archived state`() {
+        val action = UndoOperation.Restore("old-pass", "favorites").toAppAction()
+
+        assertThat(action).isEqualTo(AppAction.SetPassArchived("old-pass", true))
     }
 
 }

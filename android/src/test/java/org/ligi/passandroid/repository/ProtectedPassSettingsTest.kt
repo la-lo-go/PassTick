@@ -12,5 +12,6 @@ class ProtectedPassSettingsTest {
         assertThat(settings.showProtectedPassLockIcon).isTrue()
         assertThat(settings.blurProtectedPassCards).isFalse()
         assertThat(settings.separateProtectedPasses).isFalse()
+        assertThat(settings.blockScreenshots).isFalse()
     }
 }

@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,26 +13,42 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.ligi.passandroid.repository.PassArtworkKind
+
+internal enum class PassArtworkFit { CONTAIN, COVER }
+internal enum class PassArtworkContext { DEFAULT, HOME_THUMBNAIL }
+
+internal fun PassArtworkKind.artworkFit(
+    context: PassArtworkContext = PassArtworkContext.DEFAULT,
+    aspectRatio: Float = 1f,
+): PassArtworkFit = when (this) {
+    PassArtworkKind.ICON, PassArtworkKind.LOGO -> if (
+        context == PassArtworkContext.HOME_THUMBNAIL && minOf(aspectRatio, 1f / aspectRatio) >= 0.9f
+    ) PassArtworkFit.COVER else PassArtworkFit.CONTAIN
+    PassArtworkKind.STRIP, PassArtworkKind.THUMBNAIL, PassArtworkKind.FOOTER -> PassArtworkFit.COVER
+}
+
+internal fun PassArtworkFit.fillFraction(): Float = if (this == PassArtworkFit.COVER) 1f else 0.75f
 
 @Composable
 internal fun AdaptivePassArtwork(
     bytes: ByteArray,
+    kind: PassArtworkKind,
     accentColor: Int,
     contentDescription: String,
     modifier: Modifier,
-    contentPadding: Dp = 8.dp,
-    cropNearlySquare: Boolean = false,
+    contentPadding: Dp = 0.dp,
+    context: PassArtworkContext = PassArtworkContext.DEFAULT,
 ) {
     val bitmap = remember(bytes) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) } ?: return
-    val isNearlySquare = remember(bitmap) {
-        minOf(bitmap.width, bitmap.height).toFloat() / maxOf(bitmap.width, bitmap.height) >= 0.9f
-    }
+    val fit = kind.artworkFit(context, bitmap.width.toFloat() / bitmap.height)
     val luminance = remember(bitmap) { bitmap.averageVisibleLuminance() }
     val accent = Color(accentColor)
     val accentLuminance = accent.luminance()
@@ -41,8 +58,6 @@ internal fun AdaptivePassArtwork(
         else -> Color.White
     }
     BoxWithConstraints(modifier) {
-        // A pass image should align with the surrounding cards without turning a wide strip
-        // into a capsule. The old 32 dp cap was too pronounced in the detail screen.
         val radius = (minOf(maxWidth, maxHeight) * 0.16f).coerceIn(12.dp, 24.dp)
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -50,12 +65,16 @@ internal fun AdaptivePassArtwork(
             color = background,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         ) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = contentDescription,
-                modifier = Modifier.fillMaxSize().padding(if (cropNearlySquare && isNearlySquare) 0.dp else contentPadding),
-                contentScale = if (cropNearlySquare && isNearlySquare) ContentScale.Crop else ContentScale.Fit,
-            )
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = contentDescription,
+                    modifier = Modifier.fillMaxSize(fit.fillFraction())
+                        .padding(if (fit == PassArtworkFit.COVER) 0.dp else contentPadding),
+                    alignment = Alignment.Center,
+                    contentScale = if (fit == PassArtworkFit.COVER) ContentScale.Crop else ContentScale.Fit,
+                )
+            }
         }
     }
 }

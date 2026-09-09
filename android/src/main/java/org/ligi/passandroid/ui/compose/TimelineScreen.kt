@@ -1,44 +1,65 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AddAlarm
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import org.ligi.passandroid.domain.timeline.EventTemporalState
 import org.ligi.passandroid.domain.timeline.PassEvent
 import org.ligi.passandroid.domain.timeline.PassTimeline
+import org.ligi.passandroid.ui.theme.PassActionButton
+import org.ligi.passandroid.ui.theme.PassActionButtonGroup
+import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
 import org.threeten.bp.format.DateTimeFormatter
 
 @Immutable
@@ -96,19 +117,11 @@ private fun TimelineContent(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    var openEventId by remember { mutableStateOf<String?>(null) }
     val locale = LocalConfiguration.current.locales[0]
     val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", locale) }
     val nearestIndex = remember(state.timeline.days, state.timeline.nearestEventId) {
-        state.timeline.nearestEventId?.let { nearestId ->
-            var itemIndex = 0
-            state.timeline.days.forEach { day ->
-                itemIndex += 1
-                val eventIndex = day.events.indexOfFirst { it.id == nearestId }
-                if (eventIndex >= 0) return@let itemIndex + eventIndex
-                itemIndex += day.events.size
-            }
-            null
-        }
+        timelineItemIndex(state.timeline, state.timeline.nearestEventId)
     }
     LaunchedEffect(nearestIndex) {
         nearestIndex?.let { listState.scrollToItem(it) }
@@ -120,7 +133,7 @@ private fun TimelineContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        state.timeline.days.forEach { day ->
+        state.timeline.days.asReversed().forEach { day ->
             item(key = "day:${day.date}") {
                 Text(
                     text = day.date.format(dayFormatter),
@@ -129,20 +142,22 @@ private fun TimelineContent(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            items(day.events, key = PassEvent::id) { event ->
+            items(day.events.asReversed(), key = PassEvent::id) { event ->
                 TimelineEventRow(
                     event = event,
                     zoneId = state.timeline.zoneId,
                     reminderEnabled = event.id in state.reminderEventIds,
                     highlighted = event.id == state.timeline.nearestEventId,
                     onAction = onAction,
+                    openEventId = openEventId,
+                    onOpenEvent = { openEventId = it },
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TimelineEventRow(
     event: PassEvent,
@@ -150,7 +165,18 @@ private fun TimelineEventRow(
     reminderEnabled: Boolean,
     highlighted: Boolean,
     onAction: (TimelineAction) -> Unit,
+    openEventId: String?,
+    onOpenEvent: (String?) -> Unit,
 ) {
+    var leftRevealWidthPx by remember { mutableIntStateOf(0) }
+    var rightRevealWidthPx by remember { mutableIntStateOf(0) }
+    val revealState = rememberTimelineRevealState(
+        event.id,
+        openEventId,
+        leftRevealWidthPx,
+        rightRevealWidthPx,
+        onOpenEvent,
+    )
     val containerColor = if (highlighted) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
@@ -162,25 +188,164 @@ private fun TimelineEventRow(
         shape = RoundedCornerShape(if (highlighted) 24.dp else 16.dp),
         onClick = { onAction(TimelineAction.OpenPass(event.pass.passId)) },
     ) {
-        BoxWithConstraints(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            val expanded = maxWidth >= 720.dp
-            if (expanded) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    EventSummary(event, zoneId, Modifier.weight(1f))
-                    EventActions(event, reminderEnabled, onAction)
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    EventSummary(event, zoneId, Modifier.fillMaxWidth())
-                    EventActions(event, reminderEnabled, onAction)
-                }
+        Box(Modifier.fillMaxWidth()) {
+            Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
+                TimelineOpenAction(event, onAction, Modifier.onSizeChanged { leftRevealWidthPx = it.width })
+                Spacer(Modifier.weight(1f))
+                TimelineSecondaryActions(
+                    event,
+                    reminderEnabled,
+                    onAction,
+                    Modifier.onSizeChanged { rightRevealWidthPx = it.width },
+                )
+            }
+            Box(
+                Modifier.offset { IntOffset(if (revealState.offset.isNaN()) 0 else revealState.offset.roundToInt(), 0) }
+                    .anchoredDraggable(state = revealState, orientation = Orientation.Horizontal)
+                    .background(containerColor)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                EventSummary(event, zoneId, Modifier.fillMaxWidth())
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun TimelineOpenAction(
+    event: PassEvent,
+    onAction: (TimelineAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PassActionButtonGroup(modifier.fillMaxHeight()) {
+        customItem(
+            buttonGroupContent = {
+                PassActionButton(
+                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                    label = "Open pass",
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    index = 0,
+                    count = 1,
+                    fillHeight = true,
+                    onClick = { onAction(TimelineAction.OpenPass(event.pass.passId)) },
+                )
+            },
+            menuContent = { _ -> },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun TimelineSecondaryActions(
+    event: PassEvent,
+    reminderEnabled: Boolean,
+    onAction: (TimelineAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PassActionButtonGroup(modifier.fillMaxHeight()) {
+        customItem(
+            buttonGroupContent = {
+                TimelineActionButton(
+                    icon = Icons.Default.CalendarToday,
+                    label = "Add to calendar",
+                    index = 0,
+                    onClick = { onAction(TimelineAction.AddToCalendar(event.id)) },
+                )
+            },
+            menuContent = { _ -> },
+        )
+        customItem(
+            buttonGroupContent = {
+                TimelineActionButton(
+                    icon = Icons.Default.AddAlarm,
+                    label = if (reminderEnabled) "Turn reminder off" else "Remind me",
+                    index = 1,
+                    onClick = { onAction(TimelineAction.ConfigureReminder(event.id)) },
+                )
+            },
+            menuContent = { _ -> },
+        )
+    }
+}
+
+@Composable
+private fun TimelineActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    index: Int,
+    onClick: () -> Unit,
+) {
+    PassActionButton(
+        icon = icon,
+        label = label,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        index = index,
+        count = 2,
+        fillHeight = true,
+        onClick = onClick,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun rememberTimelineRevealState(
+    eventId: String,
+    openEventId: String?,
+    measuredLeftRevealWidthPx: Int,
+    measuredRightRevealWidthPx: Int,
+    onOpenEvent: (String?) -> Unit,
+): AnchoredDraggableState<TimelineReveal> {
+    val density = LocalDensity.current
+    val leftRevealWidth = passActionButtonGroupWidth(1)
+    val rightRevealWidth = passActionButtonGroupWidth(2)
+    val state = remember {
+        AnchoredDraggableState(
+            initialValue = TimelineReveal.Closed,
+            anchors = DraggableAnchors {
+                TimelineReveal.Closed at 0f
+                TimelineReveal.Left at with(density) { leftRevealWidth.toPx() }
+                TimelineReveal.Right at -with(density) { rightRevealWidth.toPx() }
+            },
+        )
+    }
+    SideEffect {
+        val leftAnchor = measuredLeftRevealWidthPx.takeIf { it > 0 }?.toFloat()
+            ?: with(density) { leftRevealWidth.toPx() }
+        val rightAnchor = measuredRightRevealWidthPx.takeIf { it > 0 }?.toFloat()
+            ?: with(density) { rightRevealWidth.toPx() }
+        state.updateAnchors(
+            DraggableAnchors {
+                TimelineReveal.Closed at 0f
+                TimelineReveal.Left at leftAnchor
+                TimelineReveal.Right at -rightAnchor
+            },
+        )
+    }
+    LaunchedEffect(openEventId) {
+        if (openEventId != null && openEventId != eventId) state.animateTo(TimelineReveal.Closed)
+    }
+    LaunchedEffect(state.currentValue) {
+        onOpenEvent(eventId.takeUnless { state.currentValue == TimelineReveal.Closed })
+    }
+    return state
+}
+
+private enum class TimelineReveal { Closed, Left, Right }
+
+internal fun timelineItemIndex(timeline: PassTimeline, eventId: String?): Int? {
+    if (eventId == null) return null
+    var itemIndex = 0
+    timeline.days.asReversed().forEach { day ->
+        itemIndex++
+        val eventIndex = day.events.asReversed().indexOfFirst { it.id == eventId }
+        if (eventIndex >= 0) return itemIndex + eventIndex
+        itemIndex += day.events.size
+    }
+    return null
 }
 
 @Composable
@@ -209,25 +374,6 @@ private fun EventSummary(
             style = MaterialTheme.typography.bodyLarge,
         )
         event.location?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun EventActions(
-    event: PassEvent,
-    reminderEnabled: Boolean,
-    onAction: (TimelineAction) -> Unit,
-) {
-    FlowRow(
-        modifier = Modifier.widthIn(max = 480.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        TextButton(onClick = { onAction(TimelineAction.OpenPass(event.pass.passId)) }) { Text("Open pass") }
-        TextButton(onClick = { onAction(TimelineAction.AddToCalendar(event.id)) }) { Text("Calendar") }
-        TextButton(onClick = { onAction(TimelineAction.ConfigureReminder(event.id)) }) {
-            Text(if (reminderEnabled) "Turn reminder off" else "Remind me")
-        }
     }
 }
 

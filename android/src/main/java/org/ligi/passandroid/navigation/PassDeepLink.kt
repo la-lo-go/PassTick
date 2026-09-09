@@ -2,7 +2,7 @@ package org.ligi.passandroid.navigation
 
 import android.net.Uri
 
-private const val PassScheme = "passandroid"
+private const val PassScheme = "passtick"
 private const val PassHost = "pass"
 
 data class PassDeepLinkRequest(val passId: String, val showCode: Boolean)

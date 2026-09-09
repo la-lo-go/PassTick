@@ -10,6 +10,7 @@ import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassArtworkKind
+import org.ligi.passandroid.reminder.NotificationLockScreenDetail
 import org.ligi.passandroid.repository.DEFAULT_PASS_CATEGORY_ID
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.functions.CalendarEvent
@@ -50,7 +51,13 @@ data class PassUiModel(
     val calendarTimeSpan: PassTimeSpanUiModel? = null,
     val categoryId: String = DEFAULT_PASS_CATEGORY_ID,
     val isProtected: Boolean = false,
+    val isFavorite: Boolean = false,
+    val tagIds: Set<String> = emptySet(),
+    val isArchived: Boolean = false,
+    val preferredArtworkKind: PassArtworkKind? = null,
 ) {
+    val isPinned: Boolean get() = isFavorite
+
     companion object {
         fun from(pass: PassSnapshot) = PassUiModel(
             id = pass.id,
@@ -78,6 +85,10 @@ data class PassUiModel(
             calendarTimeSpan = pass.calendarTimeSpan?.let { PassTimeSpanUiModel(it.from, it.to) },
             categoryId = pass.categoryId,
             isProtected = pass.isProtected,
+            isFavorite = pass.isFavorite,
+            tagIds = pass.tagIds,
+            isArchived = pass.isArchived,
+            preferredArtworkKind = pass.preferredArtworkKind,
         )
     }
 
@@ -104,6 +115,10 @@ data class PassUiModel(
         ?: description.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
 }
 
+fun PassUiModel.displayArtwork(defaultKinds: List<PassArtworkKind>): PassArtworkUiModel? =
+    preferredArtworkKind?.let { selected -> artwork.firstOrNull { it.kind == selected } }
+        ?: defaultKinds.firstNotNullOfOrNull { kind -> artwork.firstOrNull { it.kind == kind } }
+
 fun PassLocationUiModel.toPlatformLocation() = PlatformLocation(
     address = name,
     latitude = latitude.takeUnless { it == 0.0 && longitude == 0.0 && !name.isNullOrBlank() },
@@ -124,6 +139,10 @@ data class PassDraft(
     val calendarEnd: String = "",
     val locations: List<PassLocationDraft> = emptyList(),
 )
+
+const val PROTECTED_PASSES_CATEGORY_ID = "protected"
+const val PINNED_PASSES_CATEGORY_ID = "pinned"
+const val ARCHIVED_PASSES_CATEGORY_ID = "archived"
 
 data class MainUiState(
     val passes: List<PassUiModel> = emptyList(),
@@ -147,6 +166,11 @@ sealed interface AppAction {
     data class DeletePass(val id: String) : AppAction
     data class SetPassPendingDeletion(val id: String, val pending: Boolean) : AppAction
     data class SetPassProtected(val id: String, val isProtected: Boolean) : AppAction
+    data class SetPassFavorite(val id: String, val isFavorite: Boolean) : AppAction
+    data class SetPassPinned(val id: String, val isPinned: Boolean) : AppAction
+    data class SetPassTags(val id: String, val tagIds: Set<String>) : AppAction
+    data class SetPassArchived(val id: String, val isArchived: Boolean) : AppAction
+    data class SetPreferredArtwork(val id: String, val kind: PassArtworkKind?) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
     data class MovePass(val id: String, val categoryId: String, val announce: Boolean = true) : AppAction
     data class SelectCategory(val categoryId: String?) : AppAction
@@ -163,15 +187,31 @@ sealed interface AppAction {
     data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction
     data class SetRemindersEnabled(val value: Boolean) : AppAction
     data class SetReminderMinutes(val value: Set<Int>) : AppAction
+    data class SetNotificationAccessWindow(val minutes: Int) : AppAction
+    data class SetNotificationExactTiming(val value: Boolean) : AppAction
+    data class SetNotificationActionsEnabled(val value: Boolean) : AppAction
+    data class SetNotificationSnoozeEnabled(val value: Boolean) : AppAction
+    data class SetNotificationLockScreenDetail(val value: NotificationLockScreenDetail) : AppAction
+    data class SetUpdateNotificationAtEventStart(val value: Boolean) : AppAction
     data class SetLockAllPasses(val value: Boolean) : AppAction
     data class SetShowProtectedPassLockIcon(val value: Boolean) : AppAction
     data class SetBlurProtectedPassCards(val value: Boolean) : AppAction
     data class SetSeparateProtectedPasses(val value: Boolean) : AppAction
+    data class SetBlockScreenshots(val value: Boolean) : AppAction
     data class MovePassDetailSection(val section: PassDetailSection, val offset: Int) : AppAction
     data class SetPassDetailSectionVisible(val section: PassDetailSection, val visible: Boolean) : AppAction
     data class MoveHomeCardSection(val section: HomeCardSection, val offset: Int) : AppAction
     data class SetHomeCardSectionVisible(val section: HomeCardSection, val visible: Boolean) : AppAction
     data class TogglePassReminder(val passId: String) : AppAction
-    data class ConfigurePassReminder(val passId: String, val enabled: Boolean, val leadMinutes: Int?) : AppAction
+    data class ConfigurePassReminder(
+        val passId: String,
+        val enabled: Boolean,
+        val leadMinutes: Int?,
+        val exactAtEvent: Boolean = false,
+    ) : AppAction
+    data class SetPassReminderActions(
+        val passId: String,
+        val actions: Set<org.ligi.passandroid.reminder.NotificationAction>?,
+    ) : AppAction
     data object ClearMessage : AppAction
 }

@@ -61,7 +61,14 @@ data class PassSnapshot(
     val categoryId: String = DEFAULT_PASS_CATEGORY_ID,
     val artwork: List<PassArtworkSnapshot> = emptyList(),
     val isProtected: Boolean = false,
-)
+    val isFavorite: Boolean = false,
+    /** User labels. categoryId remains for compatibility with old classifier data. */
+    val tagIds: Set<String> = emptySet(),
+    val isArchived: Boolean = false,
+    val preferredArtworkKind: PassArtworkKind? = null,
+) {
+    val isPinned: Boolean get() = isFavorite
+}
 
 data class PassUpdate(
     val description: String,
@@ -90,6 +97,16 @@ interface PassRepository {
 
     suspend fun setProtected(id: String, isProtected: Boolean)
 
+    suspend fun setFavorite(id: String, isFavorite: Boolean)
+
+    suspend fun setPinned(id: String, isPinned: Boolean) = setFavorite(id, isPinned)
+
+    suspend fun setTags(id: String, tagIds: Set<String>)
+
+    suspend fun setArchived(id: String, isArchived: Boolean)
+
+    suspend fun setPreferredArtwork(id: String, kind: PassArtworkKind?)
+
     suspend fun delete(id: String): Boolean
 
     suspend fun export(id: String, destination: Uri): Result<Unit>
@@ -105,7 +122,15 @@ class FilePassRepository(
     private val protectionStore: FilePassProtectionStore = FilePassProtectionStore(
         File(context.filesDir, "pass-protection.json"),
     ),
+    private val favoriteStore: FileFavoriteStore = FilePinnedStore(
+        File(context.filesDir, "pass-pinned.json"),
+        File(context.filesDir, "pass-favorites.json"),
+    ),
+    private val metadataStore: FilePassMetadataStore = FilePassMetadataStore(
+        File(context.filesDir, "pass-metadata.json"),
+    ),
 ) : PassRepository {
+    private val migratedLegacyPassIds = mutableSetOf<String>()
     override fun observePasses(): Flow<List<PassSnapshot>> = flow {
         passStore.syncPassStoreWithClassifier(context.getString(R.string.topic_new))
         emit(visibleSnapshots())
@@ -171,6 +196,30 @@ class FilePassRepository(
         passStore.notifyChange()
     }
 
+    override suspend fun setFavorite(id: String, isFavorite: Boolean) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        favoriteStore.setFavorite(id, isFavorite)
+        passStore.notifyChange()
+    }
+
+    override suspend fun setTags(id: String, tagIds: Set<String>) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        metadataStore.setTags(id, tagIds)
+        passStore.notifyChange()
+    }
+
+    override suspend fun setArchived(id: String, isArchived: Boolean) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        metadataStore.setArchived(id, isArchived)
+        passStore.notifyChange()
+    }
+
+    override suspend fun setPreferredArtwork(id: String, kind: PassArtworkKind?) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        metadataStore.setPreferredArtwork(id, kind)
+        passStore.notifyChange()
+    }
+
     private fun applyUpdate(pass: org.ligi.passandroid.model.pass.PassImpl, update: PassUpdate) {
         pass.description = update.description
         pass.creator = update.creator
@@ -209,7 +258,11 @@ class FilePassRepository(
 
     override suspend fun delete(id: String) = withContext(ioDispatcher) {
         passStore.deletePassWithId(id).also { deleted ->
-            if (deleted) protectionStore.remove(id)
+            if (deleted) {
+                protectionStore.remove(id)
+                favoriteStore.remove(id)
+                metadataStore.remove(id)
+            }
         }
     }
 
@@ -241,17 +294,41 @@ class FilePassRepository(
     }
 
     private fun snapshot() = passStore.passMap.values.map { pass ->
+        val topic = passStore.classifier.getTopic(pass.id, context.getString(R.string.topic_new))
+        val legacyTag = topic.takeUnless { it in setOf("new", "trash", "archive", "favorites", "past") }
+        val isLegacy = pass.id !in migratedLegacyPassIds &&
+            (topic in setOf("archive", "favorites", "past") || legacyTag != null)
+        if (isLegacy) {
+            if (topic == "favorites") favoriteStore.setFavorite(pass.id, true)
+            if (topic == "archive") metadataStore.setArchived(pass.id, true)
+            legacyTag?.let { metadataStore.setTags(pass.id, metadataStore.tags(pass.id) + it) }
+            passStore.classifier.moveToTopic(pass, context.getString(R.string.topic_new))
+            migratedLegacyPassIds += pass.id
+        }
+        val currentTopic = passStore.classifier.getTopic(pass.id, context.getString(R.string.topic_new))
         pass.toSnapshot(
             passStore.getPathForID(pass.id),
-            passStore.classifier.getTopic(pass.id, context.getString(R.string.topic_new)),
+            currentTopic,
             protectionStore.isProtected(pass.id),
+            favoriteStore.isFavorite(pass.id),
+            metadataStore.tags(pass.id),
+            metadataStore.isArchived(pass.id),
+            metadataStore.preferredArtwork(pass.id),
         )
     }
 
     private fun visibleSnapshots() = snapshot().filterNot { it.categoryId == "trash" }
 }
 
-private fun Pass.toSnapshot(path: File, categoryId: String, isProtected: Boolean = false) = PassSnapshot(
+private fun Pass.toSnapshot(
+    path: File,
+    categoryId: String,
+    isProtected: Boolean = false,
+    isFavorite: Boolean = false,
+    tagIds: Set<String> = emptySet(),
+    isArchived: Boolean = false,
+    preferredArtworkKind: PassArtworkKind? = null,
+) = PassSnapshot(
     id = id,
     description = description.orEmpty(),
     creator = creator,
@@ -266,10 +343,54 @@ private fun Pass.toSnapshot(path: File, categoryId: String, isProtected: Boolean
         ?: validTimespans?.firstOrNull()?.let { PassTimeSpanSnapshot(it.from, it.to) },
     categoryId = categoryId,
     artwork = PassArtworkKind.entries.mapNotNull { kind ->
-        File(path, kind.fileName + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES)
-            .takeIf(File::isFile)
+        bestArtworkFile(path, kind)
             ?.readBytes()
             ?.let { PassArtworkSnapshot(kind, it) }
     },
     isProtected = isProtected,
+    isFavorite = isFavorite,
+    tagIds = tagIds,
+    isArchived = isArchived,
+    preferredArtworkKind = preferredArtworkKind,
 )
+
+internal fun bestArtworkFile(path: File, kind: PassArtworkKind): File? {
+    val candidates = listOf(
+        File(path, "${kind.fileName}@3x${org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES}"),
+        File(path, "${kind.fileName}@2x${org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES}"),
+        File(path, kind.fileName + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES),
+    ).filter { it.isFile && it.length() > 0L }
+    return candidates.mapNotNull { file -> pngPixelArea(file)?.let { area -> file to area } }
+        .maxByOrNull { it.second }
+        ?.first
+        ?: candidates.firstOrNull()
+}
+
+private fun pngPixelArea(file: File): Long? = runCatching {
+    val header = ByteArray(24)
+    file.inputStream().use { input ->
+        var offset = 0
+        while (offset < header.size) {
+            val count = input.read(header, offset, header.size - offset)
+            if (count < 0) return null
+            offset += count
+        }
+    }
+    if (!header.copyOfRange(0, 8).contentEquals(PNG_SIGNATURE) ||
+        !header.copyOfRange(12, 16).contentEquals(PNG_IHDR)
+    ) return null
+    val width = header.readPositiveInt(16) ?: return null
+    val height = header.readPositiveInt(20) ?: return null
+    width.toLong() * height
+}.getOrNull()
+
+private fun ByteArray.readPositiveInt(offset: Int): Int? {
+    val value = (this[offset].toInt() and 0xFF shl 24) or
+        (this[offset + 1].toInt() and 0xFF shl 16) or
+        (this[offset + 2].toInt() and 0xFF shl 8) or
+        (this[offset + 3].toInt() and 0xFF)
+    return value.takeIf { it > 0 }
+}
+
+private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+private val PNG_IHDR = byteArrayOf(0x49, 0x48, 0x44, 0x52)

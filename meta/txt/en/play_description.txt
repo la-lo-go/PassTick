@@ -1,4 +1,4 @@
-PassAndroid Passbooks for Android
+PassTick Passbooks for Android
 
 
 What is it?
@@ -21,7 +21,7 @@ I stumbled upon Passbook files when i received my ticket for the 29c3 - I liked 
 One year later - just before the 30C3 - I came to work a bit on this app again - for 2 reasons:
  - a friend of mine is very into this whole BTLE thing and location beacon / context aware thing could be interesting for Passbook - but nothing ready yet
  - I got a mail from a Luis Torrecilla - a very nice designer who did a great redesign
-This all was leading to PassAndroid - a completely new version - with a new look and new functions ( sorting and adding to calendar alongside pull to refresh a navigation drawer and contextual ActionBar menu )
+This all was leading to PassTick - a completely new version - with a new look and new functions ( sorting and adding to calendar alongside pull to refresh a navigation drawer and contextual ActionBar menu )
 
 Passes that work
 =============

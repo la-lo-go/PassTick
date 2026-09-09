@@ -9,7 +9,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "org.ligi.passandroid"
+        applicationId = "dev.lalogo.passtick"
         minSdk = 29
         targetSdk = 36
         versionCode = 373
@@ -120,4 +120,24 @@ dependencies {
     androidTestImplementation("com.linkedin.dexmaker:dexmaker-mockito:2.28.4")
     debugImplementation(libs.compose.ui.test.manifest)
     debugImplementation(libs.compose.ui.tooling)
+}
+
+val detektCli by configurations.creating
+
+dependencies {
+    detektCli(libs.detekt.cli)
+}
+
+tasks.register<JavaExec>("detektComplexity") {
+    group = "verification"
+    description = "Checks Kotlin cyclomatic and cognitive complexity."
+    classpath = detektCli
+    mainClass.set("io.gitlab.arturbosch.detekt.cli.Main")
+    val detektInput = providers.gradleProperty("detektInput")
+        .orElse(projectDir.resolve("src/main/java").absolutePath)
+    args(
+        "--input", detektInput.get(),
+        "--config", "${rootProject.projectDir}/config/detekt-complexity.yml",
+        "--report", "txt:${layout.buildDirectory.get()}/reports/detekt/complexity.txt",
+    )
 }

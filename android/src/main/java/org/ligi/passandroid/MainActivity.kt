@@ -1,21 +1,30 @@
 package org.ligi.passandroid
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
+import android.net.Uri
 import android.provider.Settings
 import android.view.WindowManager
+import android.graphics.drawable.ColorDrawable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
@@ -29,6 +38,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,11 +53,14 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.ligi.passandroid.navigation.AppDestination
+import org.ligi.passandroid.navigation.passCustomizationDestination
 import org.ligi.passandroid.navigation.PassDeepLinkRequest
 import org.ligi.passandroid.navigation.passDeepLinkRequestOrNull
 import org.ligi.passandroid.repository.supportedPassImportMimeTypes
@@ -57,6 +70,7 @@ import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.PassDetailScreen
+import org.ligi.passandroid.ui.compose.PassCustomizationScreen
 import org.ligi.passandroid.ui.compose.PassHomeScreen
 import org.ligi.passandroid.ui.compose.SettingsScreen
 import org.ligi.passandroid.ui.compose.TimelineAction
@@ -67,15 +81,21 @@ import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.MainViewModel
+import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassDetailAction
+import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction
 import org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction
 import org.ligi.passandroid.ui.theme.PassTheme
+import org.ligi.passandroid.repository.StartupAppearanceStore
 import org.ligi.passandroid.platform.AndroidFlashlightController
 import org.ligi.passandroid.platform.FlashlightState
 import org.ligi.passandroid.platform.PassAuthenticator
+import org.ligi.passandroid.platform.PassImageExporter
+import org.ligi.passandroid.platform.PassImageExportMode
+import org.ligi.passandroid.platform.PassImageExportSelection
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.reminder.reminderNotificationsAvailable
 import org.ligi.passandroid.ui.adaptive.AdaptivePassListDetailShell
@@ -86,28 +106,53 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val startupAppearance = StartupAppearanceStore.read(this)
+        window.setBackgroundDrawable(ColorDrawable(startupAppearance.backgroundColor(this)))
         enableEdgeToEdge()
         deepLinkRequest.value = intent.data?.passDeepLinkRequestOrNull()
         if (savedInstanceState == null) importFrom(intent)
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val displayedThemeMode = if (state.isContentLoading) startupAppearance.themeMode else state.settings.themeMode
+            val displayedAmoled = if (state.isContentLoading) {
+                startupAppearance.amoledBlackBackground
+            } else {
+                state.settings.amoledBlackBackground
+            }
+            LaunchedEffect(state.isContentLoading, state.settings.themeMode, state.settings.amoledBlackBackground) {
+                if (!state.isContentLoading) {
+                    StartupAppearanceStore.write(
+                        this@MainActivity,
+                        state.settings.themeMode,
+                        state.settings.amoledBlackBackground,
+                    )
+                }
+            }
             val requestedPass by deepLinkRequest.collectAsStateWithLifecycle()
             val context = LocalContext.current
             val backStack = rememberNavBackStack(AppDestination.PassList)
+            fun popBackStack() {
+                if (backStack.size > 1) backStack.removeLastOrNull()
+            }
+            var protectedPassesUnlocked by remember { mutableStateOf(false) }
+            fun requiresProtection(pass: PassUiModel): Boolean = state.settings.lockAllPasses || pass.isProtected
             val protectedContentVisible = when (val destination = backStack.lastOrNull()) {
-                is AppDestination.PassDetail -> state.passes.any { it.id == destination.passId && it.isProtected }
-                is AppDestination.EditPass -> state.passes.any { it.id == destination.passId && it.isProtected }
-                AppDestination.PassList, AppDestination.Timeline -> state.passes.any(PassUiModel::isProtected)
+                is AppDestination.PassDetail -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
+                is AppDestination.EditPass -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
+                is AppDestination.PassCustomization -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
+                AppDestination.PassList, AppDestination.Timeline -> state.passes.any(::requiresProtection) &&
+                    (!state.settings.separateProtectedPasses || protectedPassesUnlocked)
                 else -> false
             }
-            DisposableEffect(protectedContentVisible) {
-                if (protectedContentVisible) {
+            val secureContentVisible = protectedContentVisible && state.settings.blockScreenshots
+            DisposableEffect(secureContentVisible) {
+                if (secureContentVisible) {
                     window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 } else {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 }
                 onDispose {
-                    if (protectedContentVisible) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    if (secureContentVisible) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 }
             }
             val snackbarHostState = remember { SnackbarHostState() }
@@ -116,8 +161,54 @@ class MainActivity : ComponentActivity() {
             var showCalendarPermissionWarning by remember { mutableStateOf(false) }
             var expandedCodePassId by remember { mutableStateOf<String?>(null) }
             var authenticatedPassIds by remember { mutableStateOf(emptySet<String>()) }
+            val appLocked = state.settings.lockAllPasses && !protectedPassesUnlocked
+            var startupUnlockRequested by remember { mutableStateOf(false) }
+            fun requestAppUnlock() {
+                if (!passAuthenticator.canAuthenticate()) {
+                    coroutineScope.launch {
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        snackbarHostState.showSnackbar("Set a screen lock before protecting every pass")
+                    }
+                } else {
+                    passAuthenticator.authenticate { authenticated ->
+                        if (authenticated) {
+                            protectedPassesUnlocked = true
+                            authenticatedPassIds = authenticatedPassIds +
+                                state.passes.filter(::requiresProtection).map(PassUiModel::id)
+                        }
+                    }
+                }
+            }
+            LaunchedEffect(appLocked) {
+                if (appLocked && !startupUnlockRequested) {
+                    startupUnlockRequested = true
+                    requestAppUnlock()
+                }
+            }
             val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
+            }
+            var pendingImagePassId by rememberSaveable { mutableStateOf<String?>(null) }
+            var pendingImageModeName by rememberSaveable { mutableStateOf<String?>(null) }
+            var pendingImageArtwork by rememberSaveable { mutableStateOf(true) }
+            var pendingImageText by rememberSaveable { mutableStateOf(true) }
+            var pendingImageBarcode by rememberSaveable { mutableStateOf(true) }
+            val imageExportLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("image/png"),
+            ) { uri ->
+                val passId = pendingImagePassId
+                val mode = pendingImageModeName?.let { runCatching { PassImageExportMode.valueOf(it) }.getOrNull() }
+                val selection = PassImageExportSelection(pendingImageArtwork, pendingImageText, pendingImageBarcode)
+                pendingImagePassId = null
+                pendingImageModeName = null
+                if (uri != null && passId != null && mode != null) {
+                    val pass = state.passes.firstOrNull { it.id == passId }
+                    if (pass != null) coroutineScope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) { PassImageExporter.write(contentResolver, uri, pass, mode, selection) }
+                        }.onFailure { error -> snackbarHostState.showSnackbar("Image export failed: ${error.message.orEmpty()}") }
+                    }
+                }
             }
             var hasCameraPermission by remember {
                 mutableStateOf(
@@ -196,10 +287,10 @@ class MainActivity : ComponentActivity() {
                 val pass = state.passes.firstOrNull { it.id == passId } ?: return
                 fun navigate() {
                     if (showCode) expandedCodePassId = passId
-                    if (replaceCurrent) backStack.removeLastOrNull()
+                    if (replaceCurrent) popBackStack()
                     backStack.add(AppDestination.PassDetail(passId))
                 }
-                if (!pass.isProtected) {
+                if (!requiresProtection(pass) || protectedPassesUnlocked) {
                     navigate()
                 } else if (!passAuthenticator.canAuthenticate()) {
                     coroutineScope.launch {
@@ -216,21 +307,62 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            fun setProtectedWithAuthentication(passId: String, protect: Boolean) {
+                if (!passAuthenticator.canAuthenticate()) {
+                    coroutineScope.launch {
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        snackbarHostState.showSnackbar("Set a screen lock before protecting passes")
+                    }
+                    return
+                }
+                passAuthenticator.authenticate { authenticated ->
+                    if (authenticated) {
+                        authenticatedPassIds = if (protect) {
+                            authenticatedPassIds + passId
+                        } else {
+                            authenticatedPassIds - passId
+                        }
+                        viewModel.onAction(AppAction.SetPassProtected(passId, protect))
+                    }
+                }
+            }
+
             fun handleHomeAction(action: HomeAction) {
                 when (action) {
                     is HomeAction.OpenPass -> openPass(action.id)
+                    HomeAction.UnlockProtectedPasses -> {
+                        if (!passAuthenticator.canAuthenticate()) {
+                            coroutineScope.launch {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                snackbarHostState.showSnackbar("Set a screen lock before opening protected passes")
+                            }
+                        } else {
+                            passAuthenticator.authenticate { authenticated ->
+                                if (authenticated) {
+                                    protectedPassesUnlocked = true
+                                    authenticatedPassIds = authenticatedPassIds +
+                                        state.passes.filter(::requiresProtection).map(PassUiModel::id)
+                                    viewModel.onAction(AppAction.SelectCategory(PROTECTED_PASSES_CATEGORY_ID))
+                                }
+                            }
+                        }
+                    }
+                    is HomeAction.ToggleFavorite -> {
+                        val pass = state.passes.firstOrNull { it.id == action.id } ?: return
+                        viewModel.onAction(AppAction.SetPassPinned(action.id, !pass.isPinned))
+                    }
+                    is HomeAction.ToggleProtected -> {
+                        val pass = state.passes.firstOrNull { it.id == action.id } ?: return
+                        setProtectedWithAuthentication(action.id, !pass.isProtected)
+                    }
                     is HomeAction.SelectCategory -> viewModel.onAction(AppAction.SelectCategory(action.categoryId))
                     is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
                     is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.orderedVisibleIds))
                     is HomeAction.Archive -> {
-                        state.categories.firstOrNull { it.role == PassCategoryRole.ARCHIVE }?.let {
-                            viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
-                        }
+                        viewModel.onAction(AppAction.SetPassArchived(action.id, true))
                     }
                     is HomeAction.Restore -> {
-                        state.categories.firstOrNull { it.role == PassCategoryRole.INBOX }?.let {
-                            viewModel.onAction(AppAction.MovePass(action.id, it.id, announce = false))
-                        }
+                        viewModel.onAction(AppAction.SetPassArchived(action.id, false))
                     }
                     is HomeAction.Delete -> {
                         requestDelete(action.id)
@@ -246,9 +378,19 @@ class MainActivity : ComponentActivity() {
 
             fun handlePassDetailAction(passId: String, action: PassDetailAction) {
                 when (action) {
-                    PassDetailAction.Back -> backStack.removeLastOrNull()
+                    PassDetailAction.Back -> popBackStack()
                     PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(passId))
                     PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(passId))
+                    is PassDetailAction.ExportImage -> {
+                        state.passes.firstOrNull { it.id == passId }?.let { pass ->
+                            pendingImagePassId = pass.id
+                            pendingImageModeName = action.mode.name
+                            pendingImageArtwork = action.selection?.artwork ?: true
+                            pendingImageText = action.selection?.text ?: true
+                            pendingImageBarcode = action.selection?.barcode ?: true
+                            imageExportLauncher.launch("${pass.description.ifBlank { "pass" }}.png")
+                        }
+                    }
                     PassDetailAction.Print -> viewModel.onAction(AppAction.PrintPass(passId))
                     PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
                     is PassDetailAction.SetFlashlightEnabled -> {
@@ -260,28 +402,48 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     PassDetailAction.OpenReminderSettings -> backStack.add(AppDestination.Settings)
-                    is PassDetailAction.ConfigureReminder -> viewModel.onAction(
-                        AppAction.ConfigurePassReminder(passId, action.enabled, action.leadMinutes),
+                    PassDetailAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
+                    PassDetailAction.OpenPassCustomization -> {
+                        val artworkKinds = state.passes.firstOrNull { it.id == passId }?.artwork.orEmpty().map { it.kind }
+                        backStack.add(passCustomizationDestination(passId, artworkKinds))
+                    }
+                    PassDetailAction.OpenTagSettings -> backStack.add(AppDestination.CategorySettings)
+                    is PassDetailAction.ConfigureReminder -> {
+                        val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                            getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+                        if (!action.exactAtEvent || exactAllowed) {
+                            viewModel.onAction(
+                                AppAction.ConfigurePassReminder(
+                                    passId,
+                                    action.enabled,
+                                    action.leadMinutes,
+                                    action.exactAtEvent,
+                                ),
+                            )
+                        } else {
+                            startActivity(
+                                Intent(
+                                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                    Uri.parse("package:$packageName"),
+                                ),
+                            )
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Allow exact alarms, then select this option again")
+                            }
+                        }
+                    }
+                    is PassDetailAction.SetReminderActions -> viewModel.onAction(
+                        AppAction.SetPassReminderActions(passId, action.actions),
                     )
                     is PassDetailAction.OpenLocation -> viewModel.onAction(AppAction.OpenLocation(passId, action.index))
                     is PassDetailAction.MoveToCategory -> viewModel.onAction(
                         AppAction.MovePass(passId, action.categoryId),
                     )
-                    is PassDetailAction.SetProtected -> {
-                        if (action.isProtected && !passAuthenticator.canAuthenticate()) {
-                            coroutineScope.launch {
-                                snackbarHostState.currentSnackbarData?.dismiss()
-                                snackbarHostState.showSnackbar("Set a screen lock before protecting passes")
-                            }
-                        } else {
-                            if (action.isProtected) authenticatedPassIds = authenticatedPassIds + passId
-                            else authenticatedPassIds = authenticatedPassIds - passId
-                            viewModel.onAction(AppAction.SetPassProtected(passId, action.isProtected))
-                        }
-                    }
+                    is PassDetailAction.SetTags -> viewModel.onAction(AppAction.SetPassTags(passId, action.tagIds))
+                    is PassDetailAction.SetProtected -> setProtectedWithAuthentication(passId, action.isProtected)
                     PassDetailAction.Delete -> {
                         requestDelete(passId)
-                        backStack.removeLastOrNull()
+                        popBackStack()
                     }
                 }
             }
@@ -331,7 +493,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            PassTheme(state.settings.themeMode, state.settings.amoledBlackBackground) {
+            PassTheme(displayedThemeMode, displayedAmoled) {
                 if (showCalendarPermissionWarning) {
                     AlertDialog(
                         onDismissRequest = { showCalendarPermissionWarning = false },
@@ -369,14 +531,26 @@ class MainActivity : ComponentActivity() {
                 }
                 Surface {
                     Box(Modifier.fillMaxSize()) {
+                    if (appLocked) {
+                        Column(
+                            Modifier.align(Alignment.Center).padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            Icon(Icons.Default.Lock, null)
+                            Text("PassAndroid is protected")
+                            Button(onClick = ::requestAppUnlock) { Text("Unlock") }
+                        }
+                    } else {
                     NavDisplay(
                         backStack = backStack,
-                        onBack = { backStack.removeLastOrNull() },
+                        onBack = { popBackStack() },
                         entryProvider = entryProvider {
                             entry<AppDestination.PassList> {
                                 PassHomeScreen(
                                     state = state,
                                     showTodayHero = state.settings.highlightTodayPasses,
+                                    protectedPassesUnlocked = protectedPassesUnlocked,
                                     onAction = ::handleHomeAction,
                                 )
                             }
@@ -387,6 +561,7 @@ class MainActivity : ComponentActivity() {
                                         PassHomeScreen(
                                             state = state,
                                             showTodayHero = state.settings.highlightTodayPasses,
+                                            protectedPassesUnlocked = protectedPassesUnlocked,
                                             onAction = { action ->
                                                 if (action is HomeAction.OpenPass) {
                                                     openPass(action.id, replaceCurrent = true)
@@ -398,12 +573,12 @@ class MainActivity : ComponentActivity() {
                                     },
                                     detailPane = { selected ->
                                         val pass = state.passes.firstOrNull { it.id == selected.passId }
-                                        val requiresUnlock = pass?.isProtected == true &&
+                                        val requiresUnlock = pass?.let(::requiresProtection) == true &&
                                             selected.passId !in authenticatedPassIds
                                         if (requiresUnlock) {
                                             LaunchedEffect(selected.passId) {
                                                 if (!passAuthenticator.canAuthenticate()) {
-                                                    backStack.removeLastOrNull()
+                                                    popBackStack()
                                                     snackbarHostState.showSnackbar(
                                                         "Set a screen lock before opening protected passes",
                                                     )
@@ -412,7 +587,7 @@ class MainActivity : ComponentActivity() {
                                                         if (authenticated) {
                                                             authenticatedPassIds = authenticatedPassIds + selected.passId
                                                         } else if (backStack.lastOrNull() == selected) {
-                                                            backStack.removeLastOrNull()
+                                                            popBackStack()
                                                         }
                                                     }
                                                 }
@@ -439,11 +614,14 @@ class MainActivity : ComponentActivity() {
                                         }
                                         PassDetailScreen(
                                             pass = pass,
+                                            allPassesProtected = state.settings.lockAllPasses,
                                             categories = state.categories,
                                             passReminderEnabled = state.settings.remindersEnabled &&
                                                 selected.passId !in state.settings.reminderExcludedPassIds,
                                             remindersGloballyEnabled = state.settings.remindersEnabled,
                                             reminderLeadMinutes = state.settings.reminderLeadMinutesByPass[selected.passId],
+                                            reminderExactAtEvent = selected.passId in state.settings.reminderExactPassIds,
+                                            reminderActionOverride = state.settings.reminderActionsByPass[selected.passId],
                                             initialCodeExpanded = expandedCodePassId == selected.passId,
                                             onInitialCodeShown = { expandedCodePassId = null },
                                             flashlightAvailable = flashlight.isAvailable || !hasCameraPermission,
@@ -463,7 +641,20 @@ class MainActivity : ComponentActivity() {
                             entry<AppDestination.Timeline> {
                                 TimelineScreen(
                                     state = TimelineUiState(
-                                        timeline = state.timeline,
+                                        timeline = if (state.settings.separateProtectedPasses && !protectedPassesUnlocked) {
+                                            val protectedIds = state.passes.filter(::requiresProtection).mapTo(mutableSetOf(), PassUiModel::id)
+                                            state.timeline.copy(
+                                                days = state.timeline.days.mapNotNull { day ->
+                                                    day.copy(events = day.events.filterNot { it.pass.passId in protectedIds })
+                                                        .takeIf { it.events.isNotEmpty() }
+                                                },
+                                                nearestEventId = state.timeline.nearestEventId?.takeUnless { eventId ->
+                                                    state.timeline.days.flatMap { it.events }.any {
+                                                        it.id == eventId && it.pass.passId in protectedIds
+                                                    }
+                                                },
+                                            )
+                                        } else state.timeline,
                                         reminderEventIds = if (state.settings.remindersEnabled) {
                                             state.timeline.days.flatMap { it.events }
                                                 .filterNot { it.pass.passId in state.settings.reminderExcludedPassIds }
@@ -474,7 +665,7 @@ class MainActivity : ComponentActivity() {
                                     ),
                                     onAction = { action ->
                                     when (action) {
-                                        TimelineAction.Back -> backStack.removeLastOrNull()
+                                        TimelineAction.Back -> popBackStack()
                                         is TimelineAction.OpenPass -> openPass(action.passId)
                                         is TimelineAction.AddToCalendar -> state.timeline.days
                                             .flatMap { it.events }
@@ -495,9 +686,9 @@ class MainActivity : ComponentActivity() {
                             }
                             entry<AppDestination.EditPass> { destination ->
                                 val pass = state.passes.firstOrNull { it.id == destination.passId }
-                                if (pass?.isProtected == true && destination.passId !in authenticatedPassIds) {
+                                if (pass?.let(::requiresProtection) == true && destination.passId !in authenticatedPassIds) {
                                     LaunchedEffect(destination.passId) {
-                                        backStack.removeLastOrNull()
+                                        popBackStack()
                                         backStack.add(AppDestination.PassDetail(destination.passId))
                                     }
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -507,11 +698,25 @@ class MainActivity : ComponentActivity() {
                                     pass = pass,
                                     onAction = { action ->
                                         when (action) {
-                                            EditPassAction.Back -> backStack.removeLastOrNull()
+                                            EditPassAction.Back -> popBackStack()
                                             is EditPassAction.Save -> {
                                                 viewModel.onAction(AppAction.SavePass(destination.passId, action.draft))
-                                                backStack.removeLastOrNull()
+                                                popBackStack()
                                             }
+                                        }
+                                    },
+                                )
+                            }
+                            entry<AppDestination.PassCustomization> { destination ->
+                                PassCustomizationScreen(
+                                    pass = state.passes.firstOrNull { it.id == destination.passId },
+                                    onAction = { action ->
+                                        when (action) {
+                                            PassCustomizationAction.Back -> popBackStack()
+                                            PassCustomizationAction.OpenLayout -> backStack.add(AppDestination.PassDetailLayoutSettings)
+                                            is PassCustomizationAction.SelectArtwork -> viewModel.onAction(
+                                                AppAction.SetPreferredArtwork(destination.passId, action.kind),
+                                            )
                                         }
                                     },
                                 )
@@ -519,7 +724,7 @@ class MainActivity : ComponentActivity() {
                             entry<AppDestination.Settings> {
                                 SettingsScreen(state.settings) { action ->
                                     when (action) {
-                                        SettingsAction.Back -> backStack.removeLastOrNull()
+                                        SettingsAction.Back -> popBackStack()
                                         is SettingsAction.SetTheme -> viewModel.onAction(AppAction.SetTheme(action.value))
                                         is SettingsAction.SetAmoledBlackBackground -> viewModel.onAction(
                                             AppAction.SetAmoledBlackBackground(action.value),
@@ -527,6 +732,8 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetAutomaticBrightness -> viewModel.onAction(AppAction.SetAutomaticBrightness(action.value))
                                         is SettingsAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.value))
                                         SettingsAction.OpenCategories -> backStack.add(AppDestination.CategorySettings)
+                                        SettingsAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
+                                        SettingsAction.OpenHomeCardSettings -> backStack.add(AppDestination.HomeCardLayoutSettings)
                                         is SettingsAction.SetHighlightTodayPasses -> viewModel.onAction(
                                             AppAction.SetHighlightTodayPasses(action.value),
                                         )
@@ -571,25 +778,80 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetReminderMinutes -> viewModel.onAction(
                                             AppAction.SetReminderMinutes(action.value),
                                         )
-                                        is SettingsAction.SetLockAllPasses -> viewModel.onAction(
-                                            AppAction.SetLockAllPasses(action.value),
+                                        is SettingsAction.SetNotificationAccessWindow -> viewModel.onAction(
+                                            AppAction.SetNotificationAccessWindow(action.minutes),
                                         )
+                                        is SettingsAction.SetNotificationExactTiming -> {
+                                            val alarmManager = getSystemService(AlarmManager::class.java)
+                                            val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                                                alarmManager.canScheduleExactAlarms()
+                                            if (!action.value || exactAllowed) {
+                                                viewModel.onAction(AppAction.SetNotificationExactTiming(action.value))
+                                            } else {
+                                                viewModel.onAction(AppAction.SetNotificationExactTiming(false))
+                                                startActivity(
+                                                    Intent(
+                                                        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                                        Uri.parse("package:$packageName"),
+                                                    ),
+                                                )
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar("Allow exact alarms, then enable this option again")
+                                                }
+                                            }
+                                        }
+                                        is SettingsAction.SetNotificationActionsEnabled -> viewModel.onAction(
+                                            AppAction.SetNotificationActionsEnabled(action.value),
+                                        )
+                                        is SettingsAction.SetNotificationSnoozeEnabled -> viewModel.onAction(
+                                            AppAction.SetNotificationSnoozeEnabled(action.value),
+                                        )
+                                        is SettingsAction.SetNotificationLockScreenDetail -> viewModel.onAction(
+                                            AppAction.SetNotificationLockScreenDetail(action.value),
+                                        )
+                                        is SettingsAction.SetUpdateNotificationAtEventStart -> viewModel.onAction(
+                                            AppAction.SetUpdateNotificationAtEventStart(action.value),
+                                        )
+                                        is SettingsAction.SetLockAllPasses -> {
+                                            if (action.value && !passAuthenticator.canAuthenticate()) {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        "Set a screen lock before protecting every pass",
+                                                    )
+                                                }
+                                            } else {
+                                                protectedPassesUnlocked = false
+                                                authenticatedPassIds = emptySet()
+                                                if (state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID) {
+                                                    viewModel.onAction(AppAction.SelectCategory(null))
+                                                }
+                                                viewModel.onAction(AppAction.SetLockAllPasses(action.value))
+                                            }
+                                        }
                                         is SettingsAction.SetShowProtectedPassLockIcon -> viewModel.onAction(
                                             AppAction.SetShowProtectedPassLockIcon(action.value),
                                         )
                                         is SettingsAction.SetBlurProtectedPassCards -> viewModel.onAction(
                                             AppAction.SetBlurProtectedPassCards(action.value),
                                         )
-                                        is SettingsAction.SetSeparateProtectedPasses -> viewModel.onAction(
-                                            AppAction.SetSeparateProtectedPasses(action.value),
+                                        is SettingsAction.SetSeparateProtectedPasses -> {
+                                            protectedPassesUnlocked = false
+                                            authenticatedPassIds = emptySet()
+                                            if (state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID) {
+                                                viewModel.onAction(AppAction.SelectCategory(null))
+                                            }
+                                            viewModel.onAction(AppAction.SetSeparateProtectedPasses(action.value))
+                                        }
+                                        is SettingsAction.SetBlockScreenshots -> viewModel.onAction(
+                                            AppAction.SetBlockScreenshots(action.value),
                                         )
                                     }
                                 }
                             }
                             entry<AppDestination.CategorySettings> {
-                                CategorySettingsScreen(state.settings.categories) { action ->
+                                CategorySettingsScreen(state.categories.filter { it.role == PassCategoryRole.CUSTOM }) { action ->
                                     when (action) {
-                                        CategorySettingsAction.Back -> backStack.removeLastOrNull()
+                                        CategorySettingsAction.Back -> popBackStack()
                                         is CategorySettingsAction.Save -> viewModel.onAction(
                                             AppAction.SaveCategory(action.category),
                                         )
@@ -608,7 +870,7 @@ class MainActivity : ComponentActivity() {
                                     hidden = state.settings.hiddenPassDetailSections,
                                 ) { action ->
                                     when (action) {
-                                        PassDetailLayoutSettingsAction.Back -> backStack.removeLastOrNull()
+                                        PassDetailLayoutSettingsAction.Back -> popBackStack()
                                         is PassDetailLayoutSettingsAction.Move -> viewModel.onAction(
                                             AppAction.MovePassDetailSection(action.section, action.offset),
                                         )
@@ -624,7 +886,7 @@ class MainActivity : ComponentActivity() {
                                     hidden = state.settings.hiddenHomeCardSections,
                                 ) { action ->
                                     when (action) {
-                                        HomeCardLayoutSettingsAction.Back -> backStack.removeLastOrNull()
+                                        HomeCardLayoutSettingsAction.Back -> popBackStack()
                                         is HomeCardLayoutSettingsAction.Move -> viewModel.onAction(
                                             AppAction.MoveHomeCardSection(action.section, action.offset),
                                         )
@@ -636,6 +898,7 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                     )
+                    }
                         SnackbarHost(
                             hostState = snackbarHostState,
                             modifier = Modifier.align(Alignment.BottomCenter)

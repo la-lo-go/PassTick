@@ -4,20 +4,40 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
+import org.ligi.passandroid.reminder.NotificationLockScreenDetail
 
 sealed interface PassDetailAction {
     data object Back : PassDetailAction
     data object Edit : PassDetailAction
     data object Share : PassDetailAction
+    data class ExportImage(
+        val mode: org.ligi.passandroid.platform.PassImageExportMode,
+        val selection: org.ligi.passandroid.platform.PassImageExportSelection? = null,
+    ) : PassDetailAction
     data object Print : PassDetailAction
     data object AddToCalendar : PassDetailAction
     data object OpenReminderSettings : PassDetailAction
-    data class ConfigureReminder(val enabled: Boolean, val leadMinutes: Int?) : PassDetailAction
+    data object OpenPassViewSettings : PassDetailAction
+    data object OpenPassCustomization : PassDetailAction
+    data object OpenTagSettings : PassDetailAction
+    data class ConfigureReminder(
+        val enabled: Boolean,
+        val leadMinutes: Int?,
+        val exactAtEvent: Boolean = false,
+    ) : PassDetailAction
+    data class SetReminderActions(val actions: Set<org.ligi.passandroid.reminder.NotificationAction>?) : PassDetailAction
     data class SetFlashlightEnabled(val enabled: Boolean) : PassDetailAction
     data class OpenLocation(val index: Int) : PassDetailAction
     data class MoveToCategory(val categoryId: String) : PassDetailAction
+    data class SetTags(val tagIds: Set<String>) : PassDetailAction
     data class SetProtected(val isProtected: Boolean) : PassDetailAction
     data object Delete : PassDetailAction
+}
+
+sealed interface PassCustomizationAction {
+    data object Back : PassCustomizationAction
+    data object OpenLayout : PassCustomizationAction
+    data class SelectArtwork(val kind: org.ligi.passandroid.repository.PassArtworkKind?) : PassCustomizationAction
 }
 
 sealed interface EditPassAction {
@@ -32,15 +52,24 @@ sealed interface SettingsAction {
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction
+    data object OpenPassViewSettings : SettingsAction
+    data object OpenHomeCardSettings : SettingsAction
     data class SetHighlightTodayPasses(val value: Boolean) : SettingsAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : SettingsAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : SettingsAction
     data class SetRemindersEnabled(val value: Boolean) : SettingsAction
     data class SetReminderMinutes(val value: Set<Int>) : SettingsAction
+    data class SetNotificationAccessWindow(val minutes: Int) : SettingsAction
+    data class SetNotificationExactTiming(val value: Boolean) : SettingsAction
+    data class SetNotificationActionsEnabled(val value: Boolean) : SettingsAction
+    data class SetNotificationSnoozeEnabled(val value: Boolean) : SettingsAction
+    data class SetNotificationLockScreenDetail(val value: NotificationLockScreenDetail) : SettingsAction
+    data class SetUpdateNotificationAtEventStart(val value: Boolean) : SettingsAction
     data class SetLockAllPasses(val value: Boolean) : SettingsAction
     data class SetShowProtectedPassLockIcon(val value: Boolean) : SettingsAction
     data class SetBlurProtectedPassCards(val value: Boolean) : SettingsAction
     data class SetSeparateProtectedPasses(val value: Boolean) : SettingsAction
+    data class SetBlockScreenshots(val value: Boolean) : SettingsAction
 }
 
 sealed interface PassDetailLayoutSettingsAction {

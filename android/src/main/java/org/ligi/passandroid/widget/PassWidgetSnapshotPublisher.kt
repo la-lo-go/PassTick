@@ -16,7 +16,7 @@ class PassWidgetSnapshotPublisher(
         excludedCategoryIds: Set<String>,
     ) {
         val widgetPasses = passes.asSequence()
-            .filterNot { it.categoryId in excludedCategoryIds }
+            .filterNot { it.isArchived || it.categoryId in excludedCategoryIds }
             .map { pass ->
                 val span = pass.normalizedTimeSpan()
                 WidgetPass(

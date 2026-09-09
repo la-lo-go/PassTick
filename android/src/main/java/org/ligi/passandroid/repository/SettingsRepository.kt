@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.map
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.json.JSONArray
 import org.json.JSONObject
+import org.ligi.passandroid.reminder.NotificationPolicySettings
+import org.ligi.passandroid.reminder.NotificationLockScreenDetail
+import org.ligi.passandroid.reminder.NotificationAction
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -31,12 +34,12 @@ enum class HomeCardSection {
     PRIMARY_FIELD,
     DATE,
     CREATOR,
-    CATEGORY,
     PASS_TYPE,
+    CATEGORY,
 }
 
 val defaultHomeCardSectionOrder = HomeCardSection.entries
-val defaultHiddenHomeCardSections = setOf(HomeCardSection.CREATOR)
+val defaultHiddenHomeCardSections = setOf(HomeCardSection.CREATOR, HomeCardSection.PASS_TYPE)
 
 fun normalizeHomeCardSectionOrder(sections: List<HomeCardSection>): List<HomeCardSection> =
     listOf(HomeCardSection.ARTWORK) +
@@ -63,6 +66,7 @@ data class PassCategory(
     val name: String,
     val colorArgb: Long,
     val role: PassCategoryRole = PassCategoryRole.CUSTOM,
+    val icon: String = "label",
 )
 
 fun PassCategory.isUserOrganized(): Boolean = when (role) {
@@ -76,13 +80,22 @@ fun PassCategory.isUserOrganized(): Boolean = when (role) {
     -> true
 }
 
-val defaultPassCategories = listOf(
+private val builtInPassCategories = listOf(
     PassCategory("new", "Inbox", 0xFF3F51B5, PassCategoryRole.INBOX),
-    PassCategory("favorites", "Favorites", 0xFFC2185B, PassCategoryRole.FAVORITES),
+    PassCategory("favorites", "Pinned", 0xFFC2185B, PassCategoryRole.FAVORITES),
     PassCategory("archive", "Archive", 0xFF546E7A, PassCategoryRole.ARCHIVE),
     PassCategory("past", "Past", 0xFF6D4C41, PassCategoryRole.PAST),
     PassCategory("trash", "Trash", 0xFFC62828, PassCategoryRole.TRASH),
 )
+
+val recommendedPassTags = listOf(
+    PassCategory("travel", "Travel", 0xFF1565C0, icon = "flight"),
+    PassCategory("events", "Events", 0xFF7B1FA2, icon = "event"),
+    PassCategory("loyalty", "Loyalty", 0xFFF57C00, icon = "star"),
+    PassCategory("work", "Work", 0xFF00796B, icon = "label"),
+)
+
+val defaultPassCategories = builtInPassCategories + recommendedPassTags
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -98,6 +111,14 @@ data class AppSettings(
     val reminderMinutes: Set<Int> = setOf(60),
     val reminderExcludedPassIds: Set<String> = emptySet(),
     val reminderLeadMinutesByPass: Map<String, Int> = emptyMap(),
+    val reminderExactPassIds: Set<String> = emptySet(),
+    val reminderActionsByPass: Map<String, Set<NotificationAction>> = emptyMap(),
+    val notificationAccessWindowMinutes: Int = 15,
+    val notificationExactTiming: Boolean = false,
+    val notificationActionsEnabled: Boolean = true,
+    val notificationSnoozeEnabled: Boolean = true,
+    val notificationLockScreenDetail: NotificationLockScreenDetail = NotificationLockScreenDetail.HIDE_SENSITIVE,
+    val updateNotificationAtEventStart: Boolean = true,
     val passDetailSectionOrder: List<PassDetailSection> = defaultPassDetailSectionOrder,
     val hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
     val homeCardSectionOrder: List<HomeCardSection> = defaultHomeCardSectionOrder,
@@ -106,7 +127,17 @@ data class AppSettings(
     val showProtectedPassLockIcon: Boolean = true,
     val blurProtectedPassCards: Boolean = false,
     val separateProtectedPasses: Boolean = false,
-)
+    val blockScreenshots: Boolean = false,
+) {
+    val notificationPolicySettings: NotificationPolicySettings get() = NotificationPolicySettings(
+        accessWindowMinutes = notificationAccessWindowMinutes,
+        exactTiming = notificationExactTiming,
+        actionsEnabled = notificationActionsEnabled,
+        snoozeEnabled = notificationSnoozeEnabled,
+        lockScreenDetail = notificationLockScreenDetail,
+        updateAtEventStart = updateNotificationAtEventStart,
+    )
+}
 
 interface SettingsRepository {
     val settings: Flow<AppSettings>
@@ -124,6 +155,14 @@ interface SettingsRepository {
     suspend fun setReminderMinutes(value: Set<Int>)
     suspend fun setReminderExcludedPassIds(value: Set<String>)
     suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>)
+    suspend fun setReminderExactPassIds(value: Set<String>)
+    suspend fun setReminderActionsByPass(value: Map<String, Set<NotificationAction>>)
+    suspend fun setNotificationAccessWindowMinutes(value: Int)
+    suspend fun setNotificationExactTiming(value: Boolean)
+    suspend fun setNotificationActionsEnabled(value: Boolean)
+    suspend fun setNotificationSnoozeEnabled(value: Boolean)
+    suspend fun setNotificationLockScreenDetail(value: NotificationLockScreenDetail)
+    suspend fun setUpdateNotificationAtEventStart(value: Boolean)
     suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>)
     suspend fun setHomeCardLayout(order: List<HomeCardSection>, hidden: Set<HomeCardSection>)
     suspend fun movePassDetailSection(section: PassDetailSection, offset: Int)
@@ -134,6 +173,7 @@ interface SettingsRepository {
     suspend fun setShowProtectedPassLockIcon(value: Boolean)
     suspend fun setBlurProtectedPassCards(value: Boolean)
     suspend fun setSeparateProtectedPasses(value: Boolean)
+    suspend fun setBlockScreenshots(value: Boolean)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -149,8 +189,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             sortOrder = preferences[SORT]?.let { runCatching { PassSortOrder.valueOf(it) }.getOrNull() }
                 ?: PassSortOrder.DATE_DESC,
             passOrder = preferences[PASS_ORDER]?.let(::decodePassOrder).orEmpty(),
-            categories = preferences[CATEGORIES]?.let(::decodeCategories)?.let(::normalizeCategories)
-                ?: defaultPassCategories,
+            categories = categoriesFrom(preferences[CATEGORIES], preferences[DEFAULT_TAGS_INITIALIZED] == true),
             highlightTodayPasses = preferences[HIGHLIGHT_TODAY] ?: true,
             automaticallyMarkPast = preferences[AUTO_MARK_PAST] ?: false,
             offerCalendarAfterImport = preferences[OFFER_CALENDAR] ?: false,
@@ -161,6 +200,16 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 ?: setOf((preferences[REMINDER_MINUTES] ?: 60).coerceIn(0, 10_080)),
             reminderExcludedPassIds = preferences[REMINDER_EXCLUDED_PASS_IDS].orEmpty(),
             reminderLeadMinutesByPass = preferences[REMINDER_LEAD_BY_PASS]?.let(::decodeReminderLeads).orEmpty(),
+            reminderExactPassIds = preferences[REMINDER_EXACT_PASS_IDS].orEmpty(),
+            reminderActionsByPass = preferences[REMINDER_ACTIONS_BY_PASS]?.let(::decodeReminderActions).orEmpty(),
+            notificationAccessWindowMinutes = (preferences[NOTIFICATION_ACCESS_WINDOW] ?: 15).coerceIn(0, 120),
+            notificationExactTiming = preferences[NOTIFICATION_EXACT_TIMING] ?: false,
+            notificationActionsEnabled = preferences[NOTIFICATION_ACTIONS] ?: true,
+            notificationSnoozeEnabled = preferences[NOTIFICATION_SNOOZE] ?: true,
+            notificationLockScreenDetail = preferences[NOTIFICATION_LOCK_SCREEN]?.let {
+                runCatching { NotificationLockScreenDetail.valueOf(it) }.getOrNull()
+            } ?: NotificationLockScreenDetail.HIDE_SENSITIVE,
+            updateNotificationAtEventStart = preferences[NOTIFICATION_UPDATE_AT_START] ?: true,
             passDetailSectionOrder = preferences[PASS_DETAIL_SECTION_ORDER]
                 ?.let(::decodePassDetailSectionOrder)
                 ?: defaultPassDetailSectionOrder,
@@ -179,18 +228,28 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             showProtectedPassLockIcon = preferences[SHOW_PROTECTED_PASS_LOCK_ICON] ?: true,
             blurProtectedPassCards = preferences[BLUR_PROTECTED_PASS_CARDS] ?: false,
             separateProtectedPasses = preferences[SEPARATE_PROTECTED_PASSES] ?: false,
+            blockScreenshots = preferences[BLOCK_SCREENSHOTS] ?: false,
         )
     }
 
-    override suspend fun setThemeMode(value: ThemeMode) = update(THEME, value.name)
-    override suspend fun setAmoledBlackBackground(value: Boolean) = update(AMOLED_BLACK_BACKGROUND, value)
+    override suspend fun setThemeMode(value: ThemeMode) {
+        StartupAppearanceStore.write(context, value, StartupAppearanceStore.read(context).amoledBlackBackground)
+        update(THEME, value.name)
+    }
+
+    override suspend fun setAmoledBlackBackground(value: Boolean) {
+        StartupAppearanceStore.write(context, StartupAppearanceStore.read(context).themeMode, value)
+        update(AMOLED_BLACK_BACKGROUND, value)
+    }
     override suspend fun setAutomaticBrightness(value: Boolean) = update(AUTOMATIC_BRIGHTNESS, value)
     override suspend fun setSortOrder(value: PassSortOrder) = update(SORT, value.name)
     override suspend fun setPassOrder(value: List<String>) = update(PASS_ORDER, encodePassOrder(value))
-    override suspend fun setCategories(value: List<PassCategory>) = update(
-        CATEGORIES,
-        encodeCategories(normalizeCategories(value)),
-    )
+    override suspend fun setCategories(value: List<PassCategory>) {
+        context.settingsDataStore.edit {
+            it[CATEGORIES] = encodeCategories(normalizeCategories(value))
+            it[DEFAULT_TAGS_INITIALIZED] = true
+        }
+    }
     override suspend fun setHighlightTodayPasses(value: Boolean) = update(HIGHLIGHT_TODAY, value)
     override suspend fun setAutomaticallyMarkPast(value: Boolean) = update(AUTO_MARK_PAST, value)
     override suspend fun setOfferCalendarAfterImport(value: Boolean) = update(OFFER_CALENDAR, value)
@@ -207,6 +266,17 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         REMINDER_LEAD_BY_PASS,
         encodeReminderLeads(value),
     )
+    override suspend fun setReminderExactPassIds(value: Set<String>) = update(REMINDER_EXACT_PASS_IDS, value)
+    override suspend fun setReminderActionsByPass(value: Map<String, Set<NotificationAction>>) =
+        update(REMINDER_ACTIONS_BY_PASS, encodeReminderActions(value))
+    override suspend fun setNotificationAccessWindowMinutes(value: Int) =
+        update(NOTIFICATION_ACCESS_WINDOW, value.coerceIn(0, 120))
+    override suspend fun setNotificationExactTiming(value: Boolean) = update(NOTIFICATION_EXACT_TIMING, value)
+    override suspend fun setNotificationActionsEnabled(value: Boolean) = update(NOTIFICATION_ACTIONS, value)
+    override suspend fun setNotificationSnoozeEnabled(value: Boolean) = update(NOTIFICATION_SNOOZE, value)
+    override suspend fun setNotificationLockScreenDetail(value: NotificationLockScreenDetail) =
+        update(NOTIFICATION_LOCK_SCREEN, value.name)
+    override suspend fun setUpdateNotificationAtEventStart(value: Boolean) = update(NOTIFICATION_UPDATE_AT_START, value)
     override suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>) {
         context.settingsDataStore.edit {
             it[PASS_DETAIL_SECTION_ORDER] = encodePassDetailSectionOrder(order)
@@ -258,6 +328,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setShowProtectedPassLockIcon(value: Boolean) = update(SHOW_PROTECTED_PASS_LOCK_ICON, value)
     override suspend fun setBlurProtectedPassCards(value: Boolean) = update(BLUR_PROTECTED_PASS_CARDS, value)
     override suspend fun setSeparateProtectedPasses(value: Boolean) = update(SEPARATE_PROTECTED_PASSES, value)
+    override suspend fun setBlockScreenshots(value: Boolean) = update(BLOCK_SCREENSHOTS, value)
 
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
@@ -270,6 +341,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val SORT = stringPreferencesKey("sort_order")
         val PASS_ORDER = stringPreferencesKey("pass_order")
         val CATEGORIES = stringPreferencesKey("categories")
+        val DEFAULT_TAGS_INITIALIZED = booleanPreferencesKey("default_tags_initialized")
         val HIGHLIGHT_TODAY = booleanPreferencesKey("highlight_today_passes")
         val AUTO_MARK_PAST = booleanPreferencesKey("automatically_mark_past")
         val OFFER_CALENDAR = booleanPreferencesKey("offer_calendar_after_import")
@@ -278,6 +350,14 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val REMINDER_MINUTES_SET = stringSetPreferencesKey("reminder_minutes")
         val REMINDER_EXCLUDED_PASS_IDS = stringSetPreferencesKey("reminder_excluded_pass_ids")
         val REMINDER_LEAD_BY_PASS = stringPreferencesKey("reminder_lead_minutes_by_pass")
+        val REMINDER_EXACT_PASS_IDS = stringSetPreferencesKey("reminder_exact_pass_ids")
+        val REMINDER_ACTIONS_BY_PASS = stringPreferencesKey("reminder_actions_by_pass")
+        val NOTIFICATION_ACCESS_WINDOW = intPreferencesKey("notification_access_window_minutes")
+        val NOTIFICATION_EXACT_TIMING = booleanPreferencesKey("notification_exact_timing")
+        val NOTIFICATION_ACTIONS = booleanPreferencesKey("notification_actions_enabled")
+        val NOTIFICATION_SNOOZE = booleanPreferencesKey("notification_snooze_enabled")
+        val NOTIFICATION_LOCK_SCREEN = stringPreferencesKey("notification_lock_screen_detail")
+        val NOTIFICATION_UPDATE_AT_START = booleanPreferencesKey("notification_update_at_event_start")
         val PASS_DETAIL_SECTION_ORDER = stringPreferencesKey("pass_detail_section_order")
         val HIDDEN_PASS_DETAIL_SECTIONS = stringSetPreferencesKey("hidden_pass_detail_sections")
         val HOME_CARD_SECTION_ORDER = stringPreferencesKey("home_card_section_order")
@@ -286,6 +366,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val SHOW_PROTECTED_PASS_LOCK_ICON = booleanPreferencesKey("show_protected_pass_lock_icon")
         val BLUR_PROTECTED_PASS_CARDS = booleanPreferencesKey("blur_protected_pass_cards")
         val SEPARATE_PROTECTED_PASSES = booleanPreferencesKey("separate_protected_passes")
+        val BLOCK_SCREENSHOTS = booleanPreferencesKey("block_screenshots")
     }
 }
 
@@ -337,6 +418,26 @@ private fun decodeReminderLeads(value: String): Map<String, Int> = runCatching {
     }
 }.getOrDefault(emptyMap())
 
+private fun encodeReminderActions(values: Map<String, Set<NotificationAction>>) = JSONObject().apply {
+    values.filterKeys(String::isNotBlank).forEach { (passId, actions) ->
+        put(passId, JSONArray(actions.map(NotificationAction::name)))
+    }
+}.toString()
+
+private fun decodeReminderActions(value: String): Map<String, Set<NotificationAction>> = runCatching {
+    val json = JSONObject(value)
+    buildMap {
+        json.keys().forEach { passId ->
+            val actions = json.getJSONArray(passId)
+            put(passId, buildSet {
+                repeat(actions.length()) { index ->
+                    runCatching { NotificationAction.valueOf(actions.getString(index)) }.getOrNull()?.let(::add)
+                }
+            })
+        }
+    }
+}.getOrDefault(emptyMap())
+
 private fun encodeCategories(categories: List<PassCategory>) = JSONArray().apply {
     categories.forEach { category ->
         put(
@@ -344,7 +445,8 @@ private fun encodeCategories(categories: List<PassCategory>) = JSONArray().apply
                 .put("id", category.id)
                 .put("name", category.name)
                 .put("colorArgb", category.colorArgb)
-                .put("role", category.role.name),
+                .put("role", category.role.name)
+                .put("icon", category.icon),
         )
     }
 }.toString()
@@ -363,14 +465,24 @@ private fun decodeCategories(value: String): List<PassCategory>? = runCatching {
                         .takeIf(String::isNotBlank)
                         ?.let(PassCategoryRole::valueOf)
                         ?: PassCategoryRole.CUSTOM,
+                    icon = item.optString("icon").ifBlank { "label" },
                 ),
             )
         }
     }
 }.getOrNull()
 
+internal fun categoriesFrom(encoded: String?, defaultsInitialized: Boolean): List<PassCategory> {
+    val stored = encoded?.let(::decodeCategories)?.let(::normalizeCategories) ?: return defaultPassCategories
+    return if (defaultsInitialized || stored.any { it.role == PassCategoryRole.CUSTOM }) {
+        stored
+    } else {
+        normalizeCategories(stored + recommendedPassTags)
+    }
+}
+
 private fun normalizeCategories(categories: List<PassCategory>): List<PassCategory> {
-    val systemById = defaultPassCategories.associateBy(PassCategory::id)
+    val systemById = builtInPassCategories.associateBy(PassCategory::id)
     val normalized = categories.mapNotNull { category ->
         val id = category.id.trim()
         val name = category.name.trim()
@@ -381,6 +493,6 @@ private fun normalizeCategories(categories: List<PassCategory>): List<PassCatego
         )
     }.distinctBy(PassCategory::id).toMutableList()
     val roles = normalized.mapTo(mutableSetOf(), PassCategory::role)
-    defaultPassCategories.filterNot { it.role in roles }.forEach(normalized::add)
+    builtInPassCategories.filterNot { it.role in roles }.forEach(normalized::add)
     return normalized
 }

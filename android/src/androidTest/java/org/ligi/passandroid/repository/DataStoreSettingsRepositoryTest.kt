@@ -6,6 +6,8 @@ import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.ligi.passandroid.model.comparator.PassSortOrder
+import org.ligi.passandroid.reminder.NotificationLockScreenDetail
+import org.ligi.passandroid.reminder.NotificationAction
 
 class DataStoreSettingsRepositoryTest {
     @Test
@@ -19,7 +21,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setAutomaticBrightness(false)
             repository.setSortOrder(PassSortOrder.TYPE)
             repository.setPassOrder(listOf("pass-3", "pass-1"))
-            val categories = defaultPassCategories + PassCategory("travel", "Travel", 0xFF006C4C)
+            val categories = defaultPassCategories + PassCategory("personal", "Personal", 0xFF006C4C)
             repository.setCategories(categories)
             repository.setHighlightTodayPasses(false)
             repository.setAutomaticallyMarkPast(true)
@@ -28,6 +30,14 @@ class DataStoreSettingsRepositoryTest {
             repository.setReminderMinutes(setOf(15, 30))
             repository.setReminderExcludedPassIds(setOf("pass-2"))
             repository.setReminderLeadMinutesByPass(mapOf("pass-3" to 45))
+            repository.setReminderExactPassIds(setOf("pass-4"))
+            repository.setReminderActionsByPass(mapOf("pass-3" to setOf(NotificationAction.OPEN_CODE)))
+            repository.setNotificationAccessWindowMinutes(30)
+            repository.setNotificationExactTiming(true)
+            repository.setNotificationActionsEnabled(false)
+            repository.setNotificationSnoozeEnabled(false)
+            repository.setNotificationLockScreenDetail(NotificationLockScreenDetail.HIDDEN)
+            repository.setUpdateNotificationAtEventStart(false)
             repository.setPassDetailLayout(
                 listOf(PassDetailSection.BARCODE, PassDetailSection.ARTWORK),
                 setOf(PassDetailSection.ARTWORK),
@@ -49,6 +59,12 @@ class DataStoreSettingsRepositoryTest {
                     it.remindersEnabled && it.reminderMinutes == setOf(15, 30) &&
                     it.reminderExcludedPassIds == setOf("pass-2") &&
                     it.reminderLeadMinutesByPass == mapOf("pass-3" to 45) &&
+                    it.reminderExactPassIds == setOf("pass-4") &&
+                    it.reminderActionsByPass == mapOf("pass-3" to setOf(NotificationAction.OPEN_CODE)) &&
+                    it.notificationAccessWindowMinutes == 30 && it.notificationExactTiming &&
+                    !it.notificationActionsEnabled && !it.notificationSnoozeEnabled &&
+                    it.notificationLockScreenDetail == NotificationLockScreenDetail.HIDDEN &&
+                    !it.updateNotificationAtEventStart &&
                     it.lockAllPasses && it.showProtectedPassLockIcon &&
                     it.blurProtectedPassCards && it.separateProtectedPasses &&
                     it.passDetailSectionOrder == listOf(
@@ -75,6 +91,14 @@ class DataStoreSettingsRepositoryTest {
                     reminderMinutes = setOf(15, 30),
                     reminderExcludedPassIds = setOf("pass-2"),
                     reminderLeadMinutesByPass = mapOf("pass-3" to 45),
+                    reminderExactPassIds = setOf("pass-4"),
+                    reminderActionsByPass = mapOf("pass-3" to setOf(NotificationAction.OPEN_CODE)),
+                    notificationAccessWindowMinutes = 30,
+                    notificationExactTiming = true,
+                    notificationActionsEnabled = false,
+                    notificationSnoozeEnabled = false,
+                    notificationLockScreenDetail = NotificationLockScreenDetail.HIDDEN,
+                    updateNotificationAtEventStart = false,
                     passDetailSectionOrder = listOf(
                         PassDetailSection.BARCODE,
                         PassDetailSection.ARTWORK,

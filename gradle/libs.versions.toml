@@ -28,6 +28,7 @@ threetenbp = "1.6.8"
 timber = "5.0.1"
 zip4j = "2.11.5"
 zxing = "3.5.4"
+detekt = "1.23.8"
 
 [libraries]
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
@@ -73,6 +74,7 @@ threetenbp = { module = "org.threeten:threetenbp", version.ref = "threetenbp" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 zip4j = { module = "net.lingala.zip4j:zip4j", version.ref = "zip4j" }
 zxing = { module = "com.google.zxing:core", version.ref = "zxing" }
+detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

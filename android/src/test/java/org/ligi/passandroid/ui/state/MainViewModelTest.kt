@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -92,6 +93,24 @@ class MainViewModelTest {
 
         assertThat(repository.protectionChanges).containsExactly("pass-1" to true)
         assertThat(viewModel.uiState.value.passes.single().isProtected).isTrue()
+    }
+
+    @Test
+    fun `updates pin tags and archive state in the visible model`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.SetPassPinned("pass-1", true))
+        viewModel.onAction(AppAction.SetPassTags("pass-1", setOf("travel", "important")))
+        viewModel.onAction(AppAction.SetPassArchived("pass-1", true))
+        advanceUntilIdle()
+
+        val pass = viewModel.uiState.value.passes.single()
+        assertThat(pass.isPinned).isTrue()
+        assertThat(pass.tagIds).containsExactlyInAnyOrder("travel", "important")
+        assertThat(pass.isArchived).isTrue()
     }
 
     @Test
@@ -277,12 +296,12 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `deleting a custom category moves its passes to inbox`() = runTest(dispatcher) {
+    fun `deleting a custom category removes the tag from its passes`() = runTest(dispatcher) {
         val category = PassCategory("travel", "Travel", 0xFF006C4C, PassCategoryRole.CUSTOM)
         val settings = FakeSettingsRepository().apply {
             setCategories(settings.value.categories + category)
         }
-        val repository = FakePassRepository(listOf(snapshot("pass-1", "Train", "travel")))
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Train", "travel").copy(tagIds = setOf("travel"))))
         val viewModel = MainViewModel(repository, settings, FakePlatformActions())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
         advanceUntilIdle()
@@ -290,7 +309,8 @@ class MainViewModelTest {
         viewModel.onAction(AppAction.DeleteCategory("travel"))
         advanceUntilIdle()
 
-        assertThat(repository.moved).containsExactly("pass-1" to "new")
+        assertThat(repository.moved).isEmpty()
+        assertThat(repository.observePasses().first().single().tagIds).isEmpty()
         assertThat(settings.settings.value.categories.map { it.id }).doesNotContain("travel")
     }
 
@@ -305,12 +325,25 @@ class MainViewModelTest {
         assertThat(settings.settings.value.reminderLeadMinutesByPass).containsEntry("pass-1", 30)
         assertThat(settings.settings.value.reminderExcludedPassIds).doesNotContain("pass-1")
 
+        viewModel.setPassReminderActions(
+            AppAction.SetPassReminderActions(
+                "pass-1",
+                setOf(org.ligi.passandroid.reminder.NotificationAction.OPEN_CODE),
+            ),
+        )
+        advanceUntilIdle()
+        assertThat(settings.savedReminderActions).containsKey("pass-1")
+
+        viewModel.setPassReminderActions(AppAction.SetPassReminderActions("pass-1", null))
+        assertThat(settings.savedReminderActions).doesNotContainKey("pass-1")
+
         viewModel.onAction(AppAction.ConfigurePassReminder("pass-1", enabled = false, leadMinutes = null))
         advanceUntilIdle()
 
         assertThat(settings.settings.value.reminderLeadMinutesByPass).doesNotContainKey("pass-1")
         assertThat(settings.settings.value.reminderExcludedPassIds).contains("pass-1")
     }
+
 }
 
 private fun snapshot(id: String, description: String, categoryId: String = "new") = PassSnapshot(
@@ -354,6 +387,18 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
         protectionChanges += id to isProtected
         passes.value = passes.value.map { if (it.id == id) it.copy(isProtected = isProtected) else it }
     }
+    override suspend fun setFavorite(id: String, isFavorite: Boolean) {
+        passes.value = passes.value.map { if (it.id == id) it.copy(isFavorite = isFavorite) else it }
+    }
+    override suspend fun setTags(id: String, tagIds: Set<String>) {
+        passes.value = passes.value.map { if (it.id == id) it.copy(tagIds = tagIds) else it }
+    }
+    override suspend fun setArchived(id: String, isArchived: Boolean) {
+        passes.value = passes.value.map { if (it.id == id) it.copy(isArchived = isArchived) else it }
+    }
+    override suspend fun setPreferredArtwork(id: String, kind: org.ligi.passandroid.repository.PassArtworkKind?) {
+        passes.value = passes.value.map { if (it.id == id) it.copy(preferredArtworkKind = kind) else it }
+    }
     override suspend fun delete(id: String): Boolean {
         deletedIds += id
         passes.value = passes.value.filterNot { it.id == id }
@@ -376,6 +421,7 @@ private class FakePlatformActions : PlatformActions {
 
 private class FakeSettingsRepository : SettingsRepository {
     override val settings = MutableStateFlow(AppSettings())
+    var savedReminderActions: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>> = emptyMap()
     override suspend fun setThemeMode(value: ThemeMode) = Unit
     override suspend fun setAmoledBlackBackground(value: Boolean) = Unit
     override suspend fun setAutomaticBrightness(value: Boolean) = Unit
@@ -399,6 +445,21 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>) {
         settings.value = settings.value.copy(reminderLeadMinutesByPass = value)
     }
+    override suspend fun setReminderExactPassIds(value: Set<String>) = Unit
+    override suspend fun setReminderActionsByPass(
+        value: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>>,
+    ) {
+        savedReminderActions = value
+        settings.value = settings.value.copy(reminderActionsByPass = value)
+    }
+    override suspend fun setNotificationAccessWindowMinutes(value: Int) = Unit
+    override suspend fun setNotificationExactTiming(value: Boolean) = Unit
+    override suspend fun setNotificationActionsEnabled(value: Boolean) = Unit
+    override suspend fun setNotificationSnoozeEnabled(value: Boolean) = Unit
+    override suspend fun setNotificationLockScreenDetail(
+        value: org.ligi.passandroid.reminder.NotificationLockScreenDetail,
+    ) = Unit
+    override suspend fun setUpdateNotificationAtEventStart(value: Boolean) = Unit
     override suspend fun setPassDetailLayout(
         order: List<org.ligi.passandroid.repository.PassDetailSection>,
         hidden: Set<org.ligi.passandroid.repository.PassDetailSection>,
@@ -454,6 +515,9 @@ private class FakeSettingsRepository : SettingsRepository {
     }
     override suspend fun setSeparateProtectedPasses(value: Boolean) {
         settings.value = settings.value.copy(separateProtectedPasses = value)
+    }
+    override suspend fun setBlockScreenshots(value: Boolean) {
+        settings.value = settings.value.copy(blockScreenshots = value)
     }
 }
 

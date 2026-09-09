@@ -3,6 +3,7 @@ package org.ligi.passandroid.domain.timeline
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.repository.PassLocationSnapshot
 import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassTimeSpanSnapshot
@@ -17,7 +18,7 @@ class PassTimelineTest {
         val zone = ZoneId.of("Europe/Madrid")
         val timeline = buildPassTimeline(
             passes = listOf(
-                pass("past", "2026-08-29T22:00:00Z", "2026-08-29T22:00:00Z"),
+                pass("past", "2026-08-29T21:59:59Z", "2026-08-29T22:00:00Z"),
                 pass("today", "2026-08-29T22:00:01Z", "2026-08-30T01:00:00Z"),
                 pass("upcoming", "2026-08-30T22:00:00Z", "2026-08-30T23:00:00Z"),
             ),
@@ -33,6 +34,17 @@ class PassTimelineTest {
                     "upcoming" to EventTemporalState.UPCOMING,
                 ),
             )
+    }
+
+    @Test
+    fun `event that ends today but starts yesterday is past`() {
+        val timeline = buildPassTimeline(
+            passes = listOf(pass("overnight", "2026-08-28T23:00:00Z", "2026-08-29T23:59:00Z")),
+            now = Instant.parse("2026-08-29T12:00:00Z"),
+            zoneId = ZoneId.of("UTC"),
+        )
+
+        assertThat(timeline.days.single().events.single().temporalState).isEqualTo(EventTemporalState.PAST)
     }
 
     @Test
@@ -78,6 +90,47 @@ class PassTimelineTest {
         assertThat(timeline.nearestEventId).isEqualTo("pass:next:event")
         assertThat(next.pass).isEqualTo(PassDeepLinkData("next"))
         assertThat(next.location).isEqualTo("Platform 4")
+    }
+
+    @Test
+    fun `carries notification facts from the pass`() {
+        val snapshot = pass("protected", "2026-08-30T11:00:00Z", "2026-08-30T12:00:00Z", "Station").copy(
+            barcodeFormat = PassBarCodeFormat.QR_CODE,
+            barcodeMessage = "ticket",
+            isProtected = true,
+            locations = listOf(PassLocationSnapshot("Station", 40.4, -3.7)),
+        )
+
+        val event = buildPassTimeline(
+            listOf(snapshot),
+            Instant.parse("2026-08-30T10:00:00Z"),
+            ZoneId.of("UTC"),
+        ).days.single().events.single()
+
+        assertThat(event.hasBarcode).isTrue()
+        assertThat(event.isProtected).isTrue()
+        assertThat(event.latitude).isEqualTo(40.4)
+        assertThat(event.longitude).isEqualTo(-3.7)
+    }
+
+    @Test
+    fun `uses label and coordinates from the same location`() {
+        val snapshot = pass("locations", "2026-08-30T11:00:00Z", "2026-08-30T12:00:00Z").copy(
+            locations = listOf(
+                PassLocationSnapshot(null, 1.0, 2.0),
+                PassLocationSnapshot("Station", 40.4, -3.7),
+            ),
+        )
+
+        val event = buildPassTimeline(
+            listOf(snapshot),
+            Instant.parse("2026-08-30T10:00:00Z"),
+            ZoneId.of("UTC"),
+        ).days.single().events.single()
+
+        assertThat(event.location).isEqualTo("Station")
+        assertThat(event.latitude).isEqualTo(40.4)
+        assertThat(event.longitude).isEqualTo(-3.7)
     }
 
     @Test

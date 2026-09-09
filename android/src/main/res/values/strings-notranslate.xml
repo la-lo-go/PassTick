@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="authority_fileprovider" translatable="false">org.ligi.passandroid.fileprovider</string>
+    <string name="authority_fileprovider" translatable="false">dev.lalogo.passtick.fileprovider</string>
 </resources>

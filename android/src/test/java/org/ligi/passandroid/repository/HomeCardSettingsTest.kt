@@ -5,8 +5,23 @@ import org.junit.Test
 
 class HomeCardSettingsTest {
     @Test
-    fun `creator is hidden by default`() {
-        assertThat(AppSettings().hiddenHomeCardSections).containsExactly(HomeCardSection.CREATOR)
+    fun `creator and pass type are hidden by default`() {
+        assertThat(AppSettings().hiddenHomeCardSections)
+            .containsExactlyInAnyOrder(HomeCardSection.CREATOR, HomeCardSection.PASS_TYPE)
+    }
+
+    @Test
+    fun `tags come after pass type in the default order`() {
+        assertThat(AppSettings().homeCardSectionOrder)
+            .containsExactly(
+                HomeCardSection.ARTWORK,
+                HomeCardSection.TITLE,
+                HomeCardSection.PRIMARY_FIELD,
+                HomeCardSection.DATE,
+                HomeCardSection.CREATOR,
+                HomeCardSection.PASS_TYPE,
+                HomeCardSection.CATEGORY,
+            )
     }
 
     @Test
@@ -18,8 +33,8 @@ class HomeCardSettingsTest {
                 HomeCardSection.TITLE,
                 HomeCardSection.PRIMARY_FIELD,
                 HomeCardSection.CREATOR,
-                HomeCardSection.CATEGORY,
                 HomeCardSection.PASS_TYPE,
+                HomeCardSection.CATEGORY,
             )
     }
 }

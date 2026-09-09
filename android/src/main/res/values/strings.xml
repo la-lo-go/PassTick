@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">PassAndroid</string>
+    <string name="app_name">PassTick</string>
     <string name="boarding_pass">Boarding pass</string>
     <string name="category_event">Event</string>
     <string name="category_coupon">Coupon</string>
