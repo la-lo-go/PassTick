@@ -8,18 +8,18 @@ PassTick is a private, offline-first Android pass wallet. It uses the applicatio
 
 ## PassTick in use
 
-<table>
+<table width="100%">
   <tr>
-    <td align="center"><img src="docs/assets/screenshots/homepage.webp" width="180" height="373" alt="PassTick home screen with Today and Other passes sections"></td>
-    <td align="center"><img src="docs/assets/screenshots/coastal-express.webp" width="180" height="373" alt="A train pass with travel artwork and an Aztec code"></td>
-    <td align="center"><img src="docs/assets/screenshots/lumen-live.webp" width="180" height="373" alt="A concert pass with event artwork and a QR code"></td>
-    <td align="center"><img src="docs/assets/screenshots/glass-horizons.webp" width="180" height="373" alt="A museum pass with exhibition artwork and a PDF417 code"></td>
+    <td width="25%" align="center"><img src="docs/assets/screenshots/homepage.webp" width="100%" alt="PassTick home screen with Today and Other passes sections"></td>
+    <td width="25%" align="center"><img src="docs/assets/screenshots/coastal-express.webp" width="100%" alt="A train pass with travel artwork and an Aztec code"></td>
+    <td width="25%" align="center"><img src="docs/assets/screenshots/lumen-live.webp" width="100%" alt="A concert pass with event artwork and a QR code"></td>
+    <td width="25%" align="center"><img src="docs/assets/screenshots/glass-horizons.webp" width="100%" alt="A museum pass with exhibition artwork and a PDF417 code"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Homepage</strong><br>Today and other passes</td>
-    <td align="center"><strong>Travel</strong><br>Aztec code</td>
-    <td align="center"><strong>Events</strong><br>QR code</td>
-    <td align="center"><strong>Admission</strong><br>PDF417 code</td>
+    <td width="25%" align="center"><strong>Homepage</strong><br>Today</td>
+    <td width="25%" align="center"><strong>Travel</strong><br>Aztec</td>
+    <td width="25%" align="center"><strong>Events</strong><br>QR</td>
+    <td width="25%" align="center"><strong>Admission</strong><br>PDF417</td>
   </tr>
 </table>
 
