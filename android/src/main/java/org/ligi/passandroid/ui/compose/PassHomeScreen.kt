@@ -1104,7 +1104,10 @@ private fun TicketSwipeContainer(
             ?: with(density) { startRevealWidth.toPx() }) + gapPx
         val endAnchor = (measuredEndRevealWidthPx.takeIf { it > 0 }?.toFloat()
             ?: with(density) { endRevealWidth.toPx() }) + gapPx
-        val commitAnchor = maxOf(startAnchor + 1f, measuredCardWidthPx * FULL_SWIPE_COMMIT_FRACTION)
+        val commitAnchor = maxOf(
+            startAnchor + 1f,
+            2f * measuredCardWidthPx * FULL_SWIPE_COMMIT_FRACTION - startAnchor,
+        )
         revealState.updateAnchors(
             DraggableAnchors {
                 SwipeRevealAnchor.StartActions at startAnchor
@@ -1131,6 +1134,10 @@ private fun TicketSwipeContainer(
 
     Box(modifier.clip(shape).onSizeChanged { measuredCardWidthPx = it.width }) {
         Box(Modifier.matchParentSize()) {
+            Box(
+                Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+            )
             PassActionButtonGroup(
                 modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().wrapContentWidth()
                     .onSizeChanged { measuredStartRevealWidthPx = it.width }
