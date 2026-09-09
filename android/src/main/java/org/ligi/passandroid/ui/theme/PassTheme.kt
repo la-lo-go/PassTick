@@ -57,6 +57,7 @@ fun PassTheme(
     val colors = if (dark && amoledBlackBackground) {
         baseColors.copy(
             background = Color.Black,
+            surface = Color.Black,
         )
     } else {
         baseColors
