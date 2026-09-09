@@ -135,8 +135,9 @@ fun DatePickerField(
     value: ZonedDateTime?,
     onValueChange: (ZonedDateTime?) -> Unit,
     modifier: Modifier = Modifier,
+    initiallyOpen: Boolean = false,
 ) {
-    var open by remember { mutableStateOf(false) }
+    var open by remember { mutableStateOf(initiallyOpen) }
     var pendingDate by remember { mutableStateOf<LocalDate?>(null) }
     var openTime by remember { mutableStateOf(false) }
     val selectedMillis = value?.toInstant()?.toEpochMilli()

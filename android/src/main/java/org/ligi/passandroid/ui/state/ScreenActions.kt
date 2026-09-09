@@ -5,10 +5,12 @@ import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.reminder.NotificationLockScreenDetail
+import org.ligi.passandroid.navigation.PassDateField
 
 sealed interface PassDetailAction {
     data object Back : PassDetailAction
     data object Edit : PassDetailAction
+    data class EditDate(val field: PassDateField) : PassDetailAction
     data object Share : PassDetailAction
     data class ExportImage(
         val mode: org.ligi.passandroid.platform.PassImageExportMode,
@@ -62,9 +64,7 @@ sealed interface SettingsAction {
     data class SetNotificationAccessWindow(val minutes: Int) : SettingsAction
     data class SetNotificationExactTiming(val value: Boolean) : SettingsAction
     data class SetNotificationActionsEnabled(val value: Boolean) : SettingsAction
-    data class SetNotificationSnoozeEnabled(val value: Boolean) : SettingsAction
     data class SetNotificationLockScreenDetail(val value: NotificationLockScreenDetail) : SettingsAction
-    data class SetUpdateNotificationAtEventStart(val value: Boolean) : SettingsAction
     data class SetLockAllPasses(val value: Boolean) : SettingsAction
     data class SetShowProtectedPassLockIcon(val value: Boolean) : SettingsAction
     data class SetBlurProtectedPassCards(val value: Boolean) : SettingsAction

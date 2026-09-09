@@ -3,6 +3,7 @@ package org.ligi.passandroid.ui.compose
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +31,8 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
@@ -85,6 +89,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,6 +104,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.model.comparator.PassSortOrder
+import org.ligi.passandroid.navigation.PassDateField
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
@@ -157,6 +163,7 @@ fun PassDetailScreen(
     var customText by remember { mutableStateOf(true) }
     var customBarcode by remember { mutableStateOf(true) }
     var configureReminder by remember { mutableStateOf(false) }
+    var editDateDialog by remember { mutableStateOf(false) }
     var advancedReminderActions by remember(pass?.id) { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
@@ -214,7 +221,6 @@ fun PassDetailScreen(
                         val available = buildSet {
                             if (pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) add(NotificationAction.OPEN_CODE)
                             if (pass?.locations?.isNotEmpty() == true) add(NotificationAction.DIRECTIONS)
-                            add(NotificationAction.SNOOZE)
                         }
                         val selected = reminderActionOverride ?: available
                         if (reminderActionOverride != null) {
@@ -237,6 +243,23 @@ fun PassDetailScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { configureReminder = false }) { Text("Cancel") }
+            },
+        )
+    }
+    if (editDateDialog) {
+        AlertDialog(
+            onDismissRequest = { editDateDialog = false },
+            title = { Text("Edit date") },
+            text = { Text("Select the date to edit.") },
+            confirmButton = {
+                TextButton(onClick = { editDateDialog = false; onAction(PassDetailAction.EditDate(PassDateField.START)) }) {
+                    Text("Start")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editDateDialog = false; onAction(PassDetailAction.EditDate(PassDateField.END)) }) {
+                    Text("End")
+                }
             },
         )
     }
@@ -520,7 +543,13 @@ fun PassDetailScreen(
                                                     }
                                                 }
                                             },
-                                            modifier = Modifier.fillMaxWidth().clickable(enabled = !calendarEventPresent) { onAction(PassDetailAction.AddToCalendar) },
+                                            modifier = Modifier.fillMaxWidth().combinedClickable(
+                                                enabled = true,
+                                                onClick = {
+                                                    if (!calendarEventPresent) onAction(PassDetailAction.AddToCalendar)
+                                                },
+                                                onLongClick = { editDateDialog = true },
+                                            ),
                                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                         ) { Text("Date and time") }
                                     }
@@ -598,7 +627,7 @@ private fun BarcodeCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
+fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, onAction: (EditPassAction) -> Unit) {
     var description by remember(pass?.id) { mutableStateOf(pass?.description.orEmpty()) }
     var creator by remember(pass?.id) { mutableStateOf(pass?.creator.orEmpty()) }
     var passType by remember(pass?.id) { mutableStateOf(pass?.type ?: PassType.EVENT) }
@@ -703,7 +732,7 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
                 }
             }
             item {
-                EditorSection("Code") {
+                EditorSection("Code", initiallyExpanded = false) {
                     Box {
                         OutlinedButton(onClick = { barcodeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
                             Text("Barcode: ${barcodeFormat?.name?.replace('_', ' ') ?: "None"}")
@@ -724,8 +753,14 @@ fun EditPassScreen(pass: PassUiModel?, onAction: (EditPassAction) -> Unit) {
                     DatePickerField("Start date", calendarStart, {
                         calendarStart = it
                         if (it != null && calendarEnd == null) calendarEnd = it.plusHours(2)
-                    }, Modifier.fillMaxWidth())
-                    DatePickerField("End date", calendarEnd, { calendarEnd = it }, Modifier.fillMaxWidth())
+                    }, Modifier.fillMaxWidth(), initiallyOpen = initialDateField == PassDateField.START)
+                    DatePickerField(
+                        "End date",
+                        calendarEnd,
+                        { calendarEnd = it },
+                        Modifier.fillMaxWidth(),
+                        initiallyOpen = initialDateField == PassDateField.END,
+                    )
                 }
             }
             item {
@@ -859,11 +894,25 @@ internal fun validatePassDraft(draft: PassDraft): String? {
 }
 
 @Composable
-private fun EditorSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun EditorSection(
+    title: String,
+    initiallyExpanded: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var expanded by rememberSaveable(title) { mutableStateOf(initiallyExpanded) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        Row(
+            Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (expanded) "Collapse $title" else "Expand $title")
+        }
+        if (expanded) {
+            Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+            }
         }
     }
 }
@@ -880,11 +929,24 @@ private fun PassType.displayName() = name.lowercase().replaceFirstChar(Char::upp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+fun SettingsScreen(
+    settings: AppSettings,
+    scrollToNotifications: Boolean = false,
+    onNotificationScrollConsumed: () -> Unit = {},
+    onAction: (SettingsAction) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(scrollToNotifications) {
+        if (scrollToNotifications) {
+            listState.animateScrollToItem(5)
+            onNotificationScrollConsumed()
+        }
+    }
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
-                Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter).testTag("settings_list"),
+                state = listState,
+                modifier = Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter).testTag("settings_list"),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
@@ -1022,14 +1084,6 @@ private fun NotificationSettings(settings: AppSettings, onAction: (SettingsActio
         ) { onAction(SettingsAction.SetNotificationExactTiming(it)) }
         SettingSwitch("Notification actions", settings.notificationActionsEnabled) {
             onAction(SettingsAction.SetNotificationActionsEnabled(it))
-        }
-        if (settings.notificationActionsEnabled) {
-            SettingSwitch("Snooze action", settings.notificationSnoozeEnabled) {
-                onAction(SettingsAction.SetNotificationSnoozeEnabled(it))
-            }
-        }
-        SettingSwitch("Update when event starts", settings.updateNotificationAtEventStart) {
-            onAction(SettingsAction.SetUpdateNotificationAtEventStart(it))
         }
         Text("Lock screen", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
         NotificationLockScreenDetail.entries.forEach { detail ->

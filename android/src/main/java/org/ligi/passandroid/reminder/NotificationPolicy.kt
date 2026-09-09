@@ -41,6 +41,7 @@ object NotificationPolicy {
         val phase = phase(reminder, nowMillis, settings.accessWindowMinutes)
         val disposition = when {
             nowMillis >= reminder.endAtMillis -> NotificationDisposition.CANCEL
+            phase == NotificationPhase.ACTIVE -> NotificationDisposition.CANCEL
             nowMillis < reminder.triggerAtMillis -> NotificationDisposition.SCHEDULE
             else -> NotificationDisposition.SHOW
         }
@@ -51,7 +52,7 @@ object NotificationPolicy {
             publicTitle = if (reminder.isProtected) "Pass reminder" else reminder.title,
             publicBody = if (reminder.isProtected) publicBody(reminder, nowMillis, phase) else body,
             phase = phase,
-            actions = actions(reminder, phase, settings),
+            actions = if (disposition == NotificationDisposition.CANCEL) emptySet() else actions(reminder, settings),
             disposition = disposition,
             nextTriggerAtMillis = nextTrigger(reminder, nowMillis, phase, disposition, settings),
             exactTiming = reminder.exactTiming ?: settings.exactTiming,
@@ -79,16 +80,12 @@ object NotificationPolicy {
 
     private fun actions(
         reminder: PassReminder,
-        phase: NotificationPhase,
         settings: NotificationPolicySettings,
     ): Set<NotificationAction> = buildSet {
         if (!settings.actionsEnabled) return@buildSet
         val enabled = reminder.enabledActions ?: NotificationAction.entries.toSet()
         if (reminder.hasBarcode && NotificationAction.OPEN_CODE in enabled) add(NotificationAction.OPEN_CODE)
         if (reminder.hasLocation && NotificationAction.DIRECTIONS in enabled) add(NotificationAction.DIRECTIONS)
-        if (phase != NotificationPhase.ACTIVE && settings.snoozeEnabled && NotificationAction.SNOOZE in enabled) {
-            add(NotificationAction.SNOOZE)
-        }
     }
 
     private fun nextTrigger(

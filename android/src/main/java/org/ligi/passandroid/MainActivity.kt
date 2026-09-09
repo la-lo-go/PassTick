@@ -16,6 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -119,6 +122,11 @@ class MainActivity : ComponentActivity() {
             } else {
                 state.settings.amoledBlackBackground
             }
+            val darkSystemBars = displayedThemeMode == org.ligi.passandroid.repository.ThemeMode.DARK ||
+                displayedThemeMode == org.ligi.passandroid.repository.ThemeMode.SYSTEM && isSystemInDarkTheme()
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !darkSystemBars
+            }
             LaunchedEffect(state.isContentLoading, state.settings.themeMode, state.settings.amoledBlackBackground) {
                 if (!state.isContentLoading) {
                     StartupAppearanceStore.write(
@@ -160,6 +168,7 @@ class MainActivity : ComponentActivity() {
             val passAuthenticator = remember { PassAuthenticator(this@MainActivity) }
             var showCalendarPermissionWarning by remember { mutableStateOf(false) }
             var expandedCodePassId by remember { mutableStateOf<String?>(null) }
+            var scrollSettingsToNotifications by rememberSaveable { mutableStateOf(false) }
             var authenticatedPassIds by remember { mutableStateOf(emptySet<String>()) }
             val appLocked = state.settings.lockAllPasses && !protectedPassesUnlocked
             var startupUnlockRequested by remember { mutableStateOf(false) }
@@ -380,6 +389,7 @@ class MainActivity : ComponentActivity() {
                 when (action) {
                     PassDetailAction.Back -> popBackStack()
                     PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(passId))
+                    is PassDetailAction.EditDate -> backStack.add(AppDestination.EditPass(passId, action.field))
                     PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(passId))
                     is PassDetailAction.ExportImage -> {
                         state.passes.firstOrNull { it.id == passId }?.let { pass ->
@@ -401,7 +411,10 @@ class MainActivity : ComponentActivity() {
                             flashlightController?.setEnabled(action.enabled)
                         }
                     }
-                    PassDetailAction.OpenReminderSettings -> backStack.add(AppDestination.Settings)
+                    PassDetailAction.OpenReminderSettings -> {
+                        scrollSettingsToNotifications = true
+                        backStack.add(AppDestination.Settings)
+                    }
                     PassDetailAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
                     PassDetailAction.OpenPassCustomization -> {
                         val artworkKinds = state.passes.firstOrNull { it.id == passId }?.artwork.orEmpty().map { it.kind }
@@ -675,6 +688,7 @@ class MainActivity : ComponentActivity() {
                                             val event = state.timeline.days.flatMap { it.events }
                                                 .firstOrNull { it.id == action.eventId }
                                             if (!state.settings.remindersEnabled) {
+                                                scrollSettingsToNotifications = true
                                                 backStack.add(AppDestination.Settings)
                                             } else if (event != null) {
                                                 viewModel.onAction(AppAction.TogglePassReminder(event.pass.passId))
@@ -696,6 +710,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 } else EditPassScreen(
                                     pass = pass,
+                                    initialDateField = destination.dateField,
                                     onAction = { action ->
                                         when (action) {
                                             EditPassAction.Back -> popBackStack()
@@ -722,7 +737,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             entry<AppDestination.Settings> {
-                                SettingsScreen(state.settings) { action ->
+                                SettingsScreen(
+                                    settings = state.settings,
+                                    scrollToNotifications = scrollSettingsToNotifications,
+                                    onNotificationScrollConsumed = { scrollSettingsToNotifications = false },
+                                ) { action ->
                                     when (action) {
                                         SettingsAction.Back -> popBackStack()
                                         is SettingsAction.SetTheme -> viewModel.onAction(AppAction.SetTheme(action.value))
@@ -803,14 +822,8 @@ class MainActivity : ComponentActivity() {
                                         is SettingsAction.SetNotificationActionsEnabled -> viewModel.onAction(
                                             AppAction.SetNotificationActionsEnabled(action.value),
                                         )
-                                        is SettingsAction.SetNotificationSnoozeEnabled -> viewModel.onAction(
-                                            AppAction.SetNotificationSnoozeEnabled(action.value),
-                                        )
                                         is SettingsAction.SetNotificationLockScreenDetail -> viewModel.onAction(
                                             AppAction.SetNotificationLockScreenDetail(action.value),
-                                        )
-                                        is SettingsAction.SetUpdateNotificationAtEventStart -> viewModel.onAction(
-                                            AppAction.SetUpdateNotificationAtEventStart(action.value),
                                         )
                                         is SettingsAction.SetLockAllPasses -> {
                                             if (action.value && !passAuthenticator.canAuthenticate()) {

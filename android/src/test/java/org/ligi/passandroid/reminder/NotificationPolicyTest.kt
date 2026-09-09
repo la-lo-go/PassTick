@@ -19,11 +19,7 @@ class NotificationPolicyTest {
 
         assertThat(result.phase).isEqualTo(NotificationPhase.UPCOMING)
         assertThat(result.body).isEqualTo("Starts in 1 hour · Central station")
-        assertThat(result.actions).containsExactlyInAnyOrder(
-            NotificationAction.OPEN_CODE,
-            NotificationAction.DIRECTIONS,
-            NotificationAction.SNOOZE,
-        )
+        assertThat(result.actions).containsExactlyInAnyOrder(NotificationAction.OPEN_CODE, NotificationAction.DIRECTIONS)
     }
 
     @Test
@@ -36,7 +32,7 @@ class NotificationPolicyTest {
     }
 
     @Test
-    fun `active notification removes snooze and schedules cancellation`() {
+    fun `active notification is cancelled`() {
         val result = evaluate(
             reminder(hasBarcode = true, locationLabel = "Hall A"),
             "2026-09-09T11:15:00Z",
@@ -44,11 +40,9 @@ class NotificationPolicyTest {
 
         assertThat(result.phase).isEqualTo(NotificationPhase.ACTIVE)
         assertThat(result.body).isEqualTo("Happening now · Hall A")
-        assertThat(result.actions).containsExactlyInAnyOrder(
-            NotificationAction.OPEN_CODE,
-            NotificationAction.DIRECTIONS,
-        )
-        assertThat(result.nextTriggerAtMillis).isEqualTo(time("2026-09-09T12:00:00Z"))
+        assertThat(result.disposition).isEqualTo(NotificationDisposition.CANCEL)
+        assertThat(result.actions).isEmpty()
+        assertThat(result.nextTriggerAtMillis).isNull()
     }
 
     @Test
@@ -77,7 +71,7 @@ class NotificationPolicyTest {
         val result = evaluate(reminder(), "2026-09-09T10:30:00Z")
 
         assertThat(result.body).isEqualTo("Starts in 30 minutes")
-        assertThat(result.actions).containsExactly(NotificationAction.SNOOZE)
+        assertThat(result.actions).isEmpty()
     }
 
     @Test
@@ -110,7 +104,7 @@ class NotificationPolicyTest {
             "2026-09-09T10:30:00Z",
         )
 
-        assertThat(result.actions).containsExactlyInAnyOrder(NotificationAction.OPEN_CODE, NotificationAction.SNOOZE)
+        assertThat(result.actions).containsExactly(NotificationAction.OPEN_CODE)
     }
 
     @Test

@@ -26,6 +26,7 @@ import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -61,6 +62,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -103,6 +106,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -218,6 +222,10 @@ fun PassHomeScreen(
     val focusManager = LocalFocusManager.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val openSwipePassId = remember { mutableStateOf<String?>(null) }
+    var todayExpanded by rememberSaveable { mutableStateOf(true) }
+    var pinnedExpanded by rememberSaveable { mutableStateOf(true) }
+    var otherExpanded by rememberSaveable { mutableStateOf(true) }
+    var protectedExpanded by rememberSaveable { mutableStateOf(true) }
     val protectedPassIds = remember(state.passes, state.settings.lockAllPasses) {
         state.passes.filter { state.settings.lockAllPasses || it.isProtected }.mapTo(mutableSetOf(), PassUiModel::id)
     }
@@ -359,6 +367,7 @@ fun PassHomeScreen(
     }
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = openSwipePassId.value == null && previewPass == null,
         drawerContent = {
             ModalDrawerSheet {
                 NavigationDrawerItem(
@@ -411,6 +420,7 @@ fun PassHomeScreen(
     ) {
     Scaffold(
         topBar = {
+            Box {
             HomeToolbar(
                 onOpenDrawer = { scope.launch { drawerState.open() } },
                 searchExpanded = searchExpanded,
@@ -423,6 +433,8 @@ fun PassHomeScreen(
                     if (it) searchFocusClearedByBack = false
                 },
             )
+            if (previewPass != null) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.48f)))
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
@@ -461,8 +473,8 @@ fun PassHomeScreen(
                     }
                 }
                 if (todayPasses.isNotEmpty()) {
-                    item(key = "today-heading") { SectionHeading("Today") }
-                    item(key = "today-feed") {
+                    item(key = "today-heading") { SectionHeading("Today", todayExpanded) { todayExpanded = !todayExpanded } }
+                    if (todayExpanded) item(key = "today-feed") {
                         TicketFeed(
                             passes = todayPasses,
                             categories = state.categories,
@@ -490,8 +502,8 @@ fun PassHomeScreen(
                     }
                 }
                 if (pinnedPasses.isNotEmpty()) {
-                    item(key = "pinned-heading") { SectionHeading("Pinned") }
-                    item(key = "pinned-feed") {
+                    item(key = "pinned-heading") { SectionHeading("Pinned", pinnedExpanded) { pinnedExpanded = !pinnedExpanded } }
+                    if (pinnedExpanded) item(key = "pinned-feed") {
                         TicketFeed(
                             passes = pinnedPasses,
                             categories = state.categories,
@@ -527,10 +539,8 @@ fun PassHomeScreen(
                     }
                 }
                 if (remainingPasses.isNotEmpty()) {
-                    if (homeSections.showOtherHeading) {
-                        item(key = "passes-heading") { SectionHeading("Other passes") }
-                    }
-                    item(key = "pass-feed") {
+                    item(key = "passes-heading") { SectionHeading("Other passes", otherExpanded) { otherExpanded = !otherExpanded } }
+                    if (otherExpanded) item(key = "pass-feed") {
                         TicketFeed(
                             passes = remainingPasses,
                             categories = state.categories,
@@ -566,8 +576,10 @@ fun PassHomeScreen(
                     }
                 }
                 if (separatedProtectedPasses.isNotEmpty()) {
-                    item(key = "protected-heading") { SectionHeading("Protected passes") }
-                    item(key = "protected-feed") {
+                    item(key = "protected-heading") {
+                        SectionHeading("Protected passes", protectedExpanded) { protectedExpanded = !protectedExpanded }
+                    }
+                    if (protectedExpanded) item(key = "protected-feed") {
                         TicketFeed(
                             passes = separatedProtectedPasses,
                             categories = state.categories,
@@ -1034,7 +1046,7 @@ private fun ReorderableTicketColumn(
     }
 }
 
-private enum class SwipeRevealAnchor { Closed, StartActions, EndActions }
+private enum class SwipeRevealAnchor { Closed, StartActions, StartCommit, EndActions }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -1075,6 +1087,7 @@ private fun TicketSwipeContainer(
     val cardActionGap = PassActionButtonGap
     var measuredStartRevealWidthPx by remember { mutableIntStateOf(0) }
     var measuredEndRevealWidthPx by remember { mutableIntStateOf(0) }
+    var measuredCardWidthPx by remember { mutableIntStateOf(0) }
     val revealState = remember {
         AnchoredDraggableState(
             initialValue = SwipeRevealAnchor.Closed,
@@ -1091,15 +1104,24 @@ private fun TicketSwipeContainer(
             ?: with(density) { startRevealWidth.toPx() }) + gapPx
         val endAnchor = (measuredEndRevealWidthPx.takeIf { it > 0 }?.toFloat()
             ?: with(density) { endRevealWidth.toPx() }) + gapPx
+        val commitAnchor = maxOf(startAnchor + 1f, measuredCardWidthPx * 0.62f)
         revealState.updateAnchors(
             DraggableAnchors {
                 SwipeRevealAnchor.StartActions at startAnchor
+                SwipeRevealAnchor.StartCommit at commitAnchor
                 SwipeRevealAnchor.Closed at 0f
                 SwipeRevealAnchor.EndActions at -endAnchor
             },
         )
     }
     SyncSwipeReveal(pass.id, reorderingActive, openSwipePassId, revealState)
+    LaunchedEffect(revealState.currentValue) {
+        if (revealState.currentValue == SwipeRevealAnchor.StartCommit) {
+            onArchive(pass.id, restoring, pass.categoryId)
+            if (openSwipePassId.value == pass.id) openSwipePassId.value = null
+            revealState.snapTo(SwipeRevealAnchor.Closed)
+        }
+    }
 
     fun runSwipeAction(action: () -> Unit) {
         action()
@@ -1107,13 +1129,15 @@ private fun TicketSwipeContainer(
         scope.launch { revealState.animateTo(SwipeRevealAnchor.Closed) }
     }
 
-    Box(modifier.clip(shape)) {
+    Box(modifier.clip(shape).onSizeChanged { measuredCardWidthPx = it.width }) {
         Box(Modifier.matchParentSize()) {
             PassActionButtonGroup(
                 modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().wrapContentWidth()
                     .onSizeChanged { measuredStartRevealWidthPx = it.width }
                     .then(
-                        if (revealState.currentValue == SwipeRevealAnchor.StartActions) Modifier
+                        if (revealState.currentValue == SwipeRevealAnchor.StartActions ||
+                            revealState.currentValue == SwipeRevealAnchor.StartCommit
+                        ) Modifier
                         else Modifier.clearAndSetSemantics {},
                     ),
             ) {
@@ -1302,6 +1326,7 @@ private fun TicketRow(
         modifier = modifier.fillMaxWidth().animateContentSize()
             .indication(interactionSource, LocalIndication.current),
     ) {
+        Box {
         Row(
             Modifier.fillMaxWidth().padding(if (hero) 20.dp else 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -1456,11 +1481,6 @@ private fun TicketRow(
             }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (pass.isProtected && showProtectedPassLockIcon) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Icon(Icons.Default.Lock, "Protected pass", Modifier.size(18.dp))
-                    }
-                }
                 Icon(
                     Icons.Default.DragHandle,
                     "Reorder ${pass.description}",
@@ -1477,6 +1497,17 @@ private fun TicketRow(
                     }.padding(8.dp),
                 )
             }
+        }
+        if (pass.isProtected && showProtectedPassLockIcon) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopEnd),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                shape = RoundedCornerShape(bottomStart = 18.dp),
+            ) {
+                Icon(Icons.Default.Lock, "Protected pass", Modifier.padding(8.dp).size(18.dp))
+            }
+        }
         }
     }
 }
@@ -1593,9 +1624,13 @@ private fun LockedPassSection(passCount: Int, onUnlock: () -> Unit) {
 }
 
 @Composable
-private fun SectionHeading(title: String) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+private fun SectionHeading(title: String, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (expanded) "Collapse $title" else "Expand $title")
     }
 }
 
@@ -1659,7 +1694,7 @@ private fun PassUiModel.dateLabel(compactForToday: Boolean = false): String? {
     val to = calendarTimeSpan?.to
     val value = from ?: to ?: return null
     if (!compactForToday || !occursToday()) {
-        return value.format(DateTimeFormatter.ofPattern("EEE, MMM d · HH:mm", Locale.getDefault()))
+        return value.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy · HH:mm", Locale.getDefault()))
     }
     val timePattern = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
     if (from == null || to == null) return value.format(timePattern)
