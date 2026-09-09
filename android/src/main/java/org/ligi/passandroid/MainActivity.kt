@@ -368,15 +368,15 @@ class MainActivity : ComponentActivity() {
                     is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
                     is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.orderedVisibleIds))
                     is HomeAction.Archive -> {
-                        viewModel.onAction(AppAction.SetPassArchived(action.id, true))
+                        viewModel.onAction(AppAction.SetPassArchived(action.id, true, announce = false))
                     }
                     is HomeAction.Restore -> {
-                        viewModel.onAction(AppAction.SetPassArchived(action.id, false))
+                        viewModel.onAction(AppAction.SetPassArchived(action.id, false, announce = false))
                     }
                     is HomeAction.Delete -> {
                         requestDelete(action.id)
                     }
-                    is HomeAction.Undo -> viewModel.onAction(action.operation.toAppAction())
+                    is HomeAction.Undo -> viewModel.onAction(action.operation.toAppAction().copy(announce = false))
                     HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
                     HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
                     HomeAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)

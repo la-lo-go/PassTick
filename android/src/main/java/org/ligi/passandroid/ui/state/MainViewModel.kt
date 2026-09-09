@@ -335,7 +335,7 @@ class MainViewModel(
             true
         }
         is AppAction.SetPassArchived -> {
-            launchOperation(if (action.isArchived) "Pass archived" else "Pass restored") {
+            launchOperation(if (action.announce) if (action.isArchived) "Pass archived" else "Pass restored" else null) {
                 passRepository.setArchived(action.id, action.isArchived)
             }
             true
@@ -361,11 +361,11 @@ class MainViewModel(
             .onFailure { message.value = it.message ?: "Operation failed" }
     }
 
-    private fun launchOperation(successMessage: String, block: suspend () -> Unit) {
+    private fun launchOperation(successMessage: String?, block: suspend () -> Unit) {
         viewModelScope.launch {
             busy.value = true
             runCatching { block() }
-                .onSuccess { message.value = successMessage }
+                .onSuccess { if (successMessage != null) message.value = successMessage }
                 .onFailure { message.value = it.message ?: "Operation failed" }
             busy.value = false
         }

@@ -114,6 +114,20 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `silent archive does not publish a second message`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.SetPassArchived("pass-1", true, announce = false))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.message).isNull()
+        assertThat(viewModel.uiState.value.passes.single().isArchived).isTrue()
+    }
+
+    @Test
     fun `keeps content loading until passes and settings are ready`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())

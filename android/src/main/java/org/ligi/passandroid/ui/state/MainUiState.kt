@@ -169,7 +169,7 @@ sealed interface AppAction {
     data class SetPassFavorite(val id: String, val isFavorite: Boolean) : AppAction
     data class SetPassPinned(val id: String, val isPinned: Boolean) : AppAction
     data class SetPassTags(val id: String, val tagIds: Set<String>) : AppAction
-    data class SetPassArchived(val id: String, val isArchived: Boolean) : AppAction
+    data class SetPassArchived(val id: String, val isArchived: Boolean, val announce: Boolean = true) : AppAction
     data class SetPreferredArtwork(val id: String, val kind: PassArtworkKind?) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
     data class MovePass(val id: String, val categoryId: String, val announce: Boolean = true) : AppAction

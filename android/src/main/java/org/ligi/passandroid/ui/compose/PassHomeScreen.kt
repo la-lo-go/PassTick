@@ -1155,14 +1155,6 @@ private fun TicketSwipeContainer(
             wasActionable = isActionable
         }
     }
-    LaunchedEffect(revealState.currentValue) {
-        if (revealState.currentValue == SwipeRevealAnchor.StartCommit) {
-            onArchive(pass.id, restoring, pass.categoryId)
-            if (openSwipePassId.value == pass.id) openSwipePassId.value = null
-            revealState.snapTo(SwipeRevealAnchor.Closed)
-        }
-    }
-
     fun runSwipeAction(action: () -> Unit) {
         action()
         if (openSwipePassId.value == pass.id) openSwipePassId.value = null
@@ -1171,10 +1163,6 @@ private fun TicketSwipeContainer(
 
     Box(modifier.clip(shape).onSizeChanged { measuredCardWidthPx = it.width }) {
         Box(Modifier.matchParentSize()) {
-            Box(
-                Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
-            )
             val gapPx = with(density) { cardActionGap.toPx() }
             val minimumActionWidthPx = with(density) { startRevealWidth.toPx() }
             val rawOffset = revealState.offset.let { if (it.isNaN()) 0f else it.coerceAtLeast(0f) }
@@ -1186,32 +1174,37 @@ private fun TicketSwipeContainer(
             } else {
                 1f
             }
-            Box(
-                modifier = Modifier.align(Alignment.CenterStart)
-                    .fillMaxHeight()
-                    .width(with(density) { actionWidthPx.toDp() })
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .clickable { runSwipeAction { onArchive(pass.id, restoring, pass.categoryId) } }
+            PassActionButtonGroup(
+                modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight()
+                    .graphicsLayer { alpha = if (revealState.offset.let { !it.isNaN() && it > 0f }) 1f else 0f }
                     .then(
                         if (revealState.currentValue == SwipeRevealAnchor.StartActions ||
                             revealState.currentValue == SwipeRevealAnchor.StartCommit
                         ) Modifier
                         else Modifier.clearAndSetSemantics {},
                     ),
-                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = if (restoring) Icons.Default.Restore else Icons.Default.Archive,
-                    contentDescription = archiveLabel,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(24.dp).graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
+                customItem(
+                    buttonGroupContent = {
+                        PassActionButton(
+                            icon = if (restoring) Icons.Default.Restore else Icons.Default.Archive,
+                            label = archiveLabel,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            index = 0,
+                            count = 1,
+                            fillHeight = true,
+                            width = with(density) { actionWidthPx.toDp() },
+                            iconScale = iconScale,
+                            onClick = { runSwipeAction { onArchive(pass.id, restoring, pass.categoryId) } },
+                        )
                     },
+                    menuContent = { _ -> },
                 )
             }
             PassActionButtonGroup(
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().wrapContentWidth()
+                    .graphicsLayer { alpha = if (revealState.offset.let { !it.isNaN() && it < 0f }) 1f else 0f }
                     .onSizeChanged { measuredEndRevealWidthPx = it.width }
                     .testTag("pass_end_actions_${pass.id}")
                     .then(
@@ -1274,6 +1267,15 @@ private fun TicketSwipeContainer(
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
                     openSwipePassId.value = pass.id
+                    var pressed: Boolean
+                    do {
+                        pressed = awaitPointerEvent().changes.any { it.pressed }
+                    } while (pressed)
+                    if (revealState.offset >= measuredCardWidthPx * FULL_SWIPE_COMMIT_FRACTION) {
+                        onArchive(pass.id, restoring, pass.categoryId)
+                        if (openSwipePassId.value == pass.id) openSwipePassId.value = null
+                        scope.launch { revealState.snapTo(SwipeRevealAnchor.Closed) }
+                    }
                 }
             }.anchoredDraggable(
                 state = revealState,

@@ -1,6 +1,7 @@
 package org.ligi.passandroid.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
@@ -56,14 +57,16 @@ fun PassActionButton(
     index: Int,
     count: Int,
     fillHeight: Boolean = false,
+    width: Dp = IconButtonDefaults.mediumContainerSize().width,
+    iconScale: Float = 1f,
     onClick: () -> Unit,
 ) {
     FilledIconButton(
         onClick = onClick,
         modifier = if (fillHeight) {
-            Modifier.fillMaxHeight().width(IconButtonDefaults.mediumContainerSize().width)
+            Modifier.fillMaxHeight().width(width)
         } else {
-            Modifier.size(IconButtonDefaults.mediumContainerSize())
+            Modifier.size(width, IconButtonDefaults.mediumContainerSize().height)
         },
         shape = passActionButtonShape(index, count),
         colors = IconButtonDefaults.filledIconButtonColors(
@@ -71,7 +74,14 @@ fun PassActionButton(
             contentColor = contentColor,
         ),
     ) {
-        Icon(icon, label, Modifier.size(IconButtonDefaults.mediumIconSize))
+        Icon(
+            icon,
+            label,
+            Modifier.size(IconButtonDefaults.mediumIconSize).graphicsLayer {
+                scaleX = iconScale
+                scaleY = iconScale
+            },
+        )
     }
 }
 
