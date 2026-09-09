@@ -1,6 +1,10 @@
 # PassTick
 
-This repository is an independent modernization of the original PassAndroid project by ligi and its contributors. It preserves the complete project history, original copyright, and GNU GPL version 3 license.
+<p align="center">
+  <img src="android/src/main/assets/ic_ticket_primary.svg" width="160" alt="PassTick ticket icon">
+</p>
+
+This repository is an independent modernization of the original [PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its contributors. It preserves the complete project history, original copyright, and GNU GPL version 3 license.
 
 PassTick is a private, offline-first Android pass wallet. It uses the application ID `dev.lalogo.passtick`. It supports Android 10 and later and does not contain analytics.
 
