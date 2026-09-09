@@ -10,6 +10,9 @@ PassTick is a private, offline-first Android pass wallet. It uses the applicatio
 
 <table>
   <tr>
+    <td colspan="3" align="center"><img src="docs/assets/screenshots/homepage.png" width="840" alt="PassTick home screen with Today and Other passes sections"></td>
+  </tr>
+  <tr>
     <td align="center"><img src="docs/assets/screenshots/coastal-express.png" width="280" alt="A train pass with travel artwork and an Aztec code"></td>
     <td align="center"><img src="docs/assets/screenshots/lumen-live.png" width="280" alt="A concert pass with event artwork and a QR code"></td>
     <td align="center"><img src="docs/assets/screenshots/glass-horizons.png" width="280" alt="A museum pass with exhibition artwork and a PDF417 code"></td>
@@ -21,7 +24,6 @@ PassTick is a private, offline-first Android pass wallet. It uses the applicatio
   </tr>
 </table>
 
-The examples use fictional passes and original demonstration artwork. The screenshots come from PassTick running on a physical Android device.
 
 ## Features
 
