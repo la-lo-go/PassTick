@@ -2,7 +2,7 @@
 
 ## Scope
 
-This repository preserves the complete history of the original PassAndroid project. Keep `upstream` pointed at `https://github.com/ligi/PassAndroid.git`. Do not add an `origin`, create a remote repository, rename the app, or push changes until the owner selects the final name and authorizes publication.
+This repository preserves the complete history of the original PassAndroid project. Keep `upstream` pointed at `https://github.com/ligi/PassAndroid.git`. The owner has selected the final name: the app is "PassTick" with applicationId `dev.lalogo.passtick`. Do not add an `origin`, create a remote repository, or push changes until the owner authorizes publication.
 
 The maintained application is a private, offline-first Android app for Android 10 and later. It reads, stores, displays, edits, imports, and exports `.pkpass` and `.esPass` files. It has one application artifact, no analytics, and no vendor-specific distribution code.
 
@@ -38,10 +38,14 @@ The maintained application is a private, offline-first Android app for Android 1
 - Refactor converted code only when it improves type safety, null safety, structured concurrency, testability, reuse, or removes duplication or Android coupling.
 - Comments explain invariants, constraints, compatibility behavior, failures, or non-obvious decisions. Remove narration and commented-out code.
 - Use short, literal technical English.
+- Use ASD-STE100 Simplified Technical English for documentation and plans.
+- Follow YAGNI (You Aren't Gonna Need It). Prefer clear one-line solutions when they do not reduce readability.
 - Make atomic English commits as `Lalo <gonzalo.alvalon@gmail.com>`. Do not add co-author trailers or tool references.
 
 ## Required validation
 
 Run the narrowest relevant test during development. Before each milestone, run unit tests, lint, and the release build. Run instrumented and Compose tests on API 29 and API 37 when emulators are available. A release remains blocked until it is also tested on a physical Android 10 or later device.
+
+At the end of each major change or implementation of a complex feature, run cyclomatic-complexity lint or an equivalent complexity check.
 
 Modernization is complete only when maintained code contains no Java, XML screens, Fragments, RecyclerView, ViewBinding, backend, analytics, Amazon code, broken dependencies, or product flavors, and all required checks pass.

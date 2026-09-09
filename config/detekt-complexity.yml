@@ -1,0 +1,31 @@
+complexity:
+  active: true
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 15
+  CognitiveComplexMethod:
+    active: true
+    threshold: 15
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+  LongParameterList:
+    active: false
+  TooManyFunctions:
+    active: false
+  ComplexCondition:
+    active: true
+    threshold: 4
+
+style:
+  active: false
+performance:
+  active: false
+potential-bugs:
+  active: false
+naming:
+  active: false
+comments:
+  active: false
+exceptions:
+  active: false
