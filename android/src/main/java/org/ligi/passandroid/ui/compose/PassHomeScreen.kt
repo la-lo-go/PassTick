@@ -222,10 +222,10 @@ fun PassHomeScreen(
     val focusManager = LocalFocusManager.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val openSwipePassId = remember { mutableStateOf<String?>(null) }
-    var todayExpanded by rememberSaveable { mutableStateOf(true) }
-    var pinnedExpanded by rememberSaveable { mutableStateOf(true) }
-    var otherExpanded by rememberSaveable { mutableStateOf(true) }
-    var protectedExpanded by rememberSaveable { mutableStateOf(true) }
+    var todayExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
+    var pinnedExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
+    var otherExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
+    var protectedExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     val protectedPassIds = remember(state.passes, state.settings.lockAllPasses) {
         state.passes.filter { state.settings.lockAllPasses || it.isProtected }.mapTo(mutableSetOf(), PassUiModel::id)
     }
@@ -1104,7 +1104,7 @@ private fun TicketSwipeContainer(
             ?: with(density) { startRevealWidth.toPx() }) + gapPx
         val endAnchor = (measuredEndRevealWidthPx.takeIf { it > 0 }?.toFloat()
             ?: with(density) { endRevealWidth.toPx() }) + gapPx
-        val commitAnchor = maxOf(startAnchor + 1f, measuredCardWidthPx * 0.62f)
+        val commitAnchor = maxOf(startAnchor + 1f, measuredCardWidthPx * FULL_SWIPE_COMMIT_FRACTION)
         revealState.updateAnchors(
             DraggableAnchors {
                 SwipeRevealAnchor.StartActions at startAnchor
@@ -1703,3 +1703,5 @@ private fun PassUiModel.dateLabel(compactForToday: Boolean = false): String? {
     val daySuffix = if (dayGap >= 1) " (+$dayGap)" else ""
     return "${from.format(timePattern)} > ${endInStartZone.format(timePattern)}$daySuffix"
 }
+
+private const val FULL_SWIPE_COMMIT_FRACTION = 0.62f

@@ -116,9 +116,7 @@ data class AppSettings(
     val notificationAccessWindowMinutes: Int = 15,
     val notificationExactTiming: Boolean = false,
     val notificationActionsEnabled: Boolean = true,
-    val notificationSnoozeEnabled: Boolean = true,
     val notificationLockScreenDetail: NotificationLockScreenDetail = NotificationLockScreenDetail.HIDE_SENSITIVE,
-    val updateNotificationAtEventStart: Boolean = true,
     val passDetailSectionOrder: List<PassDetailSection> = defaultPassDetailSectionOrder,
     val hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
     val homeCardSectionOrder: List<HomeCardSection> = defaultHomeCardSectionOrder,
@@ -133,9 +131,7 @@ data class AppSettings(
         accessWindowMinutes = notificationAccessWindowMinutes,
         exactTiming = notificationExactTiming,
         actionsEnabled = notificationActionsEnabled,
-        snoozeEnabled = notificationSnoozeEnabled,
         lockScreenDetail = notificationLockScreenDetail,
-        updateAtEventStart = updateNotificationAtEventStart,
     )
 }
 
@@ -160,9 +156,7 @@ interface SettingsRepository {
     suspend fun setNotificationAccessWindowMinutes(value: Int)
     suspend fun setNotificationExactTiming(value: Boolean)
     suspend fun setNotificationActionsEnabled(value: Boolean)
-    suspend fun setNotificationSnoozeEnabled(value: Boolean)
     suspend fun setNotificationLockScreenDetail(value: NotificationLockScreenDetail)
-    suspend fun setUpdateNotificationAtEventStart(value: Boolean)
     suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>)
     suspend fun setHomeCardLayout(order: List<HomeCardSection>, hidden: Set<HomeCardSection>)
     suspend fun movePassDetailSection(section: PassDetailSection, offset: Int)
@@ -205,11 +199,9 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             notificationAccessWindowMinutes = (preferences[NOTIFICATION_ACCESS_WINDOW] ?: 15).coerceIn(0, 120),
             notificationExactTiming = preferences[NOTIFICATION_EXACT_TIMING] ?: false,
             notificationActionsEnabled = preferences[NOTIFICATION_ACTIONS] ?: true,
-            notificationSnoozeEnabled = preferences[NOTIFICATION_SNOOZE] ?: true,
             notificationLockScreenDetail = preferences[NOTIFICATION_LOCK_SCREEN]?.let {
                 runCatching { NotificationLockScreenDetail.valueOf(it) }.getOrNull()
             } ?: NotificationLockScreenDetail.HIDE_SENSITIVE,
-            updateNotificationAtEventStart = preferences[NOTIFICATION_UPDATE_AT_START] ?: true,
             passDetailSectionOrder = preferences[PASS_DETAIL_SECTION_ORDER]
                 ?.let(::decodePassDetailSectionOrder)
                 ?: defaultPassDetailSectionOrder,
@@ -273,10 +265,8 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         update(NOTIFICATION_ACCESS_WINDOW, value.coerceIn(0, 120))
     override suspend fun setNotificationExactTiming(value: Boolean) = update(NOTIFICATION_EXACT_TIMING, value)
     override suspend fun setNotificationActionsEnabled(value: Boolean) = update(NOTIFICATION_ACTIONS, value)
-    override suspend fun setNotificationSnoozeEnabled(value: Boolean) = update(NOTIFICATION_SNOOZE, value)
     override suspend fun setNotificationLockScreenDetail(value: NotificationLockScreenDetail) =
         update(NOTIFICATION_LOCK_SCREEN, value.name)
-    override suspend fun setUpdateNotificationAtEventStart(value: Boolean) = update(NOTIFICATION_UPDATE_AT_START, value)
     override suspend fun setPassDetailLayout(order: List<PassDetailSection>, hidden: Set<PassDetailSection>) {
         context.settingsDataStore.edit {
             it[PASS_DETAIL_SECTION_ORDER] = encodePassDetailSectionOrder(order)
@@ -355,9 +345,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val NOTIFICATION_ACCESS_WINDOW = intPreferencesKey("notification_access_window_minutes")
         val NOTIFICATION_EXACT_TIMING = booleanPreferencesKey("notification_exact_timing")
         val NOTIFICATION_ACTIONS = booleanPreferencesKey("notification_actions_enabled")
-        val NOTIFICATION_SNOOZE = booleanPreferencesKey("notification_snooze_enabled")
         val NOTIFICATION_LOCK_SCREEN = stringPreferencesKey("notification_lock_screen_detail")
-        val NOTIFICATION_UPDATE_AT_START = booleanPreferencesKey("notification_update_at_event_start")
         val PASS_DETAIL_SECTION_ORDER = stringPreferencesKey("pass_detail_section_order")
         val HIDDEN_PASS_DETAIL_SECTIONS = stringSetPreferencesKey("hidden_pass_detail_sections")
         val HOME_CARD_SECTION_ORDER = stringPreferencesKey("home_card_section_order")

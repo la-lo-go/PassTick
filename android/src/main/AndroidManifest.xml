@@ -31,9 +31,6 @@
             android:name=".reminder.PassReminderReceiver"
             android:exported="false" />
         <receiver
-            android:name=".reminder.ReminderSnoozeReceiver"
-            android:exported="false" />
-        <receiver
             android:name=".reminder.ReminderBootReceiver"
             android:enabled="true"
             android:exported="false">

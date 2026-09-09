@@ -46,7 +46,6 @@ class AndroidReminderScheduler(private val context: Context) : ReminderScheduler
 
     private fun cancel(reminder: PassReminder) {
         alarms.cancel(leadIntent(context, reminder))
-        alarms.cancel(snoozeDeliveryIntent(context, reminder))
     }
 
     companion object {
@@ -74,18 +73,6 @@ class PassReminderReceiver : BroadcastReceiver() {
         if (intent.action == ACTION_LIFECYCLE || intent.action == null && isLifecycleOwner(context, reminder)) {
             scheduleLifecycle(context, reminder, System.currentTimeMillis(), settings)
         }
-    }
-}
-
-class ReminderSnoozeReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val reminder = intent.reminderOrNull() ?: return
-        requireNotNull(context.getSystemService(AlarmManager::class.java)).setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + DEFAULT_SNOOZE_MILLIS,
-            snoozeDeliveryIntent(context, reminder),
-        )
-        NotificationManagerCompat.from(context).cancel(notificationId(reminder.passId))
     }
 }
 
@@ -182,7 +169,6 @@ private fun NotificationCompat.Builder.addReminderAction(context: Context, remin
     when (action) {
         NotificationAction.OPEN_CODE -> addAction(0, "Open code", openPassIntent(context, reminder.passId, true))
         NotificationAction.DIRECTIONS -> addAction(0, "Directions", directionsIntent(context, reminder))
-        NotificationAction.SNOOZE -> addAction(0, "Snooze", snoozeIntent(context, reminder))
     }
 }
 
@@ -211,13 +197,6 @@ private fun directionsIntent(context: Context, reminder: PassReminder) = Pending
     PENDING_FLAGS,
 )
 
-private fun snoozeIntent(context: Context, reminder: PassReminder) = PendingIntent.getBroadcast(
-    context,
-    reminder.id.hashCode(),
-    Intent(context, ReminderSnoozeReceiver::class.java).putReminder(reminder),
-    PENDING_FLAGS,
-)
-
 private fun leadIntent(context: Context, reminder: PassReminder) = PendingIntent.getBroadcast(
     context,
     reminder.id.hashCode(),
@@ -229,13 +208,6 @@ private fun lifecycleIntent(context: Context, reminder: PassReminder) = PendingI
     context,
     lifecycleKey(reminder).hashCode(),
     Intent(context, PassReminderReceiver::class.java).apply { action = ACTION_LIFECYCLE }.putReminder(reminder),
-    PENDING_FLAGS,
-)
-
-private fun snoozeDeliveryIntent(context: Context, reminder: PassReminder) = PendingIntent.getBroadcast(
-    context,
-    (reminder.id + "snooze").hashCode(),
-    Intent(context, PassReminderReceiver::class.java).apply { action = ACTION_SNOOZE }.putReminder(reminder),
     PENDING_FLAGS,
 )
 
@@ -256,9 +228,7 @@ private fun storePolicySettings(context: Context, settings: NotificationPolicySe
         .putInt(ACCESS_WINDOW, settings.accessWindowMinutes)
         .putBoolean(EXACT_TIMING, settings.exactTiming)
         .putBoolean(ACTIONS_ENABLED, settings.actionsEnabled)
-        .putBoolean(SNOOZE_ENABLED, settings.snoozeEnabled)
         .putString(LOCK_SCREEN_DETAIL, settings.lockScreenDetail.name)
-        .putBoolean(UPDATE_AT_EVENT_START, settings.updateAtEventStart)
         .apply()
 }
 
@@ -268,11 +238,9 @@ private fun readPolicySettings(context: Context): NotificationPolicySettings =
             accessWindowMinutes = getInt(ACCESS_WINDOW, 15),
             exactTiming = getBoolean(EXACT_TIMING, false),
             actionsEnabled = getBoolean(ACTIONS_ENABLED, true),
-            snoozeEnabled = getBoolean(SNOOZE_ENABLED, true),
             lockScreenDetail = getString(LOCK_SCREEN_DETAIL, null)
                 ?.let { runCatching { NotificationLockScreenDetail.valueOf(it) }.getOrNull() }
                 ?: NotificationLockScreenDetail.HIDE_SENSITIVE,
-            updateAtEventStart = getBoolean(UPDATE_AT_EVENT_START, true),
         )
     }
 
@@ -323,11 +291,7 @@ private const val STORED = "reminders"
 private const val ACCESS_WINDOW = "access_window"
 private const val EXACT_TIMING = "exact_timing"
 private const val ACTIONS_ENABLED = "actions_enabled"
-private const val SNOOZE_ENABLED = "snooze_enabled"
 private const val LOCK_SCREEN_DETAIL = "lock_screen_detail"
-private const val UPDATE_AT_EVENT_START = "update_at_event_start"
-private const val ACTION_SNOOZE = "dev.lalogo.passtick.action.SNOOZE_DELIVERY"
 private const val ACTION_LIFECYCLE = "dev.lalogo.passtick.action.REMINDER_LIFECYCLE"
-private const val DEFAULT_SNOOZE_MILLIS = 10 * 60_000L
 private const val MAX_ACTIONS = 3
 private const val PENDING_FLAGS = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

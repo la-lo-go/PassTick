@@ -455,11 +455,9 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setNotificationAccessWindowMinutes(value: Int) = Unit
     override suspend fun setNotificationExactTiming(value: Boolean) = Unit
     override suspend fun setNotificationActionsEnabled(value: Boolean) = Unit
-    override suspend fun setNotificationSnoozeEnabled(value: Boolean) = Unit
     override suspend fun setNotificationLockScreenDetail(
         value: org.ligi.passandroid.reminder.NotificationLockScreenDetail,
     ) = Unit
-    override suspend fun setUpdateNotificationAtEventStart(value: Boolean) = Unit
     override suspend fun setPassDetailLayout(
         order: List<org.ligi.passandroid.repository.PassDetailSection>,
         hidden: Set<org.ligi.passandroid.repository.PassDetailSection>,

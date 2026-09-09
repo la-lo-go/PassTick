@@ -18,7 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -568,7 +569,6 @@ private fun ReminderActionSetting(action: NotificationAction, enabled: Boolean, 
     val label = when (action) {
         NotificationAction.OPEN_CODE -> "Open code"
         NotificationAction.DIRECTIONS -> "Directions"
-        NotificationAction.SNOOZE -> "Snooze"
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(enabled, onCheckedChange = onEnabled)
@@ -935,17 +935,16 @@ fun SettingsScreen(
     onNotificationScrollConsumed: () -> Unit = {},
     onAction: (SettingsAction) -> Unit,
 ) {
-    val listState = rememberLazyListState()
+    val notificationRequester = remember { BringIntoViewRequester() }
     LaunchedEffect(scrollToNotifications) {
         if (scrollToNotifications) {
-            listState.animateScrollToItem(5)
+            notificationRequester.bringIntoView()
             onNotificationScrollConsumed()
         }
     }
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
-                state = listState,
                 modifier = Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter).testTag("settings_list"),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -955,7 +954,7 @@ fun SettingsScreen(
                 item { PassListSettings(onAction) }
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
-                item { NotificationSettings(settings, onAction) }
+                item { NotificationSettings(settings, onAction, Modifier.bringIntoViewRequester(notificationRequester)) }
             }
         }
     }
@@ -1061,8 +1060,8 @@ private fun CalendarSettings(settings: AppSettings, onAction: (SettingsAction) -
 }
 
 @Composable
-private fun NotificationSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup("Notifications") {
+private fun NotificationSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit, modifier: Modifier = Modifier) {
+    SettingsGroup("Notifications", modifier) {
         SettingSwitch("Pass reminders", settings.remindersEnabled) {
             onAction(SettingsAction.SetRemindersEnabled(it))
         }
@@ -1139,8 +1138,8 @@ private fun Set<Int>.toggle(value: Int) = toMutableSet().apply {
 }
 
 @Composable
-private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun SettingsGroup(title: String, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Surface(
             shape = RoundedCornerShape(28.dp),

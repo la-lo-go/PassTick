@@ -190,9 +190,7 @@ sealed interface AppAction {
     data class SetNotificationAccessWindow(val minutes: Int) : AppAction
     data class SetNotificationExactTiming(val value: Boolean) : AppAction
     data class SetNotificationActionsEnabled(val value: Boolean) : AppAction
-    data class SetNotificationSnoozeEnabled(val value: Boolean) : AppAction
     data class SetNotificationLockScreenDetail(val value: NotificationLockScreenDetail) : AppAction
-    data class SetUpdateNotificationAtEventStart(val value: Boolean) : AppAction
     data class SetLockAllPasses(val value: Boolean) : AppAction
     data class SetShowProtectedPassLockIcon(val value: Boolean) : AppAction
     data class SetBlurProtectedPassCards(val value: Boolean) : AppAction

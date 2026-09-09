@@ -244,14 +244,8 @@ class MainViewModel(
             is AppAction.SetNotificationActionsEnabled -> viewModelScope.launch {
                 settingsRepository.setNotificationActionsEnabled(action.value)
             }
-            is AppAction.SetNotificationSnoozeEnabled -> viewModelScope.launch {
-                settingsRepository.setNotificationSnoozeEnabled(action.value)
-            }
             is AppAction.SetNotificationLockScreenDetail -> viewModelScope.launch {
                 settingsRepository.setNotificationLockScreenDetail(action.value)
-            }
-            is AppAction.SetUpdateNotificationAtEventStart -> viewModelScope.launch {
-                settingsRepository.setUpdateNotificationAtEventStart(action.value)
             }
             is AppAction.SetLockAllPasses -> viewModelScope.launch {
                 settingsRepository.setLockAllPasses(action.value)

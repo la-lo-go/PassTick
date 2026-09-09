@@ -38,8 +38,7 @@ class NotificationPolicyTest {
             "2026-09-09T11:15:00Z",
         )
 
-        assertThat(result.phase).isEqualTo(NotificationPhase.ACTIVE)
-        assertThat(result.body).isEqualTo("Happening now · Hall A")
+        assertThat(result.phase).isEqualTo(NotificationPhase.ACCESS)
         assertThat(result.disposition).isEqualTo(NotificationDisposition.CANCEL)
         assertThat(result.actions).isEmpty()
         assertThat(result.nextTriggerAtMillis).isNull()
@@ -141,18 +140,6 @@ class NotificationPolicyTest {
         assertThat(
             evaluate(reminder, "2026-09-09T10:40:00Z", NotificationPolicySettings(accessWindowMinutes = 15)).phase,
         ).isEqualTo(NotificationPhase.UPCOMING)
-    }
-
-    @Test
-    fun `disabled event start update schedules cancellation after access`() {
-        val result = evaluate(
-            reminder(),
-            "2026-09-09T10:50:00Z",
-            NotificationPolicySettings(updateAtEventStart = false),
-        )
-
-        assertThat(result.phase).isEqualTo(NotificationPhase.ACCESS)
-        assertThat(result.nextTriggerAtMillis).isEqualTo(time("2026-09-09T12:00:00Z"))
     }
 
     @Test

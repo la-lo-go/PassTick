@@ -2,9 +2,9 @@ package org.ligi.passandroid.reminder
 
 import kotlin.math.max
 
-enum class NotificationPhase { UPCOMING, ACCESS, ACTIVE }
+enum class NotificationPhase { UPCOMING, ACCESS }
 
-enum class NotificationAction { OPEN_CODE, DIRECTIONS, SNOOZE }
+enum class NotificationAction { OPEN_CODE, DIRECTIONS }
 
 enum class NotificationDisposition { SCHEDULE, SHOW, CANCEL }
 
@@ -14,9 +14,7 @@ data class NotificationPolicySettings(
     val accessWindowMinutes: Int = 15,
     val exactTiming: Boolean = false,
     val actionsEnabled: Boolean = true,
-    val snoozeEnabled: Boolean = true,
     val lockScreenDetail: NotificationLockScreenDetail = NotificationLockScreenDetail.HIDE_SENSITIVE,
-    val updateAtEventStart: Boolean = true,
 )
 
 data class NotificationPolicyResult(
@@ -40,8 +38,7 @@ object NotificationPolicy {
     ): NotificationPolicyResult {
         val phase = phase(reminder, nowMillis, settings.accessWindowMinutes)
         val disposition = when {
-            nowMillis >= reminder.endAtMillis -> NotificationDisposition.CANCEL
-            phase == NotificationPhase.ACTIVE -> NotificationDisposition.CANCEL
+            nowMillis >= reminder.eventAtMillis -> NotificationDisposition.CANCEL
             nowMillis < reminder.triggerAtMillis -> NotificationDisposition.SCHEDULE
             else -> NotificationDisposition.SHOW
         }
@@ -61,7 +58,6 @@ object NotificationPolicy {
     }
 
     private fun phase(reminder: PassReminder, nowMillis: Long, accessWindowMinutes: Int) = when {
-        nowMillis >= reminder.eventAtMillis -> NotificationPhase.ACTIVE
         reminder.eventAtMillis - nowMillis <= accessWindowMinutes.coerceAtLeast(0) * MINUTE -> NotificationPhase.ACCESS
         else -> NotificationPhase.UPCOMING
     }
@@ -71,10 +67,9 @@ object NotificationPolicy {
             .joinToString(" · ")
 
     private fun publicBody(reminder: PassReminder, nowMillis: Long, phase: NotificationPhase): String =
-        phaseText(reminder, nowMillis, phase).replace("Happening", "Pass is happening")
+        phaseText(reminder, nowMillis, phase)
 
     private fun phaseText(reminder: PassReminder, nowMillis: Long, phase: NotificationPhase): String = when (phase) {
-        NotificationPhase.ACTIVE -> "Happening now"
         NotificationPhase.ACCESS, NotificationPhase.UPCOMING -> "Starts in ${durationLabel(reminder.eventAtMillis - nowMillis)}"
     }
 
@@ -102,8 +97,7 @@ object NotificationPolicy {
             nowMillis + MINUTE,
             reminder.eventAtMillis - settings.accessWindowMinutes.coerceAtLeast(0) * MINUTE,
         )
-        phase == NotificationPhase.ACCESS && settings.updateAtEventStart -> reminder.eventAtMillis
-        phase == NotificationPhase.ACCESS -> reminder.endAtMillis
+        phase == NotificationPhase.ACCESS -> reminder.eventAtMillis
         else -> reminder.endAtMillis
     }?.takeIf { it > nowMillis }
 
