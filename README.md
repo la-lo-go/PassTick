@@ -2,24 +2,31 @@
   <img src="docs/assets/passtick-wordmark.svg" width="390" alt="PassTick">
 </p>
 
-This repository is an independent modernization of the original [PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its contributors. It preserves the complete project history, original copyright, and GNU GPL version 3 license.
+PassTick is a modern, private and offline-first wallet for Apple Wallet passes on Android.
 
-PassTick is a private, offline-first Android pass wallet. It uses the application ID `dev.lalogo.passtick`. It supports Android 10 and later and does not contain analytics.
+This repository is an independent modernization of the original [PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its contributors. It preserves the complete project history, original copyright, and GNU GPL version 3 license.
 
 ## PassTick in use
 
 <table width="100%">
   <tr>
-    <td width="25%" align="center"><img src="docs/assets/screenshots/homepage.webp" width="100%" alt="PassTick home screen with Today and Other passes sections"></td>
-    <td width="25%" align="center"><img src="docs/assets/screenshots/coastal-express.webp" width="100%" alt="A train pass with travel artwork and an Aztec code"></td>
-    <td width="25%" align="center"><img src="docs/assets/screenshots/lumen-live.webp" width="100%" alt="A concert pass with event artwork and a QR code"></td>
-    <td width="25%" align="center"><img src="docs/assets/screenshots/glass-horizons.webp" width="100%" alt="A museum pass with exhibition artwork and a PDF417 code"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/homepage.webp" width="100%" alt="PassTick home screen with Today and Other passes sections"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/coastal-express.webp" width="100%" alt="A train pass with travel artwork and an Aztec code"></td>
   </tr>
   <tr>
-    <td width="25%" align="center"><strong>Homepage</strong><br>Today</td>
-    <td width="25%" align="center"><strong>Travel</strong><br>Aztec</td>
-    <td width="25%" align="center"><strong>Events</strong><br>QR</td>
-    <td width="25%" align="center"><strong>Admission</strong><br>PDF417</td>
+    <td width="50%" align="center"><strong>Homepage</strong></td>
+    <td width="50%" align="center"><strong>Coastal Express</strong></td>
+  </tr>
+</table>
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/lumen-live.webp" width="100%" alt="A concert pass with event artwork and a QR code"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/glass-horizons.webp" width="100%" alt="A museum pass with exhibition artwork and a PDF417 code"></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><strong>Lumen Live</strong></td>
+    <td width="50%" align="center"><strong>Glass Horizons</strong></td>
   </tr>
 </table>
 
