@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PassAndroid"
+rootProject.name = "PassTick"
 include(":android")

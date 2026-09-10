@@ -2,7 +2,7 @@
 
 ## Scope
 
-This repository preserves the complete history of the original PassAndroid project. Keep `upstream` pointed at `https://github.com/ligi/PassAndroid.git`. The owner has selected the final name: the app is "PassTick" with applicationId `dev.lalogo.passtick`. Do not add an `origin`, create a remote repository, or push changes until the owner authorizes publication.
+This repository preserves the complete history of the original PassAndroid project. Keep `upstream` pointed at `https://github.com/ligi/PassAndroid.git` and `origin` pointed at `https://github.com/la-lo-go/PassTick.git`. The owner has selected the final name: the app is "PassTick" with applicationId `dev.lalogo.passtick`. Do not push changes until the owner authorizes publication.
 
 The maintained application is a private, offline-first Android app for Android 10 and later. It reads, stores, displays, edits, imports, and exports `.pkpass` and `.esPass` files. It has one application artifact, no analytics, and no vendor-specific distribution code.
 

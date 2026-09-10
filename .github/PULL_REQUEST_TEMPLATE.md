@@ -1,7 +1,13 @@
-# PullRequest
+# Pull request
 
-Great that you are thinking about submitting a PullRequest!
+## Summary
 
-Please keep them small if not otherwise possible. Contact me *before* you are creating a big PR to avoid unnecessary work and rebasing of big PRs. Also try to add tests - I am not dogmatic about that but prefer PRs backed by tests. This project has everything setup for Espresso UI and Unit-tests. Also the existing unit and UI-tests muss pass before submitting a PullRequest.
+Describe what changes and why.
 
-Please base the PullRequests on the branch named dev if one currently exists - otherwise use master
+## Validation
+
+- [ ] `.\gradlew.bat :android:testDebugUnitTest :android:lintDebug :android:assembleRelease`
+- [ ] Instrumented tests on API 29 and API 37 (when emulators are available)
+- [ ] Release tested on a physical Android 10 or later device (release changes only)
+
+Base the branch on `main`. Keep the pull request small and focused. Follow [AGENTS.md](https://github.com/la-lo-go/PassTick/blob/main/AGENTS.md).
