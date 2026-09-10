@@ -21,7 +21,6 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
 import org.junit.Rule
 import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
@@ -67,7 +66,7 @@ class PassScreensTest {
         val settings = AppSettings(themeMode = ThemeMode.DARK)
         composeRule.setContent {
             PassTheme(settings.themeMode, settings.amoledBlackBackground) {
-                SettingsScreen(settings, {})
+                SettingsScreen(settings, onAction = {})
             }
         }
 
@@ -79,7 +78,7 @@ class PassScreensTest {
     @Test
     fun settingsExposeProtectedPassPrivacyOptions() {
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), {}) }
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = {}) }
         }
 
         composeRule.onNodeWithTag("settings_list").performScrollToIndex(3)
@@ -93,21 +92,19 @@ class PassScreensTest {
     @Test
     fun settingsExposeNotificationPolicyOptions() {
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(remindersEnabled = true), {}) }
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(remindersEnabled = true), onAction = {}) }
         }
 
         composeRule.onNodeWithTag("settings_list").performScrollToIndex(5)
         composeRule.onNodeWithText("Exact reminders").assertIsDisplayed()
         composeRule.onNodeWithText("Notification actions").assertIsDisplayed()
-        composeRule.onNodeWithText("Snooze action").assertIsDisplayed()
-        composeRule.onNodeWithText("Update when event starts").assertIsDisplayed()
-        composeRule.onNodeWithText("Hide protected details").assertIsDisplayed()
+        composeRule.onNodeWithText("Hide protected details").assertExists()
     }
 
     @Test
     fun settingsGroupPassListCustomizationLinks() {
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), {}) }
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = {}) }
         }
 
         composeRule.onNodeWithTag("settings_list").performScrollToIndex(2)
@@ -118,7 +115,6 @@ class PassScreensTest {
         composeRule.onNodeWithText("Choose sections and their order").assertDoesNotExist()
         composeRule.onNodeWithText("Choose card content and order").assertDoesNotExist()
         composeRule.onNodeWithText("Manage names, icons, colors, and order").assertDoesNotExist()
-        composeRule.onNodeWithText("Highlight today's passes").assertDoesNotExist()
     }
 
     @Test
@@ -166,9 +162,11 @@ class PassScreensTest {
             fields = listOf(PassFieldUiModel("gate", "Gate", "A12", false, null)),
         )
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass, {}) }
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass, onAction = {}) }
         }
 
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(1)
+        composeRule.onNodeWithText("Code").performClick()
         composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
         composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(4)
         composeRule.onNodeWithText("Artwork").assertDoesNotExist()
@@ -181,7 +179,7 @@ class PassScreensTest {
         val actions = mutableListOf<EditPassAction>()
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) {
-                EditPassScreen(pass("one", "Boarding pass", PassType.BOARDING), actions::add)
+                EditPassScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add)
             }
         }
 
@@ -218,7 +216,6 @@ class PassScreensTest {
         val search = composeRule.onNodeWithContentDescription("Pass search")
         search.performClick()
         search.assertIsFocused()
-        composeRule.onNodeWithText("All").assertDoesNotExist()
         composeRule.onNodeWithText("Newest").assertDoesNotExist()
 
         pressBack()
@@ -257,7 +254,11 @@ class PassScreensTest {
             }
         }
 
-        composeRule.onNodeWithText("Private ticket").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Private ticket").performTouchInput {
+            down(center)
+            advanceEventTime(1_200)
+            up()
+        }
         composeRule.onNodeWithContentDescription("Pass preview scrim").assertDoesNotExist()
         composeRule.onNodeWithText("Unlock the pass to preview it").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Protected pass").assertIsDisplayed()

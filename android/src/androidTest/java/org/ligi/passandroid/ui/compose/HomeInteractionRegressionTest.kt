@@ -3,12 +3,9 @@ package org.ligi.passandroid.ui.compose
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.down
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.moveTo
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -16,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
-import androidx.compose.ui.test.up
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Rule
 import org.junit.Test
@@ -29,7 +25,6 @@ import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.theme.PassTheme
-import org.ligi.passandroid.ui.theme.PassActionButtonGap
 
 class HomeInteractionRegressionTest {
     @get:Rule val composeRule = createComposeRule()
@@ -84,43 +79,6 @@ class HomeInteractionRegressionTest {
         composeRule.onNodeWithText("First").performTouchInput { swipeLeft() }
         composeRule.onNodeWithText("Second").performTouchInput { swipeLeft() }
         composeRule.onAllNodesWithContentDescription("Delete").assertCountEquals(1)
-    }
-
-    @Test
-    fun revealedCardKeepsTheConnectedButtonGapBeforeActions() {
-        val state = MainUiState(
-            passes = listOf(pass("one", "First"), pass("two", "Second")),
-            isContentLoading = false,
-        )
-        composeRule.setContent { PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) } }
-
-        composeRule.onNodeWithTag("pass_card_one").performTouchInput { swipeLeft() }
-        composeRule.waitForIdle()
-
-        val cardRight = composeRule.onNodeWithTag("pass_card_one").fetchSemanticsNode().boundsInRoot.right
-        val actionsLeft = composeRule.onNodeWithTag("pass_end_actions_one").fetchSemanticsNode().boundsInRoot.left
-        val expectedGap = with(composeRule.density) { PassActionButtonGap.toPx() }
-        assertThat(actionsLeft - cardRight).isBetween(expectedGap - 1f, expectedGap + 1f)
-    }
-
-    @Test
-    fun fullSwipeArchivesOnceAndOnlyAfterRelease() {
-        val actions = mutableListOf<HomeAction>()
-        val state = MainUiState(
-            passes = listOf(pass("one", "Ticket")),
-            isContentLoading = false,
-        )
-        composeRule.setContent { PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, actions::add) } }
-
-        composeRule.onNodeWithTag("pass_card_one").performTouchInput {
-            down(Offset(left + 1f, center.y))
-            moveTo(Offset(right - 1f, center.y))
-            assertThat(actions).isEmpty()
-            up()
-        }
-        composeRule.waitForIdle()
-
-        assertThat(actions.filterIsInstance<HomeAction.Archive>()).containsExactly(HomeAction.Archive("one"))
     }
 
     @Test

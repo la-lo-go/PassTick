@@ -35,9 +35,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setNotificationAccessWindowMinutes(30)
             repository.setNotificationExactTiming(true)
             repository.setNotificationActionsEnabled(false)
-            repository.setNotificationSnoozeEnabled(false)
             repository.setNotificationLockScreenDetail(NotificationLockScreenDetail.HIDDEN)
-            repository.setUpdateNotificationAtEventStart(false)
             repository.setPassDetailLayout(
                 listOf(PassDetailSection.BARCODE, PassDetailSection.ARTWORK),
                 setOf(PassDetailSection.ARTWORK),
@@ -50,6 +48,13 @@ class DataStoreSettingsRepositoryTest {
             repository.setShowProtectedPassLockIcon(true)
             repository.setBlurProtectedPassCards(true)
             repository.setSeparateProtectedPasses(true)
+            repository.setBlockScreenshots(true)
+            val imageExportOptions = PassImageExportOptions(
+                aspectRatio = PassImageAspectRatio.RATIO_4_5,
+                orientation = PassImageOrientation.LANDSCAPE,
+                content = PassImageContent(artwork = false, barcode = false),
+            )
+            repository.setImageExportOptions(imageExportOptions)
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
@@ -62,11 +67,11 @@ class DataStoreSettingsRepositoryTest {
                     it.reminderExactPassIds == setOf("pass-4") &&
                     it.reminderActionsByPass == mapOf("pass-3" to setOf(NotificationAction.OPEN_CODE)) &&
                     it.notificationAccessWindowMinutes == 30 && it.notificationExactTiming &&
-                    !it.notificationActionsEnabled && !it.notificationSnoozeEnabled &&
+                    !it.notificationActionsEnabled &&
                     it.notificationLockScreenDetail == NotificationLockScreenDetail.HIDDEN &&
-                    !it.updateNotificationAtEventStart &&
                     it.lockAllPasses && it.showProtectedPassLockIcon &&
-                    it.blurProtectedPassCards && it.separateProtectedPasses &&
+                    it.blurProtectedPassCards && it.separateProtectedPasses && it.blockScreenshots &&
+                    it.imageExportOptions == imageExportOptions &&
                     it.passDetailSectionOrder == listOf(
                         PassDetailSection.BARCODE,
                         PassDetailSection.ARTWORK,
@@ -96,9 +101,7 @@ class DataStoreSettingsRepositoryTest {
                     notificationAccessWindowMinutes = 30,
                     notificationExactTiming = true,
                     notificationActionsEnabled = false,
-                    notificationSnoozeEnabled = false,
                     notificationLockScreenDetail = NotificationLockScreenDetail.HIDDEN,
-                    updateNotificationAtEventStart = false,
                     passDetailSectionOrder = listOf(
                         PassDetailSection.BARCODE,
                         PassDetailSection.ARTWORK,
@@ -107,10 +110,13 @@ class DataStoreSettingsRepositoryTest {
                         PassDetailSection.CALENDAR,
                     ),
                     hiddenPassDetailSections = setOf(PassDetailSection.ARTWORK),
+                    hiddenHomeCardSections = setOf(HomeCardSection.CREATOR),
                     lockAllPasses = true,
                     showProtectedPassLockIcon = true,
                     blurProtectedPassCards = true,
                     separateProtectedPasses = true,
+                    blockScreenshots = true,
+                    imageExportOptions = imageExportOptions,
                 ),
             )
         }
