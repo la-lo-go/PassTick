@@ -23,7 +23,6 @@ import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.platform.PlatformLocation
-import org.ligi.passandroid.platform.PrintablePass
 import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.PassRepository
@@ -36,6 +35,7 @@ import org.ligi.passandroid.repository.SettingsRepository
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.repository.PassImageExportOptions
 import org.threeten.bp.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -429,8 +429,10 @@ private class FakePlatformActions : PlatformActions {
     override fun addToCalendar(event: CalendarEvent) = Unit
     override fun addToCalendarAutomatically(event: CalendarEvent) = true
     override fun share(uri: Uri, mimeType: String) = Unit
-    override fun print(pass: PrintablePass) = Unit
+    override fun printImage(jobName: String, bitmap: android.graphics.Bitmap) = Unit
     override fun openLocation(location: PlatformLocation) = Unit
+    override fun openUrl(url: String) = Unit
+    override fun shareImage(pass: PassUiModel, options: PassImageExportOptions) = Unit
 }
 
 private class FakeSettingsRepository : SettingsRepository {
@@ -530,6 +532,9 @@ private class FakeSettingsRepository : SettingsRepository {
     }
     override suspend fun setBlockScreenshots(value: Boolean) {
         settings.value = settings.value.copy(blockScreenshots = value)
+    }
+    override suspend fun setImageExportOptions(value: PassImageExportOptions) {
+        settings.value = settings.value.copy(imageExportOptions = value)
     }
 }
 

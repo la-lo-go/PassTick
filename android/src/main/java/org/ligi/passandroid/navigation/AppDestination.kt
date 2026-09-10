@@ -12,6 +12,7 @@ sealed interface AppDestination : NavKey {
     @Serializable data class PassDetail(val passId: String) : AppDestination
     @Serializable data class EditPass(val passId: String, val dateField: PassDateField? = null) : AppDestination
     @Serializable data class PassCustomization(val passId: String) : AppDestination
+    @Serializable data class ExportImage(val passId: String) : AppDestination
     @Serializable data object Settings : AppDestination
     @Serializable data object CategorySettings : AppDestination
     @Serializable data object PassDetailLayoutSettings : AppDestination

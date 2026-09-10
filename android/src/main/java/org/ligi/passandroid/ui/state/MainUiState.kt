@@ -5,6 +5,7 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
+import org.ligi.passandroid.repository.PassImageExportOptions
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.ThemeMode
@@ -16,8 +17,6 @@ import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.functions.DEFAULT_EVENT_LENGTH_IN_HOURS
 import org.ligi.passandroid.platform.PlatformLocation
-import org.ligi.passandroid.platform.PrintableField
-import org.ligi.passandroid.platform.PrintablePass
 import org.threeten.bp.ZonedDateTime
 import org.ligi.passandroid.domain.timeline.PassTimeline
 import org.ligi.passandroid.navigation.passDeepLink
@@ -92,14 +91,6 @@ data class PassUiModel(
         )
     }
 
-    fun toPrintablePass() = PrintablePass(
-        description = description,
-        barcodeFormat = barcodeFormat,
-        barcodeMessage = barcodeMessage,
-        barcodeAlternativeText = barcodeAlternativeText,
-        fields = fields.filterNot { it.hidden }.map { PrintableField(it.label, it.value) },
-    )
-
     fun homeCardDetail(): String? = fields.asSequence()
         .filter { !it.hidden && it.hint == "primaryFields" }
         .map { it.value.trim() }
@@ -160,9 +151,11 @@ sealed interface AppAction {
     data class ImportFiles(val uris: List<Uri>) : AppAction
     data class Export(val id: String, val destination: Uri) : AppAction
     data class SharePass(val id: String) : AppAction
-    data class PrintPass(val id: String) : AppAction
+    data class ShareImage(val id: String, val options: PassImageExportOptions) : AppAction
+    data class PrintImage(val id: String, val options: PassImageExportOptions) : AppAction
     data class AddToCalendar(val id: String) : AppAction
     data class OpenLocation(val id: String, val locationIndex: Int) : AppAction
+    data class OpenUrl(val url: String) : AppAction
     data class DeletePass(val id: String) : AppAction
     data class SetPassPendingDeletion(val id: String, val pending: Boolean) : AppAction
     data class SetPassProtected(val id: String, val isProtected: Boolean) : AppAction
@@ -196,6 +189,7 @@ sealed interface AppAction {
     data class SetBlurProtectedPassCards(val value: Boolean) : AppAction
     data class SetSeparateProtectedPasses(val value: Boolean) : AppAction
     data class SetBlockScreenshots(val value: Boolean) : AppAction
+    data class SetImageExportOptions(val value: PassImageExportOptions) : AppAction
     data class MovePassDetailSection(val section: PassDetailSection, val offset: Int) : AppAction
     data class SetPassDetailSectionVisible(val section: PassDetailSection, val visible: Boolean) : AppAction
     data class MoveHomeCardSection(val section: HomeCardSection, val offset: Int) : AppAction

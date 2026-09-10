@@ -69,6 +69,7 @@ import org.ligi.passandroid.navigation.passDeepLinkRequestOrNull
 import org.ligi.passandroid.repository.supportedPassImportMimeTypes
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
+import org.ligi.passandroid.ui.compose.ExportImageScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.HomeAction
@@ -86,6 +87,7 @@ import org.ligi.passandroid.ui.state.CategorySettingsAction
 import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassDetailAction
+import org.ligi.passandroid.ui.state.PassImageExportAction
 import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.SettingsAction
@@ -97,8 +99,7 @@ import org.ligi.passandroid.platform.AndroidFlashlightController
 import org.ligi.passandroid.platform.FlashlightState
 import org.ligi.passandroid.platform.PassAuthenticator
 import org.ligi.passandroid.platform.PassImageExporter
-import org.ligi.passandroid.platform.PassImageExportMode
-import org.ligi.passandroid.platform.PassImageExportSelection
+import org.ligi.passandroid.repository.PassImageContent
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.reminder.reminderNotificationsAvailable
 import org.ligi.passandroid.ui.adaptive.AdaptivePassListDetailShell
@@ -197,25 +198,41 @@ class MainActivity : ComponentActivity() {
             val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
             }
-            var pendingImagePassId by rememberSaveable { mutableStateOf<String?>(null) }
-            var pendingImageModeName by rememberSaveable { mutableStateOf<String?>(null) }
-            var pendingImageArtwork by rememberSaveable { mutableStateOf(true) }
-            var pendingImageText by rememberSaveable { mutableStateOf(true) }
-            var pendingImageBarcode by rememberSaveable { mutableStateOf(true) }
-            val imageExportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("image/png"),
-            ) { uri ->
-                val passId = pendingImagePassId
-                val mode = pendingImageModeName?.let { runCatching { PassImageExportMode.valueOf(it) }.getOrNull() }
-                val selection = PassImageExportSelection(pendingImageArtwork, pendingImageText, pendingImageBarcode)
-                pendingImagePassId = null
-                pendingImageModeName = null
-                if (uri != null && passId != null && mode != null) {
-                    val pass = state.passes.firstOrNull { it.id == passId }
-                    if (pass != null) coroutineScope.launch {
+            var imageExporting by remember { mutableStateOf(false) }
+            fun exportImageToGallery(pass: PassUiModel, barcodeOnly: Boolean, returnToPass: Boolean) {
+                val options = if (barcodeOnly) {
+                    state.settings.imageExportOptions.copy(
+                        content = PassImageContent(
+                            artwork = false,
+                            details = false,
+                            barcode = true,
+                            dateTime = false,
+                            location = false,
+                        ),
+                    )
+                } else {
+                    state.settings.imageExportOptions
+                }
+                coroutineScope.launch {
+                    imageExporting = true
+                    try {
                         runCatching {
-                            withContext(Dispatchers.IO) { PassImageExporter.write(contentResolver, uri, pass, mode, selection) }
-                        }.onFailure { error -> snackbarHostState.showSnackbar("Image export failed: ${error.message.orEmpty()}") }
+                            withContext(Dispatchers.IO) {
+                                PassImageExporter.writeToGallery(
+                                    contentResolver,
+                                    imageExportFileName(pass.description),
+                                    pass,
+                                    options,
+                                )
+                            }
+                        }.onSuccess {
+                            if (returnToPass) popBackStack()
+                            snackbarHostState.showSnackbar("Image saved to gallery")
+                        }.onFailure { error ->
+                            snackbarHostState.showSnackbar("Image export failed: ${error.message.orEmpty()}")
+                        }
+                    } finally {
+                        imageExporting = false
                     }
                 }
             }
@@ -382,6 +399,7 @@ class MainActivity : ComponentActivity() {
                     HomeAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
                     HomeAction.OpenHomeCardSettings -> backStack.add(AppDestination.HomeCardLayoutSettings)
                     HomeAction.OpenTimeline -> backStack.add(AppDestination.Timeline)
+                    is HomeAction.OpenUrl -> viewModel.onAction(AppAction.OpenUrl(action.url))
                 }
             }
 
@@ -391,17 +409,12 @@ class MainActivity : ComponentActivity() {
                     PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(passId))
                     is PassDetailAction.EditDate -> backStack.add(AppDestination.EditPass(passId, action.field))
                     PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(passId))
-                    is PassDetailAction.ExportImage -> {
+                    PassDetailAction.OpenImageExport -> backStack.add(AppDestination.ExportImage(passId))
+                    PassDetailAction.SaveBarcodeImage -> {
                         state.passes.firstOrNull { it.id == passId }?.let { pass ->
-                            pendingImagePassId = pass.id
-                            pendingImageModeName = action.mode.name
-                            pendingImageArtwork = action.selection?.artwork ?: true
-                            pendingImageText = action.selection?.text ?: true
-                            pendingImageBarcode = action.selection?.barcode ?: true
-                            imageExportLauncher.launch("${pass.description.ifBlank { "pass" }}.png")
+                            exportImageToGallery(pass, barcodeOnly = true, returnToPass = false)
                         }
                     }
-                    PassDetailAction.Print -> viewModel.onAction(AppAction.PrintPass(passId))
                     PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
                     is PassDetailAction.SetFlashlightEnabled -> {
                         if (action.enabled && !hasCameraPermission) {
@@ -736,6 +749,35 @@ class MainActivity : ComponentActivity() {
                                     },
                                 )
                             }
+                            entry<AppDestination.ExportImage> { destination ->
+                                ExportImageScreen(
+                                    pass = state.passes.firstOrNull { it.id == destination.passId },
+                                    options = state.settings.imageExportOptions,
+                                    isBusy = state.isBusy || imageExporting,
+                                    onAction = { action ->
+                                        when (action) {
+                                            PassImageExportAction.Back -> popBackStack()
+                                            is PassImageExportAction.SetOptions -> viewModel.onAction(
+                                                AppAction.SetImageExportOptions(action.value),
+                                            )
+                                            PassImageExportAction.Save -> {
+                                                state.passes.firstOrNull { it.id == destination.passId }?.let { pass ->
+                                                    exportImageToGallery(pass, barcodeOnly = false, returnToPass = true)
+                                                }
+                                            }
+                                            PassImageExportAction.Share -> {
+                                                viewModel.onAction(
+                                                    AppAction.ShareImage(destination.passId, state.settings.imageExportOptions),
+                                                )
+                                                popBackStack()
+                                            }
+                                            PassImageExportAction.Print -> viewModel.onAction(
+                                                AppAction.PrintImage(destination.passId, state.settings.imageExportOptions),
+                                            )
+                                        }
+                                    },
+                                )
+                            }
                             entry<AppDestination.Settings> {
                                 SettingsScreen(
                                     settings = state.settings,
@@ -949,3 +991,12 @@ private fun Intent.importUris(): List<android.net.Uri> = buildList {
         getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let(::add)
     }
 }.filter { it.scheme == "content" }.distinct()
+
+private fun imageExportFileName(description: String?): String {
+    val base = description.orEmpty()
+        .replace(Regex("[^A-Za-z0-9 _-]"), "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .ifBlank { "pass" }
+    return "$base ${org.threeten.bp.LocalDate.now()}.png"
+}

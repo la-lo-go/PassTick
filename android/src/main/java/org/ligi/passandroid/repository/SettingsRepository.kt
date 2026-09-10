@@ -126,6 +126,7 @@ data class AppSettings(
     val blurProtectedPassCards: Boolean = false,
     val separateProtectedPasses: Boolean = false,
     val blockScreenshots: Boolean = false,
+    val imageExportOptions: PassImageExportOptions = PassImageExportOptions(),
 ) {
     val notificationPolicySettings: NotificationPolicySettings get() = NotificationPolicySettings(
         accessWindowMinutes = notificationAccessWindowMinutes,
@@ -168,6 +169,7 @@ interface SettingsRepository {
     suspend fun setBlurProtectedPassCards(value: Boolean)
     suspend fun setSeparateProtectedPasses(value: Boolean)
     suspend fun setBlockScreenshots(value: Boolean)
+    suspend fun setImageExportOptions(value: PassImageExportOptions)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -221,6 +223,15 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             blurProtectedPassCards = preferences[BLUR_PROTECTED_PASS_CARDS] ?: false,
             separateProtectedPasses = preferences[SEPARATE_PROTECTED_PASSES] ?: false,
             blockScreenshots = preferences[BLOCK_SCREENSHOTS] ?: false,
+            imageExportOptions = PassImageExportOptions(
+                aspectRatio = preferences[IMAGE_EXPORT_ASPECT_RATIO]?.let {
+                    runCatching { PassImageAspectRatio.valueOf(it) }.getOrNull()
+                } ?: PassImageAspectRatio.AUTO_HEIGHT,
+                orientation = preferences[IMAGE_EXPORT_ORIENTATION]?.let {
+                    runCatching { PassImageOrientation.valueOf(it) }.getOrNull()
+                } ?: PassImageOrientation.PORTRAIT,
+                content = decodePassImageContent(preferences[IMAGE_EXPORT_CONTENT]),
+            ),
         )
     }
 
@@ -320,6 +331,14 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setSeparateProtectedPasses(value: Boolean) = update(SEPARATE_PROTECTED_PASSES, value)
     override suspend fun setBlockScreenshots(value: Boolean) = update(BLOCK_SCREENSHOTS, value)
 
+    override suspend fun setImageExportOptions(value: PassImageExportOptions) {
+        context.settingsDataStore.edit {
+            it[IMAGE_EXPORT_ASPECT_RATIO] = value.aspectRatio.name
+            it[IMAGE_EXPORT_ORIENTATION] = value.orientation.name
+            it[IMAGE_EXPORT_CONTENT] = encodePassImageContent(value.content)
+        }
+    }
+
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
     }
@@ -355,6 +374,9 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val BLUR_PROTECTED_PASS_CARDS = booleanPreferencesKey("blur_protected_pass_cards")
         val SEPARATE_PROTECTED_PASSES = booleanPreferencesKey("separate_protected_passes")
         val BLOCK_SCREENSHOTS = booleanPreferencesKey("block_screenshots")
+        val IMAGE_EXPORT_ASPECT_RATIO = stringPreferencesKey("image_export_aspect_ratio")
+        val IMAGE_EXPORT_ORIENTATION = stringPreferencesKey("image_export_orientation")
+        val IMAGE_EXPORT_CONTENT = stringSetPreferencesKey("image_export_content")
     }
 }
 
@@ -425,6 +447,29 @@ private fun decodeReminderActions(value: String): Map<String, Set<NotificationAc
         }
     }
 }.getOrDefault(emptyMap())
+
+private fun encodePassImageContent(value: PassImageContent): Set<String> = buildSet {
+    if (value.artwork) add("artwork")
+    if (value.details) add("details")
+    if (value.barcode) add("barcode")
+    if (value.dateTime) add("dateTime")
+    if (value.location) add("location")
+    if (value.hiddenFields) add("hiddenFields")
+}
+
+private fun decodePassImageContent(values: Set<String>?): PassImageContent =
+    if (values == null) {
+        PassImageContent()
+    } else {
+        PassImageContent(
+            artwork = "artwork" in values,
+            details = "details" in values,
+            barcode = "barcode" in values,
+            dateTime = "dateTime" in values,
+            location = "location" in values,
+            hiddenFields = "hiddenFields" in values,
+        )
+    }
 
 private fun encodeCategories(categories: List<PassCategory>) = JSONArray().apply {
     categories.forEach { category ->

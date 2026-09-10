@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.withContext
 import org.ligi.passandroid.platform.PlatformActions
+import org.ligi.passandroid.platform.PassImageExporter
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.PassRepository
@@ -146,7 +147,15 @@ class MainViewModel(
                 val uri = passRepository.prepareShare(action.id).getOrThrow()
                 platformActions.share(uri, "application/vnd.espass-espass+zip")
             }
-            is AppAction.PrintPass -> withPass(action.id) { platformActions.print(it.toPrintablePass()) }
+            is AppAction.ShareImage -> launchOperation("Image ready to share") {
+                val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
+                withContext(Dispatchers.IO) { platformActions.shareImage(pass, action.options) }
+            }
+            is AppAction.PrintImage -> launchOperation(null) {
+                val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
+                val bitmap = withContext(Dispatchers.Default) { PassImageExporter.renderBitmap(pass, action.options) }
+                platformActions.printImage(pass.description.ifBlank { "Pass" }, bitmap)
+            }
             is AppAction.AddToCalendar -> withPass(action.id) { pass ->
                 pass.calendarEvent?.let(platformActions::addToCalendar) ?: error("Pass has no date")
             }
@@ -154,6 +163,8 @@ class MainViewModel(
                 val location = pass.locations.getOrNull(action.locationIndex) ?: error("Location not found")
                 platformActions.openLocation(location.toPlatformLocation())
             }
+            is AppAction.OpenUrl -> runCatching { platformActions.openUrl(action.url) }
+                .onFailure { message.value = it.message ?: "Operation failed" }
             is AppAction.DeletePass -> viewModelScope.launch {
                 busy.value = true
                 runCatching { check(passRepository.delete(action.id)) }
@@ -261,6 +272,9 @@ class MainViewModel(
             }
             is AppAction.SetBlockScreenshots -> viewModelScope.launch {
                 settingsRepository.setBlockScreenshots(action.value)
+            }
+            is AppAction.SetImageExportOptions -> viewModelScope.launch {
+                settingsRepository.setImageExportOptions(action.value)
             }
             is AppAction.MovePassDetailSection -> viewModelScope.launch {
                 settingsRepository.movePassDetailSection(action.section, action.offset)

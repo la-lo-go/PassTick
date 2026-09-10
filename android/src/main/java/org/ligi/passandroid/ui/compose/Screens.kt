@@ -44,7 +44,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.ViewAgenda
@@ -53,6 +52,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -126,8 +126,6 @@ import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.displayArtwork
-import org.ligi.passandroid.platform.PassImageExportMode
-import org.ligi.passandroid.platform.PassImageExportSelection
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
@@ -158,11 +156,6 @@ fun PassDetailScreen(
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
     var tagMenuOpen by remember { mutableStateOf(false) }
-    var imageExportOpen by remember { mutableStateOf(false) }
-    var customExportOpen by remember { mutableStateOf(false) }
-    var customArtwork by remember { mutableStateOf(true) }
-    var customText by remember { mutableStateOf(true) }
-    var customBarcode by remember { mutableStateOf(true) }
     var configureReminder by remember { mutableStateOf(false) }
     var editDateDialog by remember { mutableStateOf(false) }
     var advancedReminderActions by remember(pass?.id) { mutableStateOf(false) }
@@ -264,41 +257,6 @@ fun PassDetailScreen(
             },
         )
     }
-    if (imageExportOpen) {
-        AlertDialog(
-            onDismissRequest = { imageExportOpen = false },
-            title = { Text("Export as image") },
-            text = { Text("Choose the content to include in the PNG image.") },
-            confirmButton = {
-                Column {
-                    TextButton(onClick = { imageExportOpen = false; onAction(PassDetailAction.ExportImage(PassImageExportMode.FULL)) }) { Text("Full pass") }
-                    TextButton(onClick = { imageExportOpen = false; onAction(PassDetailAction.ExportImage(PassImageExportMode.BARCODE)) }) { Text("Barcode only") }
-                    TextButton(onClick = { imageExportOpen = false; customExportOpen = true }) { Text("Custom") }
-                }
-            },
-            dismissButton = { TextButton(onClick = { imageExportOpen = false }) { Text("Cancel") } },
-        )
-    }
-    if (customExportOpen) {
-        AlertDialog(
-            onDismissRequest = { customExportOpen = false },
-            title = { Text("Custom image") },
-            text = {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(customArtwork, { customArtwork = it }); Text("Artwork") }
-                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(customText, { customText = it }); Text("Pass details") }
-                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(customBarcode, { customBarcode = it }); Text("Barcode") }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    customExportOpen = false
-                    onAction(PassDetailAction.ExportImage(PassImageExportMode.CUSTOM, PassImageExportSelection(customArtwork, customText, customBarcode)))
-                }, enabled = customArtwork || customText || customBarcode) { Text("Export") }
-            },
-            dismissButton = { TextButton(onClick = { customExportOpen = false }) { Text("Cancel") } },
-        )
-    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -315,17 +273,15 @@ fun PassDetailScreen(
                         }
                         DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Print") },
-                                leadingIcon = { Icon(Icons.Default.Print, null) },
-                                onClick = {
-                                overflowOpen = false
-                                onAction(PassDetailAction.Print)
-                                },
-                            )
-                            DropdownMenuItem(
                                 text = { Text("Export as image") },
                                 leadingIcon = { Icon(Icons.Default.Image, null) },
-                                onClick = { overflowOpen = false; imageExportOpen = true },
+                                onClick = { overflowOpen = false; onAction(PassDetailAction.OpenImageExport) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Save code") },
+                                leadingIcon = { Icon(Icons.Default.QrCode, null) },
+                                enabled = pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank(),
+                                onClick = { overflowOpen = false; onAction(PassDetailAction.SaveBarcodeImage) },
                             )
                             DropdownMenuItem(
                                 text = { Text("Customize pass") },

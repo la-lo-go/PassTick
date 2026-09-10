@@ -18,6 +18,8 @@ object CrispBarcodeRenderer {
 
     fun supports(format: PassBarCodeFormat): Boolean = format in supportedFormats
 
+    fun isLinear(format: PassBarCodeFormat): Boolean = format.isLinear()
+
     fun renderMatrix(
         data: String,
         format: PassBarCodeFormat,

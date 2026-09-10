@@ -6,17 +6,15 @@ import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.reminder.NotificationLockScreenDetail
 import org.ligi.passandroid.navigation.PassDateField
+import org.ligi.passandroid.repository.PassImageExportOptions
 
 sealed interface PassDetailAction {
     data object Back : PassDetailAction
     data object Edit : PassDetailAction
     data class EditDate(val field: PassDateField) : PassDetailAction
     data object Share : PassDetailAction
-    data class ExportImage(
-        val mode: org.ligi.passandroid.platform.PassImageExportMode,
-        val selection: org.ligi.passandroid.platform.PassImageExportSelection? = null,
-    ) : PassDetailAction
-    data object Print : PassDetailAction
+    data object OpenImageExport : PassDetailAction
+    data object SaveBarcodeImage : PassDetailAction
     data object AddToCalendar : PassDetailAction
     data object OpenReminderSettings : PassDetailAction
     data object OpenPassViewSettings : PassDetailAction
@@ -45,6 +43,14 @@ sealed interface PassCustomizationAction {
 sealed interface EditPassAction {
     data object Back : EditPassAction
     data class Save(val draft: PassDraft) : EditPassAction
+}
+
+sealed interface PassImageExportAction {
+    data object Back : PassImageExportAction
+    data class SetOptions(val value: PassImageExportOptions) : PassImageExportAction
+    data object Save : PassImageExportAction
+    data object Share : PassImageExportAction
+    data object Print : PassImageExportAction
 }
 
 sealed interface SettingsAction {

@@ -1,6 +1,8 @@
 package org.ligi.passandroid
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import com.jakewharton.threetenabp.AndroidThreeTen
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -26,6 +28,7 @@ import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
 open class App : Application() {
 
     private val moshi = createPassMoshi()
+    private var currentActivity: Activity? = null
 
     open fun createKoin(): Module {
 
@@ -40,7 +43,7 @@ open class App : Application() {
             }
             single<PassRepository> { FilePassRepository(this@App, get(), get(), favoriteStore = get()) }
             single<SettingsRepository> { DataStoreSettingsRepository(this@App) }
-            single<PlatformActions> { AndroidPlatformActions(this@App) }
+            single<PlatformActions> { AndroidPlatformActions(this@App, activityProvider = { currentActivity }) }
             single<ReminderScheduler> { AndroidReminderScheduler(this@App) }
             single { PassWidgetSnapshotPublisher(this@App) }
             viewModel { MainViewModel(get(), get(), get(), get(), get()) }
@@ -49,6 +52,20 @@ open class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityResumed(activity: Activity) {
+                currentActivity = activity
+            }
+            override fun onActivityPaused(activity: Activity) {
+                if (currentActivity === activity) currentActivity = null
+            }
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
 
         startKoin {
             if (BuildConfig.DEBUG) androidLogger()

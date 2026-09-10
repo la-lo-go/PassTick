@@ -1,5 +1,6 @@
 package org.ligi.passandroid.printing
 
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
@@ -9,26 +10,17 @@ import android.print.PrintDocumentAdapter
 import androidx.test.platform.app.InstrumentationRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import org.ligi.passandroid.model.pass.PassBarCodeFormat
-import org.ligi.passandroid.platform.PrintableField
-import org.ligi.passandroid.platform.PrintablePass
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.mockito.ArgumentMatchers.any
 import java.io.File
 
-class PassPrintDocumentAdapterTest {
+class PassImagePrintDocumentAdapterTest {
     @Test
-    fun writesAPassAsPdf() {
+    fun writesABitmapAsPdf() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val pass = PrintablePass(
-            description = "Train ticket",
-            barcodeFormat = PassBarCodeFormat.QR_CODE,
-            barcodeMessage = "ticket-123",
-            barcodeAlternativeText = "Ticket 123",
-            fields = listOf(PrintableField("Seat", "12A")),
-        )
-        val adapter = PassPrintDocumentAdapter(context, pass, "Print test")
+        val bitmap = Bitmap.createBitmap(400, 200, Bitmap.Config.ARGB_8888)
+        val adapter = PassImagePrintDocumentAdapter(context, bitmap, "Print test")
         val attributes = PrintAttributes.Builder()
             .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
             .setResolution(PrintAttributes.Resolution("test", "Test", 300, 300))
@@ -49,5 +41,6 @@ class PassPrintDocumentAdapterTest {
         verify(writeCallback).onWriteFinished(any())
         assertThat(output.readBytes().decodeToString(0, 4)).isEqualTo("%PDF")
         assertThat(output.length()).isGreaterThan(100)
+        bitmap.recycle()
     }
 }

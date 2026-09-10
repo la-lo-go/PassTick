@@ -4,15 +4,21 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.CalendarContract
 import androidx.annotation.VisibleForTesting
+import androidx.core.content.FileProvider
+import org.ligi.passandroid.R
 import org.ligi.passandroid.functions.createIntent
 import org.ligi.passandroid.functions.CalendarEvent
-import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.repository.PassImageExportOptions
+import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.printing.doPrint
 import androidx.core.net.toUri
 import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileOutputStream
 import java.util.TimeZone
 
 data class PlatformLocation(
@@ -20,25 +26,22 @@ data class PlatformLocation(
     val latitude: Double?,
     val longitude: Double?,
 )
-data class PrintableField(val label: String, val value: String)
-data class PrintablePass(
-    val description: String,
-    val barcodeFormat: PassBarCodeFormat?,
-    val barcodeMessage: String?,
-    val barcodeAlternativeText: String?,
-    val fields: List<PrintableField>,
-)
 
 interface PlatformActions {
     fun addToCalendar(event: CalendarEvent)
     fun addToCalendarAutomatically(event: CalendarEvent): Boolean
     fun isCalendarEventPresent(event: CalendarEvent): Boolean = false
     fun share(uri: Uri, mimeType: String)
-    fun print(pass: PrintablePass)
+    fun printImage(jobName: String, bitmap: Bitmap)
     fun openLocation(location: PlatformLocation)
+    fun openUrl(url: String)
+    fun shareImage(pass: PassUiModel, options: PassImageExportOptions)
 }
 
-class AndroidPlatformActions(private val context: Context) : PlatformActions {
+class AndroidPlatformActions(
+    private val context: Context,
+    private val activityProvider: () -> Context? = { null },
+) : PlatformActions {
     override fun addToCalendar(event: CalendarEvent) {
         context.startActivity(createIntent(event).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
@@ -84,12 +87,35 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
         context.startActivity(Intent.createChooser(shareIntent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    override fun print(pass: PrintablePass) = doPrint(context, pass)
+    override fun printImage(jobName: String, bitmap: Bitmap) =
+        doPrint(activityProvider() ?: context, jobName, bitmap)
 
     override fun openLocation(location: PlatformLocation) {
         context.startActivity(createLocationIntent(location).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
+
+    override fun openUrl(url: String) {
+        context.startActivity(createUrlIntent(url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    override fun shareImage(pass: PassUiModel, options: PassImageExportOptions) {
+        val directory = File(context.filesDir, "share").apply { mkdirs() }
+        val file = File(directory, "${pass.id}.png")
+        val bitmap = PassImageExporter.renderBitmap(pass, options)
+        try {
+            FileOutputStream(file).use { output ->
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) { "Could not encode PNG" }
+            }
+        } finally {
+            bitmap.recycle()
+        }
+        share(FileProvider.getUriForFile(context, context.getString(R.string.authority_fileprovider), file), "image/png")
+    }
 }
+
+@VisibleForTesting
+internal fun createUrlIntent(url: String): Intent =
+    Intent(Intent.ACTION_VIEW, url.toUri())
 
 @VisibleForTesting
 internal fun createLocationIntent(location: PlatformLocation): Intent =
