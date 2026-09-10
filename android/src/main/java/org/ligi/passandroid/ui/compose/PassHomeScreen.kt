@@ -54,7 +54,9 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -168,7 +170,10 @@ import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.theme.PassActionButtonGroup
 import org.ligi.passandroid.ui.theme.PassActionButton
 import org.ligi.passandroid.ui.theme.PassActionButtonGap
+import org.ligi.passandroid.ui.theme.PassIcons
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
+
+internal const val PROJECT_REPOSITORY_URL = "https://github.com/la-lo-go/PassTick"
 
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
@@ -184,6 +189,7 @@ sealed interface HomeAction {
     data object ImportPass : HomeAction
     data object OpenTimeline : HomeAction
     data object OpenSettings : HomeAction
+    data class OpenUrl(val url: String) : HomeAction
     data object OpenPassViewSettings : HomeAction
     data object OpenHomeCardSettings : HomeAction
     data object UnlockProtectedPasses : HomeAction
@@ -372,73 +378,89 @@ fun PassHomeScreen(
         gesturesEnabled = openSwipePassId.value == null && previewPass == null,
         drawerContent = {
             ModalDrawerSheet {
-                NavigationDrawerItem(
-                    label = { Text("Timeline") },
-                    selected = false,
-                    icon = { Icon(Icons.Default.Timeline, null) },
-                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenTimeline) },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                )
-                HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                NavigationDrawerItem(
-                    label = { Text("All") },
-                    selected = state.selectedCategoryId == null,
-                    icon = { Icon(Icons.Default.ViewAgenda, null) },
-                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(null)) },
-                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_all"),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Protected") },
-                    selected = state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID,
-                    icon = { Icon(Icons.Default.Lock, null) },
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onAction(
-                            if (protectedPassesUnlocked) HomeAction.SelectCategory(PROTECTED_PASSES_CATEGORY_ID)
-                            else HomeAction.UnlockProtectedPasses,
-                        )
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_protected"),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Pinned") },
-                    selected = state.selectedCategoryId == "pinned",
-                    icon = { Icon(Icons.Default.PushPin, null) },
-                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("pinned")) },
-                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_pinned"),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Archived") },
-                    selected = state.selectedCategoryId == "archived",
-                    icon = { Icon(Icons.Default.Archive, null) },
-                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
-                    modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
-                )
-                if (visibleCategories.isNotEmpty()) {
-                    Text(
-                        "Tags",
-                        modifier = Modifier.padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 4.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                visibleCategories.forEach { category ->
+                Column(Modifier.fillMaxSize()) {
                     NavigationDrawerItem(
-                        label = { Text(category.name) },
-                        selected = state.selectedCategoryId == category.id,
-                        icon = { Icon(categoryIcon(category.icon), category.icon) },
-                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(category.id)) },
-                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_${category.id}"),
+                        label = { Text("Timeline") },
+                        selected = false,
+                        icon = { Icon(Icons.Default.Timeline, null) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenTimeline) },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                    HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    NavigationDrawerItem(
+                        label = { Text("All") },
+                        selected = state.selectedCategoryId == null,
+                        icon = { Icon(Icons.Default.ViewAgenda, null) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(null)) },
+                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_all"),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Protected") },
+                        selected = state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID,
+                        icon = { Icon(Icons.Default.Lock, null) },
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onAction(
+                                if (protectedPassesUnlocked) HomeAction.SelectCategory(PROTECTED_PASSES_CATEGORY_ID)
+                                else HomeAction.UnlockProtectedPasses,
+                            )
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_protected"),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Pinned") },
+                        selected = state.selectedCategoryId == "pinned",
+                        icon = { Icon(Icons.Default.PushPin, null) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("pinned")) },
+                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_pinned"),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Archived") },
+                        selected = state.selectedCategoryId == "archived",
+                        icon = { Icon(Icons.Default.Archive, null) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
+                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
+                    )
+                    if (visibleCategories.isNotEmpty()) {
+                        Text(
+                            "Tags",
+                            modifier = Modifier.padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 4.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        visibleCategories.forEach { category ->
+                            NavigationDrawerItem(
+                                label = { Text(category.name) },
+                                selected = state.selectedCategoryId == category.id,
+                                icon = { Icon(categoryIcon(category.icon), category.icon) },
+                                onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(category.id)) },
+                                modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_${category.id}"),
+                            )
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    NavigationDrawerItem(
+                        label = { Text("Github Repo") },
+                        selected = false,
+                        icon = { Icon(PassIcons.GitHub, null) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenUrl(PROJECT_REPOSITORY_URL)) },
+                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_open_repository"),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Settings") },
+                        selected = false,
+                        icon = { Icon(Icons.Default.Settings, null) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenSettings) },
+                        modifier = Modifier.padding(horizontal = 12.dp),
                     )
                 }
-                HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                NavigationDrawerItem(
-                    label = { Text("Settings") },
-                    selected = false,
-                    icon = { Icon(Icons.Default.Settings, null) },
-                    onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenSettings) },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
             }
         },
     ) {
@@ -1620,7 +1642,7 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
         )
     } else {
         Surface(
-            modifier = modifier,
+            modifier = modifier.semantics { contentDescription = "Pass artwork" },
             shape = RoundedCornerShape(16),
             color = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.primary,
