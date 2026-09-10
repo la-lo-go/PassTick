@@ -36,7 +36,7 @@ jobs:
 
       - name: Archive reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-reports
           path: |
@@ -82,7 +82,7 @@ jobs:
 
       - name: Archive reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-reports-api-${{ matrix.api-level }}
           path: android/build/reports/androidTests/
