@@ -11,16 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Run unit tests
         run: ./gradlew :android:testDebugUnitTest
@@ -36,7 +36,7 @@ jobs:
 
       - name: Archive reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-reports
           path: |
@@ -52,14 +52,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # API 37 requires an available x86_64 system image in the runner.
-        api-level: [29, 37]
+        # SDK 37 uses the minor-versioned package name system-images;android-37.0.
+        api-level: [29, 37.0]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -71,7 +71,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Run instrumented tests
         uses: reactivecircus/android-emulator-runner@v2
@@ -82,7 +82,7 @@ jobs:
 
       - name: Archive reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: instrumented-reports-api-${{ matrix.api-level }}
           path: android/build/reports/androidTests/
