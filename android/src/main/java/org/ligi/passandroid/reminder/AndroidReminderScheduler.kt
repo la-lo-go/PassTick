@@ -229,6 +229,7 @@ private fun storePolicySettings(context: Context, settings: NotificationPolicySe
         .putBoolean(EXACT_TIMING, settings.exactTiming)
         .putBoolean(ACTIONS_ENABLED, settings.actionsEnabled)
         .putString(LOCK_SCREEN_DETAIL, settings.lockScreenDetail.name)
+        .putBoolean(LOCK_ALL_PASSES, settings.lockAllPasses)
         .apply()
 }
 
@@ -241,6 +242,7 @@ private fun readPolicySettings(context: Context): NotificationPolicySettings =
             lockScreenDetail = getString(LOCK_SCREEN_DETAIL, null)
                 ?.let { runCatching { NotificationLockScreenDetail.valueOf(it) }.getOrNull() }
                 ?: NotificationLockScreenDetail.HIDE_SENSITIVE,
+            lockAllPasses = getBoolean(LOCK_ALL_PASSES, false),
         )
     }
 
@@ -292,6 +294,7 @@ private const val ACCESS_WINDOW = "access_window"
 private const val EXACT_TIMING = "exact_timing"
 private const val ACTIONS_ENABLED = "actions_enabled"
 private const val LOCK_SCREEN_DETAIL = "lock_screen_detail"
+private const val LOCK_ALL_PASSES = "lock_all_passes"
 private const val ACTION_LIFECYCLE = "dev.lalogo.passtick.action.REMINDER_LIFECYCLE"
 private const val MAX_ACTIONS = 3
 private const val PENDING_FLAGS = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

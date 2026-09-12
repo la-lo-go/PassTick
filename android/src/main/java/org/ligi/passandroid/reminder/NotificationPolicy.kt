@@ -15,6 +15,7 @@ data class NotificationPolicySettings(
     val exactTiming: Boolean = false,
     val actionsEnabled: Boolean = true,
     val lockScreenDetail: NotificationLockScreenDetail = NotificationLockScreenDetail.HIDE_SENSITIVE,
+    val lockAllPasses: Boolean = false,
 )
 
 data class NotificationPolicyResult(
@@ -43,11 +44,12 @@ object NotificationPolicy {
             else -> NotificationDisposition.SHOW
         }
         val body = body(reminder, nowMillis, phase)
+        val isProtected = reminder.isProtected || settings.lockAllPasses
         return NotificationPolicyResult(
             title = reminder.title,
             body = body,
-            publicTitle = if (reminder.isProtected) "Pass reminder" else reminder.title,
-            publicBody = if (reminder.isProtected) publicBody(reminder, nowMillis, phase) else body,
+            publicTitle = if (isProtected) "Pass reminder" else reminder.title,
+            publicBody = if (isProtected) publicBody(reminder, nowMillis, phase) else body,
             phase = phase,
             actions = if (disposition == NotificationDisposition.CANCEL) emptySet() else actions(reminder, settings),
             disposition = disposition,

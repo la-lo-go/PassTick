@@ -133,6 +133,7 @@ data class AppSettings(
         exactTiming = notificationExactTiming,
         actionsEnabled = notificationActionsEnabled,
         lockScreenDetail = notificationLockScreenDetail,
+        lockAllPasses = lockAllPasses,
     )
 }
 

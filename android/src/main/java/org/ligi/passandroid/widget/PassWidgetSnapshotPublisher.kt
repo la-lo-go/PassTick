@@ -14,25 +14,10 @@ class PassWidgetSnapshotPublisher(
     suspend fun publish(
         passes: List<PassSnapshot>,
         excludedCategoryIds: Set<String>,
+        lockAllPasses: Boolean = false,
     ) {
-        val widgetPasses = passes.asSequence()
-            .filterNot { it.isArchived || it.categoryId in excludedCategoryIds }
-            .map { pass ->
-                val span = pass.normalizedTimeSpan()
-                WidgetPass(
-                    id = pass.id,
-                    title = pass.description.ifBlank { "Pass" },
-                    startsAtEpochMillis = span?.startsAt?.toEpochMilli(),
-                    endsAtEpochMillis = span?.endsAt?.toEpochMilli(),
-                    location = pass.locations.firstNotNullOfOrNull { it.name?.takeIf(String::isNotBlank) },
-                    supportingText = pass.fields.firstNotNullOfOrNull { field ->
-                        field.value.takeIf { !field.hidden && it.isNotBlank() }
-                    },
-                )
-            }
-            .toList()
         val snapshot = PassWidgetSnapshot(
-            passes = widgetPasses,
+            passes = widgetPasses(passes, excludedCategoryIds, lockAllPasses),
             generatedAtEpochMillis = clock.millis(),
         )
         store.replace(snapshot)
@@ -40,3 +25,25 @@ class PassWidgetSnapshotPublisher(
         scheduleNextWidgetRefresh(context, snapshot)
     }
 }
+
+internal fun widgetPasses(
+    passes: List<PassSnapshot>,
+    excludedCategoryIds: Set<String>,
+    lockAllPasses: Boolean,
+): List<WidgetPass> = passes.asSequence()
+    .filterNot { it.isArchived || it.categoryId in excludedCategoryIds }
+    .filterNot { lockAllPasses || it.isProtected }
+    .map { pass ->
+        val span = pass.normalizedTimeSpan()
+        WidgetPass(
+            id = pass.id,
+            title = pass.description.ifBlank { "Pass" },
+            startsAtEpochMillis = span?.startsAt?.toEpochMilli(),
+            endsAtEpochMillis = span?.endsAt?.toEpochMilli(),
+            location = pass.locations.firstNotNullOfOrNull { it.name?.takeIf(String::isNotBlank) },
+            supportingText = pass.fields.firstNotNullOfOrNull { field ->
+                field.value.takeIf { !field.hidden && it.isNotBlank() }
+            },
+        )
+    }
+    .toList()

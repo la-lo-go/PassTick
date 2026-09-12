@@ -66,6 +66,18 @@ class NotificationPolicyTest {
     }
 
     @Test
+    fun `lock all passes hides title and location on lock screen`() {
+        val result = evaluate(
+            reminder(title = "Private journey", locationLabel = "Home"),
+            "2026-09-09T10:30:00Z",
+            NotificationPolicySettings(lockAllPasses = true),
+        )
+
+        assertThat(result.publicTitle).isEqualTo("Pass reminder")
+        assertThat(result.publicBody).isEqualTo("Starts in 30 minutes")
+    }
+
+    @Test
     fun `missing optional content produces a useful generic notification`() {
         val result = evaluate(reminder(), "2026-09-09T10:30:00Z")
 
