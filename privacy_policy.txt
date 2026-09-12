@@ -1,5 +1,51 @@
-PassAndroid is built as an Open Source app.
-This SERVICE is provided at no cost and is intended for use as is.
-This app does not collect any private data.
-But it can use external google services like maps and push that might.
-PassAndroid processes personal (e.g. received via internet or local storage) data on the device.
+# PassTick Privacy Policy
+
+Effective date: 2026-09-12
+
+PassTick is an offline-first wallet for Apple Wallet (.pkpass) and esPass (.esPass) files. This policy explains what data the app handles and how.
+
+## Summary
+
+PassTick collects no personal data. The app has no INTERNET permission and makes no network requests. There are no accounts, no analytics, no advertising, no crash reporting, no trackers, and no third-party data sharing.
+
+## Data stored on your device
+
+Pass files, images, and all settings are stored in app-private storage on your device. The developer cannot access this data. PassTick is published by la-lo-go.
+
+## Import, export, and sharing
+
+Imports use the Android document picker or sharesheet. Export, sharing, printing, and gallery saves happen only when you explicitly start them through Android system components.
+
+## Permissions and why they are used
+
+- READ_CALENDAR / WRITE_CALENDAR: only when you add a pass event to the calendar.
+- POST_NOTIFICATIONS: pass reminders.
+- SCHEDULE_EXACT_ALARM: exact reminder times. If access is denied, the app falls back to inexact alarms.
+- USE_BIOMETRIC: unlock protected passes through the system biometric prompt. The app never receives or stores biometric data.
+- RECEIVE_BOOT_COMPLETED: restore scheduled reminders and refresh widgets after a restart.
+
+The flashlight uses the camera flash hardware and does not access the camera.
+
+## Backups
+
+Android Auto Backup is disabled. Pass data is not copied to cloud backup.
+
+## Protected passes and deletion
+
+Protected passes and barcodes stay on your device. You can delete any pass at any time. Deleted passes go to Trash and can then be permanently deleted.
+
+## Children
+
+PassTick does not collect personal data from children or adults. No accounts and no sign-in exist.
+
+## Changes to this policy
+
+This policy may change if the app changes. The effective date above is updated with each revision. The current version is always available at this page.
+
+## Origin and license
+
+PassTick is an independent, GPL-3.0 modernization of the original PassAndroid project by ligi and contributors.
+
+## Contact
+
+For questions or issues, use GitHub issues: https://github.com/la-lo-go/PassTick
