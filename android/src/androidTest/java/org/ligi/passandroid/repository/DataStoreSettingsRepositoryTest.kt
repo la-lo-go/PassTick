@@ -4,6 +4,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.After
 import org.junit.Test
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.reminder.NotificationLockScreenDetail
@@ -119,6 +120,42 @@ class DataStoreSettingsRepositoryTest {
                     imageExportOptions = imageExportOptions,
                 ),
             )
+        }
+    }
+
+    @After
+    fun resetSettings() {
+        runBlocking {
+            val repository = DataStoreSettingsRepository(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+            )
+            repository.setThemeMode(ThemeMode.SYSTEM)
+            repository.setAmoledBlackBackground(false)
+            repository.setAutomaticBrightness(true)
+            repository.setSortOrder(PassSortOrder.DATE_DESC)
+            repository.setPassOrder(emptyList())
+            repository.setCategories(defaultPassCategories)
+            repository.setHighlightTodayPasses(true)
+            repository.setAutomaticallyMarkPast(false)
+            repository.setOfferCalendarAfterImport(false)
+            repository.setRemindersEnabled(false)
+            repository.setReminderMinutes(setOf(60))
+            repository.setReminderExcludedPassIds(emptySet())
+            repository.setReminderLeadMinutesByPass(emptyMap())
+            repository.setReminderExactPassIds(emptySet())
+            repository.setReminderActionsByPass(emptyMap())
+            repository.setNotificationAccessWindowMinutes(15)
+            repository.setNotificationExactTiming(false)
+            repository.setNotificationActionsEnabled(true)
+            repository.setNotificationLockScreenDetail(NotificationLockScreenDetail.HIDE_SENSITIVE)
+            repository.setPassDetailLayout(defaultPassDetailSectionOrder, emptySet())
+            repository.setHomeCardLayout(defaultHomeCardSectionOrder, defaultHiddenHomeCardSections)
+            repository.setLockAllPasses(false)
+            repository.setShowProtectedPassLockIcon(true)
+            repository.setBlurProtectedPassCards(false)
+            repository.setSeparateProtectedPasses(false)
+            repository.setBlockScreenshots(false)
+            repository.setImageExportOptions(PassImageExportOptions())
         }
     }
 }

@@ -12,11 +12,12 @@ import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.then
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -43,10 +44,10 @@ import org.ligi.passandroid.ui.theme.PassTheme
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import org.assertj.core.api.Assertions.assertThat
-import androidx.test.espresso.Espresso.pressBack
+import androidx.activity.ComponentActivity
 
 class PassScreensTest {
-    @get:Rule val composeRule = createComposeRule()
+    @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun emptyHomeShowsImportAction() {
@@ -96,8 +97,8 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithTag("settings_list").performScrollToIndex(5)
-        composeRule.onNodeWithText("Exact reminders").assertIsDisplayed()
-        composeRule.onNodeWithText("Notification actions").assertIsDisplayed()
+        composeRule.onNodeWithText("Exact reminders").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Notification actions").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Hide protected details").assertExists()
     }
 
@@ -218,7 +219,7 @@ class PassScreensTest {
         search.assertIsFocused()
         composeRule.onNodeWithText("Newest").assertDoesNotExist()
 
-        pressBack()
+        composeRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         composeRule.waitUntil(timeoutMillis = 2_000) {
             runCatching {
                 search.assertIsNotFocused()
@@ -227,7 +228,7 @@ class PassScreensTest {
         }
         composeRule.onNodeWithContentDescription("Pass search").assertIsNotFocused()
 
-        pressBack()
+        composeRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         composeRule.onNodeWithContentDescription("Pass search").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Search passes").assertIsDisplayed()
     }

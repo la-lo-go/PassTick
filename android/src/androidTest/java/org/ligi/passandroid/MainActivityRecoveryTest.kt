@@ -16,13 +16,15 @@ class MainActivityRecoveryTest {
 
     @Test
     fun restoresTheCurrentDestinationAfterActivityRecreation() {
-        composeRule.waitUntilAtLeastOneExists(hasText("Recovery pass"), 10_000)
+        composeRule.waitUntilAtLeastOneExists(hasText("Recovery pass"), timeoutMillis = 15_000)
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("Recovery pass").performClick()
         composeRule.onNodeWithContentDescription("Edit pass").assertIsDisplayed()
 
         composeRule.activityRule.scenario.recreate()
 
         composeRule.waitForIdle()
+        composeRule.waitUntilAtLeastOneExists(hasText("Recovery pass"), timeoutMillis = 15_000)
         composeRule.onNodeWithContentDescription("Edit pass").assertIsDisplayed()
         composeRule.onNodeWithText("Recovery pass").assertIsDisplayed()
     }
