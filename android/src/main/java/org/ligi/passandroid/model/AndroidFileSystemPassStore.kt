@@ -12,6 +12,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.ligi.passandroid.BuildConfig
 import org.ligi.passandroid.Tracker
+import org.ligi.passandroid.functions.safePassIdOrNull
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassImpl
 import org.ligi.passandroid.reader.AppleStylePassReader
@@ -124,7 +125,8 @@ class AndroidFileSystemPassStore(
     }
 
     override fun getPathForID(id: String): File {
-        return File(path, id)
+        val safeId = safePassIdOrNull(id) ?: throw IllegalArgumentException("Unsafe pass id: $id")
+        return File(path, safeId)
     }
 
     override fun notifyChange() {
