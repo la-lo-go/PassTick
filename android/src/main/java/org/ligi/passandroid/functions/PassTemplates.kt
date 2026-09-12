@@ -1,39 +1,14 @@
 package org.ligi.passandroid.functions
 
 import android.content.res.Resources
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import org.ligi.passandroid.R
-import org.ligi.passandroid.model.PassBitmapDefinitions
-import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassField
 import org.ligi.passandroid.model.pass.PassImpl
 import org.ligi.passandroid.model.pass.PassType
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
 import java.util.*
 
 const val APP = "passandroid"
-
-fun createAndAddEmptyPass(passStore: PassStore, resources: Resources): Pass {
-    val pass = createBasePass()
-
-    pass.description = "custom Pass"
-
-    passStore.currentPass = pass
-    passStore.save(pass)
-
-    val bitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_launcher)
-
-    try {
-        bitmap.compress(Bitmap.CompressFormat.PNG, 90, FileOutputStream(File(passStore.getPathForID(pass.id), PassBitmapDefinitions.BITMAP_ICON + ".png")))
-    } catch (ignored: FileNotFoundException) {
-    }
-
-    return pass
-}
 
 fun createPassForImageImport(resources: Resources): Pass {
     return createBasePass().apply {
