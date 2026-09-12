@@ -1,8 +1,32 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// Release signing values come from the git-ignored root keystore.properties file or from
+// PASSTICK_KEYSTORE_FILE, PASSTICK_KEYSTORE_PASSWORD, PASSTICK_KEY_ALIAS, and PASSTICK_KEY_PASSWORD.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+
+fun releaseSigningValue(property: String, environment: String): String? =
+    keystoreProperties.getProperty(property)?.takeIf(String::isNotBlank)
+        ?: System.getenv(environment)?.takeIf(String::isNotBlank)
+
+val releaseStoreFile = releaseSigningValue("storeFile", "PASSTICK_KEYSTORE_FILE")
+val releaseStorePassword = releaseSigningValue("storePassword", "PASSTICK_KEYSTORE_PASSWORD")
+val releaseKeyAlias = releaseSigningValue("keyAlias", "PASSTICK_KEY_ALIAS")
+val releaseKeyPassword = releaseSigningValue("keyPassword", "PASSTICK_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { it != null }
 
 android {
     namespace = "org.ligi.passandroid"
@@ -18,11 +42,23 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(requireNotNull(releaseStoreFile))
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-project.txt")
+            signingConfig = signingConfigs.findByName("release")
         }
         debug {
             isDebuggable = true

@@ -8,5 +8,8 @@ bin
 gen
 project.properties
 local.properties
+keystore.properties
+*.jks
+*.keystore
 *iml
 
