@@ -299,9 +299,10 @@ fun PassHomeScreen(
             searchTerms.all(document::contains)
         }
     }
+    val separatedProtectedPassesShown = state.settings.separateProtectedPasses &&
+        protectedPassesUnlocked && !searchExpanded
     val separatedProtectedPasses = if (
-        state.settings.separateProtectedPasses && protectedPassesUnlocked && !searchExpanded &&
-        state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID
+        separatedProtectedPassesShown && state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID
     ) {
         categoryPasses.filter { it.id in protectedPassIds }
     } else {
@@ -506,9 +507,9 @@ fun PassHomeScreen(
                         }
                     }
                 }
-                if (visiblePasses.isEmpty() && separatedProtectedPasses.isEmpty() && !showLockedSection &&
-                    !state.isContentLoading && !state.isBusy
-                ) {
+                val hasNoVisiblePasses = visiblePasses.isEmpty() && separatedProtectedPasses.isEmpty() &&
+                    !showLockedSection
+                if (hasNoVisiblePasses && !state.isContentLoading && !state.isBusy) {
                     item(key = "empty") {
                         if (searchTerms.isEmpty()) EmptyHome() else EmptySearch(searchQuery)
                     }
@@ -1060,7 +1061,8 @@ private fun ReorderableTicketColumn(
                         val from = draggedFromIndex
                         val to = draggedTargetIndex
                         val id = draggedId
-                        if (id != null && from in visualPasses.indices && to in visualPasses.indices && from != to) {
+                        val canCommitReorder = from in visualPasses.indices && to in visualPasses.indices && from != to
+                        if (id != null && canCommitReorder) {
                             val reorderedPasses = visualPasses.toMutableList().apply { add(to, removeAt(from)) }
                             val reorderedIds = reorderedPasses.map(PassUiModel::id)
                             val originTop = frozenBounds[id]?.top ?: 0f

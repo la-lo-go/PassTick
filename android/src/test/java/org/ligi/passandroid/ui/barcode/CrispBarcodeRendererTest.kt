@@ -53,6 +53,13 @@ class CrispBarcodeRendererTest {
         }
     }
 
+    @Test
+    fun `rejects empty data and non positive bounds`() {
+        assertThat(CrispBarcodeRenderer.renderMatrix("", PassBarCodeFormat.QR_CODE, 720, 420)).isNull()
+        assertThat(CrispBarcodeRenderer.renderMatrix("PASS-1234", PassBarCodeFormat.QR_CODE, 0, 420)).isNull()
+        assertThat(CrispBarcodeRenderer.renderMatrix("PASS-1234", PassBarCodeFormat.QR_CODE, 720, 0)).isNull()
+    }
+
     private fun assertTransitionsAlignToModules(rendered: RenderedBarcodeMatrix) {
         val pixels = rendered.pixels
         val scale = rendered.moduleScale

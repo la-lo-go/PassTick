@@ -131,65 +131,138 @@ class MainViewModel(
             return
         }
         if (handlePassMetadataAction(action)) return
-        when (action) {
-            is AppAction.Import -> launchOperation("Pass imported") {
+        if (action is AppAction.ClearMessage) {
+            message.value = null
+            return
+        }
+        if (handleImportExportAction(action)) return
+        if (handlePassPresentationAction(action)) return
+        if (handlePassMutationAction(action)) return
+        if (handleCategoryAction(action)) return
+        if (handleHomeAction(action)) return
+        if (handleAppearanceSettingsAction(action)) return
+        if (handlePassListSettingsAction(action)) return
+        if (handlePrivacySettingsAction(action)) return
+        if (handleNotificationSettingsAction(action)) return
+        handleReminderAction(action)
+    }
+
+    private fun handleImportExportAction(action: AppAction): Boolean = when (action) {
+        is AppAction.Import -> {
+            launchOperation("Pass imported") {
                 val imported = passRepository.import(action.uri).getOrThrow()
                 addCalendarEventsAfterImport(listOf(imported))
             }
-            is AppAction.ImportFiles -> launchOperation("Passes imported") {
+            true
+        }
+        is AppAction.ImportFiles -> {
+            launchOperation("Passes imported") {
                 val imported = action.uris.map { passRepository.import(it).getOrThrow() }
                 addCalendarEventsAfterImport(imported)
             }
-            is AppAction.Export -> launchOperation("Pass exported") {
+            true
+        }
+        is AppAction.Export -> {
+            launchOperation("Pass exported") {
                 passRepository.export(action.id, action.destination).getOrThrow()
             }
-            is AppAction.SharePass -> launchOperation("Pass ready to share") {
+            true
+        }
+        is AppAction.SharePass -> {
+            launchOperation("Pass ready to share") {
                 val uri = passRepository.prepareShare(action.id).getOrThrow()
                 platformActions.share(uri, "application/vnd.espass-espass+zip")
             }
-            is AppAction.ShareImage -> launchOperation("Image ready to share") {
+            true
+        }
+        is AppAction.ShareImage -> {
+            launchOperation("Image ready to share") {
                 val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
                 withContext(Dispatchers.IO) { platformActions.shareImage(pass, action.options) }
             }
-            is AppAction.PrintImage -> launchOperation(null) {
+            true
+        }
+        is AppAction.PrintImage -> {
+            launchOperation(null) {
                 val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
                 val bitmap = withContext(Dispatchers.Default) { PassImageExporter.renderBitmap(pass, action.options) }
                 platformActions.printImage(pass.description.ifBlank { "Pass" }, bitmap)
             }
-            is AppAction.AddToCalendar -> withPass(action.id) { pass ->
+            true
+        }
+        else -> false
+    }
+
+    private fun handlePassPresentationAction(action: AppAction): Boolean = when (action) {
+        is AppAction.AddToCalendar -> {
+            withPass(action.id) { pass ->
                 pass.calendarEvent?.let(platformActions::addToCalendar) ?: error("Pass has no date")
             }
-            is AppAction.OpenLocation -> withPass(action.id) { pass ->
+            true
+        }
+        is AppAction.OpenLocation -> {
+            withPass(action.id) { pass ->
                 val location = pass.locations.getOrNull(action.locationIndex) ?: error("Location not found")
                 platformActions.openLocation(location.toPlatformLocation())
             }
-            is AppAction.OpenUrl -> runCatching { platformActions.openUrl(action.url) }
+            true
+        }
+        is AppAction.OpenUrl -> {
+            runCatching { platformActions.openUrl(action.url) }
                 .onFailure { message.value = it.message ?: "Operation failed" }
-            is AppAction.DeletePass -> viewModelScope.launch {
+            true
+        }
+        else -> false
+    }
+
+    private fun handlePassMutationAction(action: AppAction): Boolean = when (action) {
+        is AppAction.DeletePass -> {
+            viewModelScope.launch {
                 busy.value = true
                 runCatching { check(passRepository.delete(action.id)) }
                     .onFailure { message.value = it.message ?: "Operation failed" }
                 pendingDeletionIds.update { it - action.id }
                 busy.value = false
             }
-            is AppAction.SetPassPendingDeletion -> pendingDeletionIds.update { pendingIds ->
+            true
+        }
+        is AppAction.SetPassPendingDeletion -> {
+            pendingDeletionIds.update { pendingIds ->
                 if (action.pending) pendingIds + action.id else pendingIds - action.id
             }
-            is AppAction.SetPassProtected -> launchOperation(
+            true
+        }
+        is AppAction.SetPassProtected -> {
+            launchOperation(
                 if (action.isProtected) "Pass protected" else "Protection removed",
             ) {
                 passRepository.setProtected(action.id, action.isProtected)
             }
-            is AppAction.SavePass -> launchOperation("Pass saved") { save(action) }
-            is AppAction.MovePass -> check(categoryMoves.trySend(action).isSuccess) { "Pass move queue is closed" }
-            is AppAction.SelectCategory -> selectedCategoryId.value = action.categoryId
-            is AppAction.SaveCategory -> viewModelScope.launch {
+            true
+        }
+        is AppAction.SavePass -> {
+            launchOperation("Pass saved") { save(action) }
+            true
+        }
+        else -> false
+    }
+
+    private fun handleCategoryAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SelectCategory -> {
+            selectedCategoryId.value = action.categoryId
+            true
+        }
+        is AppAction.SaveCategory -> {
+            viewModelScope.launch {
                 val categories = uiState.value.settings.categories
                 settingsRepository.setCategories(
                     categories.filterNot { it.id == action.category.id } + action.category,
                 )
             }
-            is AppAction.DeleteCategory -> launchOperation("Category deleted") {
+            true
+        }
+        is AppAction.DeleteCategory -> {
+            launchOperation("Category deleted") {
                 val category = uiState.value.categories.firstOrNull { it.id == action.categoryId }
                     ?: error("Category not found")
                 require(category.role == PassCategoryRole.CUSTOM) { "Built-in categories cannot be deleted" }
@@ -200,7 +273,10 @@ class MainViewModel(
                     uiState.value.settings.categories.filterNot { it.id == action.categoryId },
                 )
             }
-            is AppAction.MoveCategory -> viewModelScope.launch {
+            true
+        }
+        is AppAction.MoveCategory -> {
+            viewModelScope.launch {
                 val categories = uiState.value.categories.toMutableList()
                 val from = categories.indexOfFirst { it.id == action.categoryId }
                 val to = (from + action.offset).coerceIn(categories.indices)
@@ -210,15 +286,18 @@ class MainViewModel(
                     settingsRepository.setCategories(categories)
                 }
             }
-            is AppAction.SetTheme -> viewModelScope.launch { settingsRepository.setThemeMode(action.value) }
-            is AppAction.SetAmoledBlackBackground -> viewModelScope.launch {
-                settingsRepository.setAmoledBlackBackground(action.value)
-            }
-            is AppAction.SetAutomaticBrightness -> viewModelScope.launch {
-                settingsRepository.setAutomaticBrightness(action.value)
-            }
-            is AppAction.SetSortOrder -> viewModelScope.launch { settingsRepository.setSortOrder(action.value) }
-            is AppAction.ReorderPass -> viewModelScope.launch {
+            true
+        }
+        is AppAction.MovePass -> {
+            check(categoryMoves.trySend(action).isSuccess) { "Pass move queue is closed" }
+            true
+        }
+        else -> false
+    }
+
+    private fun handleHomeAction(action: AppAction): Boolean = when (action) {
+        is AppAction.ReorderPass -> {
+            viewModelScope.launch {
                 val currentIds = uiState.value.passes.map(PassUiModel::id).toMutableList()
                 val visibleIds = action.orderedVisibleIds.distinct().filter(currentIds::contains)
                 val visibleIdSet = visibleIds.toSet()
@@ -231,92 +310,202 @@ class MainViewModel(
                     settingsRepository.setSortOrder(PassSortOrder.MANUAL)
                 }
             }
-            is AppAction.SetHighlightTodayPasses -> viewModelScope.launch {
+            true
+        }
+        is AppAction.SetHighlightTodayPasses -> {
+            viewModelScope.launch {
                 settingsRepository.setHighlightTodayPasses(action.value)
             }
-            is AppAction.SetAutomaticallyMarkPast -> viewModelScope.launch {
+            true
+        }
+        is AppAction.SetAutomaticallyMarkPast -> {
+            viewModelScope.launch {
                 settingsRepository.setAutomaticallyMarkPast(action.value)
             }
-            is AppAction.SetOfferCalendarAfterImport -> viewModelScope.launch {
+            true
+        }
+        is AppAction.SetOfferCalendarAfterImport -> {
+            viewModelScope.launch {
                 settingsRepository.setOfferCalendarAfterImport(action.value)
             }
-            is AppAction.SetRemindersEnabled -> viewModelScope.launch {
-                settingsRepository.setRemindersEnabled(action.value)
-            }
-            is AppAction.SetReminderMinutes -> viewModelScope.launch {
-                settingsRepository.setReminderMinutes(action.value)
-            }
-            is AppAction.SetNotificationAccessWindow -> viewModelScope.launch {
-                settingsRepository.setNotificationAccessWindowMinutes(action.minutes)
-            }
-            is AppAction.SetNotificationExactTiming -> viewModelScope.launch {
-                settingsRepository.setNotificationExactTiming(action.value)
-            }
-            is AppAction.SetNotificationActionsEnabled -> viewModelScope.launch {
-                settingsRepository.setNotificationActionsEnabled(action.value)
-            }
-            is AppAction.SetNotificationLockScreenDetail -> viewModelScope.launch {
-                settingsRepository.setNotificationLockScreenDetail(action.value)
-            }
-            is AppAction.SetLockAllPasses -> viewModelScope.launch {
-                settingsRepository.setLockAllPasses(action.value)
-            }
-            is AppAction.SetShowProtectedPassLockIcon -> viewModelScope.launch {
-                settingsRepository.setShowProtectedPassLockIcon(action.value)
-            }
-            is AppAction.SetBlurProtectedPassCards -> viewModelScope.launch {
-                settingsRepository.setBlurProtectedPassCards(action.value)
-            }
-            is AppAction.SetSeparateProtectedPasses -> viewModelScope.launch {
-                settingsRepository.setSeparateProtectedPasses(action.value)
-            }
-            is AppAction.SetBlockScreenshots -> viewModelScope.launch {
-                settingsRepository.setBlockScreenshots(action.value)
-            }
-            is AppAction.SetImageExportOptions -> viewModelScope.launch {
-                settingsRepository.setImageExportOptions(action.value)
-            }
-            is AppAction.MovePassDetailSection -> viewModelScope.launch {
-                settingsRepository.movePassDetailSection(action.section, action.offset)
-            }
-            is AppAction.SetPassDetailSectionVisible -> viewModelScope.launch {
-                settingsRepository.setPassDetailSectionVisible(action.section, action.visible)
-            }
-            is AppAction.MoveHomeCardSection -> viewModelScope.launch {
+            true
+        }
+        is AppAction.MoveHomeCardSection -> {
+            viewModelScope.launch {
                 settingsRepository.moveHomeCardSection(action.section, action.offset)
             }
-            is AppAction.SetHomeCardSectionVisible -> viewModelScope.launch {
+            true
+        }
+        is AppAction.SetHomeCardSectionVisible -> {
+            viewModelScope.launch {
                 settingsRepository.setHomeCardSectionVisible(action.section, action.visible)
             }
-            is AppAction.TogglePassReminder -> viewModelScope.launch {
-                val excluded = uiState.value.settings.reminderExcludedPassIds.toMutableSet()
-                if (!excluded.add(action.passId)) excluded.remove(action.passId)
-                settingsRepository.setReminderExcludedPassIds(excluded)
+            true
+        }
+        else -> false
+    }
+
+    private fun handleAppearanceSettingsAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetTheme -> {
+            viewModelScope.launch { settingsRepository.setThemeMode(action.value) }
+            true
+        }
+        is AppAction.SetAmoledBlackBackground -> {
+            viewModelScope.launch {
+                settingsRepository.setAmoledBlackBackground(action.value)
             }
-            is AppAction.ConfigurePassReminder -> viewModelScope.launch {
-                val settings = uiState.value.settings
-                val excluded = settings.reminderExcludedPassIds.toMutableSet().apply {
-                    if (action.enabled) remove(action.passId) else add(action.passId)
-                }
-                val leads = settings.reminderLeadMinutesByPass.toMutableMap().apply {
-                    val minutes = action.leadMinutes
-                    if (action.enabled && minutes != null) {
-                        put(action.passId, minutes.coerceIn(0, 10_080))
-                    } else {
-                        remove(action.passId)
-                    }
-                }
-                settingsRepository.setReminderExcludedPassIds(excluded)
-                settingsRepository.setReminderLeadMinutesByPass(leads)
-                settingsRepository.setReminderExactPassIds(
-                    settings.reminderExactPassIds.toMutableSet().apply {
-                        if (action.enabled && action.exactAtEvent) add(action.passId) else remove(action.passId)
-                    },
-                )
+            true
+        }
+        is AppAction.SetAutomaticBrightness -> {
+            viewModelScope.launch {
+                settingsRepository.setAutomaticBrightness(action.value)
             }
-            is AppAction.SetPassReminderActions -> Unit
-            AppAction.ClearMessage -> message.value = null
-            else -> Unit
+            true
+        }
+        is AppAction.SetBlockScreenshots -> {
+            viewModelScope.launch {
+                settingsRepository.setBlockScreenshots(action.value)
+            }
+            true
+        }
+        is AppAction.SetImageExportOptions -> {
+            viewModelScope.launch {
+                settingsRepository.setImageExportOptions(action.value)
+            }
+            true
+        }
+        else -> false
+    }
+
+    private fun handlePassListSettingsAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetSortOrder -> {
+            viewModelScope.launch { settingsRepository.setSortOrder(action.value) }
+            true
+        }
+        is AppAction.MovePassDetailSection -> {
+            viewModelScope.launch {
+                settingsRepository.movePassDetailSection(action.section, action.offset)
+            }
+            true
+        }
+        is AppAction.SetPassDetailSectionVisible -> {
+            viewModelScope.launch {
+                settingsRepository.setPassDetailSectionVisible(action.section, action.visible)
+            }
+            true
+        }
+        else -> false
+    }
+
+    private fun handlePrivacySettingsAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetLockAllPasses -> {
+            viewModelScope.launch {
+                settingsRepository.setLockAllPasses(action.value)
+            }
+            true
+        }
+        is AppAction.SetShowProtectedPassLockIcon -> {
+            viewModelScope.launch {
+                settingsRepository.setShowProtectedPassLockIcon(action.value)
+            }
+            true
+        }
+        is AppAction.SetBlurProtectedPassCards -> {
+            viewModelScope.launch {
+                settingsRepository.setBlurProtectedPassCards(action.value)
+            }
+            true
+        }
+        is AppAction.SetSeparateProtectedPasses -> {
+            viewModelScope.launch {
+                settingsRepository.setSeparateProtectedPasses(action.value)
+            }
+            true
+        }
+        else -> false
+    }
+
+    private fun handleNotificationSettingsAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetRemindersEnabled -> {
+            viewModelScope.launch {
+                settingsRepository.setRemindersEnabled(action.value)
+            }
+            true
+        }
+        is AppAction.SetReminderMinutes -> {
+            viewModelScope.launch {
+                settingsRepository.setReminderMinutes(action.value)
+            }
+            true
+        }
+        is AppAction.SetNotificationAccessWindow -> {
+            viewModelScope.launch {
+                settingsRepository.setNotificationAccessWindowMinutes(action.minutes)
+            }
+            true
+        }
+        is AppAction.SetNotificationExactTiming -> {
+            viewModelScope.launch {
+                settingsRepository.setNotificationExactTiming(action.value)
+            }
+            true
+        }
+        is AppAction.SetNotificationActionsEnabled -> {
+            viewModelScope.launch {
+                settingsRepository.setNotificationActionsEnabled(action.value)
+            }
+            true
+        }
+        is AppAction.SetNotificationLockScreenDetail -> {
+            viewModelScope.launch {
+                settingsRepository.setNotificationLockScreenDetail(action.value)
+            }
+            true
+        }
+        else -> false
+    }
+
+    private fun handleReminderAction(action: AppAction): Boolean = when (action) {
+        is AppAction.TogglePassReminder -> {
+            togglePassReminder(action)
+            true
+        }
+        is AppAction.ConfigurePassReminder -> {
+            configurePassReminder(action)
+            true
+        }
+        else -> false
+    }
+
+    private fun togglePassReminder(action: AppAction.TogglePassReminder) {
+        viewModelScope.launch {
+            val excluded = uiState.value.settings.reminderExcludedPassIds.toMutableSet()
+            if (!excluded.add(action.passId)) excluded.remove(action.passId)
+            settingsRepository.setReminderExcludedPassIds(excluded)
+        }
+    }
+
+    private fun configurePassReminder(action: AppAction.ConfigurePassReminder) {
+        viewModelScope.launch {
+            val settings = uiState.value.settings
+            val excluded = settings.reminderExcludedPassIds.toMutableSet().apply {
+                if (action.enabled) remove(action.passId) else add(action.passId)
+            }
+            val leads = settings.reminderLeadMinutesByPass.toMutableMap().apply {
+                val minutes = action.leadMinutes
+                if (action.enabled && minutes != null) {
+                    put(action.passId, minutes.coerceIn(0, 10_080))
+                } else {
+                    remove(action.passId)
+                }
+            }
+            settingsRepository.setReminderExcludedPassIds(excluded)
+            settingsRepository.setReminderLeadMinutesByPass(leads)
+            settingsRepository.setReminderExactPassIds(
+                settings.reminderExactPassIds.toMutableSet().apply {
+                    if (action.enabled && action.exactAtEvent) add(action.passId) else remove(action.passId)
+                },
+            )
         }
     }
 

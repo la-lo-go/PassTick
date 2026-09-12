@@ -129,6 +129,7 @@ import org.ligi.passandroid.ui.state.displayArtwork
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
+import org.threeten.bp.ZonedDateTime
 import org.threeten.bp.format.DateTimeFormatter
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -827,27 +828,53 @@ private fun PassUiModel.toEditableDraft(): PassDraft = PassDraft(
 )
 
 internal fun validatePassDraft(draft: PassDraft): String? {
-    if (draft.description.isBlank()) return "Add a description before leaving."
-    if (draft.barcodeFormat != null && draft.barcodeMessage.isBlank()) return "Add barcode data or remove the barcode."
-    val start = draft.calendarStart.takeIf(String::isNotBlank)?.let { runCatching { org.threeten.bp.ZonedDateTime.parse(it) }.getOrNull() }
-    val end = draft.calendarEnd.takeIf(String::isNotBlank)?.let { runCatching { org.threeten.bp.ZonedDateTime.parse(it) }.getOrNull() }
+    validateDescription(draft)?.let { return it }
+    validateBarcode(draft)?.let { return it }
+    validateCalendar(draft)?.let { return it }
+    validateLocations(draft.locations)?.let { return it }
+    return validateFields(draft)
+}
+
+private fun validateDescription(draft: PassDraft): String? =
+    if (draft.description.isBlank()) "Add a description before leaving." else null
+
+private fun validateBarcode(draft: PassDraft): String? =
+    if (draft.barcodeFormat != null && draft.barcodeMessage.isBlank()) "Add barcode data or remove the barcode." else null
+
+private fun validateCalendar(draft: PassDraft): String? {
+    val start = parseDraftDate(draft.calendarStart)
+    val end = parseDraftDate(draft.calendarEnd)
     if (draft.calendarStart.isNotBlank() && start == null) return "Select a valid start date or clear it."
     if (draft.calendarEnd.isNotBlank() && end == null) return "Select a valid end date or clear it."
     if (start != null && end != null && end.isBefore(start)) return "The end date must be after the start date."
-    draft.locations.forEach { location ->
-        val hasLatitude = location.latitude.isNotBlank()
-        val hasLongitude = location.longitude.isNotBlank()
-        if (hasLatitude != hasLongitude) return "Enter both coordinates or clear both."
-        val latitude = location.latitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
-        val longitude = location.longitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
-        if (hasLatitude && (latitude == null || longitude == null)) return "Fix the location coordinates or clear them."
-        if (latitude != null && latitude !in -90.0..90.0) return "Latitude must be between -90 and 90."
-        if (longitude != null && longitude !in -180.0..180.0) return "Longitude must be between -180 and 180."
-        if (location.name.isBlank() && !hasLatitude) return "Add an address or delete the empty location."
-    }
-    if (draft.fields.any { it.label.isBlank() && it.value.isBlank() }) return "Complete or delete the empty field."
     return null
 }
+
+private fun parseDraftDate(value: String): ZonedDateTime? =
+    value.takeIf(String::isNotBlank)?.let { runCatching { ZonedDateTime.parse(it) }.getOrNull() }
+
+private fun validateLocations(locations: List<PassLocationDraft>): String? {
+    locations.forEach { location ->
+        validateLocation(location)?.let { return it }
+    }
+    return null
+}
+
+private fun validateLocation(location: PassLocationDraft): String? {
+    val hasLatitude = location.latitude.isNotBlank()
+    val hasLongitude = location.longitude.isNotBlank()
+    if (hasLatitude != hasLongitude) return "Enter both coordinates or clear both."
+    val latitude = location.latitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
+    val longitude = location.longitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
+    if (hasLatitude && (latitude == null || longitude == null)) return "Fix the location coordinates or clear them."
+    if (latitude != null && latitude !in -90.0..90.0) return "Latitude must be between -90 and 90."
+    if (longitude != null && longitude !in -180.0..180.0) return "Longitude must be between -180 and 180."
+    if (location.name.isBlank() && !hasLatitude) return "Add an address or delete the empty location."
+    return null
+}
+
+private fun validateFields(draft: PassDraft): String? =
+    if (draft.fields.any { it.label.isBlank() && it.value.isBlank() }) "Complete or delete the empty field." else null
 
 @Composable
 private fun EditorSection(

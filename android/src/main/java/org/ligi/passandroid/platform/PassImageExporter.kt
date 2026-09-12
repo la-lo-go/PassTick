@@ -85,7 +85,7 @@ object PassImageExporter {
         require(width > 0) { "Width must be positive" }
         val base = width.toFloat()
         val content = options.content
-        val barcodeOnly = content.barcode && !content.artwork && !content.details && !content.dateTime && !content.location
+        val barcodeOnly = isBarcodeOnly(content)
         val cardMargin = base * if (barcodeOnly) BARCODE_ONLY_MARGIN_RATIO else CARD_MARGIN_RATIO
         val padding = base * if (barcodeOnly) BARCODE_ONLY_PADDING_RATIO else CARD_PADDING_RATIO
         val gap = base * BLOCK_GAP_RATIO
@@ -101,48 +101,83 @@ object PassImageExporter {
         val barcode = renderBarcode(pass, options, contentWidth, base, barcodeOnly)
         try {
             val blocks = buildContentBlocks(pass, options, artwork, thumbnail, barcode, contentWidth, base, imagePaint, barcodeOnly)
-            val contentHeight = measureContentHeight(blocks, gap)
-            val autoHeight = options.aspectRatio.ratioWidth == 0f
-            val cardWidth = width - 2 * cardMargin
-            val canvasHeight: Int
-            val cardHeight: Float
-            if (autoHeight) {
-                cardHeight = 2 * padding + contentHeight
-                canvasHeight = (2 * cardMargin + cardHeight).toInt()
-            } else {
-                canvasHeight = (width * orientedHeightFactor(options.aspectRatio, options.orientation)).toInt()
-                cardHeight = canvasHeight - 2 * cardMargin
-            }
-
-            val bitmap = Bitmap.createBitmap(width, canvasHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-            bitmap.eraseColor(Color.TRANSPARENT)
-            val canvas = Canvas(bitmap)
-            drawCard(canvas, cardMargin, cardMargin, cardWidth, cardHeight, base)
-            if (blocks.isNotEmpty() && contentHeight > 0f) {
-                val innerLeft = cardMargin + padding
-                val innerTop = cardMargin + padding
-                if (autoHeight) {
-                    drawBlocks(canvas, blocks, innerLeft, innerTop, gap)
-                } else {
-                    drawScaledContent(
-                        canvas,
-                        blocks,
-                        contentWidth,
-                        contentHeight,
-                        innerLeft,
-                        innerTop,
-                        cardWidth - 2 * padding,
-                        cardHeight - 2 * padding,
-                        gap,
-                        imagePaint,
-                    )
-                }
-            }
-            return bitmap
+            return drawExportBitmap(blocks, options, cardMargin, padding, gap, contentWidth, width, base, imagePaint)
         } finally {
             artwork?.recycle()
             thumbnail?.recycle()
             barcode?.recycle()
+        }
+    }
+
+    private fun isBarcodeOnly(content: PassImageContent): Boolean =
+        content.barcode && !hasNonBarcodeContent(content)
+
+    private fun hasNonBarcodeContent(content: PassImageContent): Boolean =
+        content.artwork || content.details || content.dateTime || content.location
+
+    private fun drawExportBitmap(
+        blocks: List<ContentBlock>,
+        options: PassImageExportOptions,
+        cardMargin: Float,
+        padding: Float,
+        gap: Float,
+        contentWidth: Int,
+        width: Int,
+        base: Float,
+        imagePaint: Paint,
+    ): Bitmap {
+        val contentHeight = measureContentHeight(blocks, gap)
+        val cardWidth = width - 2 * cardMargin
+        val autoHeight = options.aspectRatio.ratioWidth == 0f
+        val canvasHeight: Int
+        val cardHeight: Float
+        if (autoHeight) {
+            cardHeight = 2 * padding + contentHeight
+            canvasHeight = (2 * cardMargin + cardHeight).toInt()
+        } else {
+            canvasHeight = (width * orientedHeightFactor(options.aspectRatio, options.orientation)).toInt()
+            cardHeight = canvasHeight - 2 * cardMargin
+        }
+
+        val bitmap = Bitmap.createBitmap(width, canvasHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.TRANSPARENT)
+        val canvas = Canvas(bitmap)
+        drawCard(canvas, cardMargin, cardMargin, cardWidth, cardHeight, base)
+        drawBlocksOnCanvas(canvas, blocks, contentWidth, contentHeight, cardMargin, padding, cardWidth, cardHeight, gap, autoHeight, imagePaint)
+        return bitmap
+    }
+
+    private fun drawBlocksOnCanvas(
+        canvas: Canvas,
+        blocks: List<ContentBlock>,
+        contentWidth: Int,
+        contentHeight: Float,
+        cardMargin: Float,
+        padding: Float,
+        cardWidth: Float,
+        cardHeight: Float,
+        gap: Float,
+        autoHeight: Boolean,
+        imagePaint: Paint,
+    ) {
+        if (blocks.isEmpty() || contentHeight <= 0f) return
+        val innerLeft = cardMargin + padding
+        val innerTop = cardMargin + padding
+        if (autoHeight) {
+            drawBlocks(canvas, blocks, innerLeft, innerTop, gap)
+        } else {
+            drawScaledContent(
+                canvas,
+                blocks,
+                contentWidth,
+                contentHeight,
+                innerLeft,
+                innerTop,
+                cardWidth - 2 * padding,
+                cardHeight - 2 * padding,
+                gap,
+                imagePaint,
+            )
         }
     }
 

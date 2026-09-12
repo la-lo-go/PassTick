@@ -29,22 +29,7 @@ fun generateBarCodeBitmap(data: String, type: PassBarCodeFormat): Bitmap? {
     }
 
     try {
-        val matrix = getBitMatrix(data, type)
-        val is1D = matrix.height == 1
-
-        val width = matrix.width
-        val height = if (is1D) width / 5 else matrix.height
-
-        // RGB_565 keeps barcode pixels opaque on print and screen surfaces.
-        val barcodeImage = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                barcodeImage.setPixel(x, y, if (matrix.get(x, if (is1D) 0 else y)) 0 else 0xFFFFFF)
-            }
-        }
-
-        return barcodeImage
+        return createBarcodeBitmap(getBitMatrix(data, type))
     } catch (e: com.google.zxing.WriterException) {
         Timber.w(e, "could not write image")
         return null
@@ -56,6 +41,24 @@ fun generateBarCodeBitmap(data: String, type: PassBarCodeFormat): Bitmap? {
         return null
     }
 
+}
+
+private fun createBarcodeBitmap(matrix: BitMatrix): Bitmap {
+    val is1D = matrix.height == 1
+
+    val width = matrix.width
+    val height = if (is1D) width / 5 else matrix.height
+
+    // RGB_565 keeps barcode pixels opaque on print and screen surfaces.
+    val barcodeImage = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            barcodeImage.setPixel(x, y, if (matrix.get(x, if (is1D) 0 else y)) 0 else 0xFFFFFF)
+        }
+    }
+
+    return barcodeImage
 }
 
 @VisibleForTesting

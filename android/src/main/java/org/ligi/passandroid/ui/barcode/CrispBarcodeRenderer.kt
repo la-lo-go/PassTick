@@ -26,33 +26,14 @@ object CrispBarcodeRenderer {
         maxWidthPx: Int,
         maxHeightPx: Int,
     ): RenderedBarcodeMatrix? {
-        if (data.isEmpty() || !supports(format) || maxWidthPx <= 0 || maxHeightPx <= 0) return null
+        if (!hasRenderableInput(data, format) || !hasRenderableBounds(maxWidthPx, maxHeightPx)) return null
 
-        val source = try {
-            MultiFormatWriter().encode(
-                data,
-                format.zxingBarCodeFormat(),
-                1,
-                1,
-                mapOf(EncodeHintType.MARGIN to 0),
-            )
-        } catch (_: WriterException) {
-            return null
-        } catch (_: IllegalArgumentException) {
-            return null
-        } catch (_: ArrayIndexOutOfBoundsException) {
-            return null
-        }
-
+        val source = encodeSource(data, format) ?: return null
         val quietZone = format.quietZonePixels()
         val contentWidth = source.width + quietZone.horizontal * 2
         val contentHeight = source.height + quietZone.vertical * 2
         val isLinear = format.isLinear()
-        val scale = if (isLinear) {
-            maxWidthPx / contentWidth
-        } else {
-            minOf(maxWidthPx / contentWidth, maxHeightPx / contentHeight)
-        }
+        val scale = moduleScale(isLinear, maxWidthPx, maxHeightPx, contentWidth, contentHeight)
         if (scale < 1) return null
 
         val outputWidth = contentWidth * scale
@@ -61,6 +42,54 @@ object CrispBarcodeRenderer {
         val left = quietZone.horizontal * scale
         val top = if (isLinear) 0 else quietZone.vertical * scale
 
+        paintModules(source, output, scale, isLinear, left, top, outputHeight)
+
+        return RenderedBarcodeMatrix(output, scale)
+    }
+
+    private fun hasRenderableInput(data: String, format: PassBarCodeFormat): Boolean =
+        data.isNotEmpty() && supports(format)
+
+    private fun hasRenderableBounds(maxWidthPx: Int, maxHeightPx: Int): Boolean =
+        maxWidthPx > 0 && maxHeightPx > 0
+
+    private fun encodeSource(data: String, format: PassBarCodeFormat): BitMatrix? = try {
+        MultiFormatWriter().encode(
+            data,
+            format.zxingBarCodeFormat(),
+            1,
+            1,
+            mapOf(EncodeHintType.MARGIN to 0),
+        )
+    } catch (_: WriterException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    } catch (_: ArrayIndexOutOfBoundsException) {
+        null
+    }
+
+    private fun moduleScale(
+        isLinear: Boolean,
+        maxWidthPx: Int,
+        maxHeightPx: Int,
+        contentWidth: Int,
+        contentHeight: Int,
+    ): Int = if (isLinear) {
+        maxWidthPx / contentWidth
+    } else {
+        minOf(maxWidthPx / contentWidth, maxHeightPx / contentHeight)
+    }
+
+    private fun paintModules(
+        source: BitMatrix,
+        output: BitMatrix,
+        scale: Int,
+        isLinear: Boolean,
+        left: Int,
+        top: Int,
+        outputHeight: Int,
+    ) {
         for (sourceY in 0 until source.height) {
             for (sourceX in 0 until source.width) {
                 if (!source[sourceX, sourceY]) continue
@@ -70,8 +99,6 @@ object CrispBarcodeRenderer {
                 output.setRegion(outputX, outputY, scale, outputBarHeight)
             }
         }
-
-        return RenderedBarcodeMatrix(output, scale)
     }
 
     fun renderBitmap(

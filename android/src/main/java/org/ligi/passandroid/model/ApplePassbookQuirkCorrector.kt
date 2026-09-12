@@ -46,49 +46,60 @@ class ApplePassbookQuirkCorrector(private val tracker: Tracker) {
     }
 
     private fun parseDateTime(value: String, key: String?, label: String?): ZonedDateTime? {
+        parseIsoDateTime(value)?.let { return it }
+
+        val hint = "$key $label".lowercase(Locale.ROOT)
+        MONTH_NAME_DATE.find(value)?.let { return parseMonthNamedDateTime(it) }
+        MONTH_FIRST_NAME_DATE.find(value)?.let { return parseMonthFirstNameDateTime(it) }
+        return NUMERIC_DATE.find(value)?.let { parseNumericDateTime(it, hint) }
+    }
+
+    private fun parseIsoDateTime(value: String): ZonedDateTime? {
         ISO_DATE_TIME.find(value)?.value?.let { iso ->
             runCatching { ZonedDateTime.parse(iso) }.getOrNull()?.let { return it }
         }
-        runCatching { ZonedDateTime.parse(value) }.getOrNull()?.let { return it }
+        return runCatching { ZonedDateTime.parse(value) }.getOrNull()
+    }
 
-        val hint = "$key $label".lowercase(Locale.ROOT)
-        MONTH_NAME_DATE.find(value)?.let { match ->
-            return localDateTime(
-                year = match.groupValues[3].toInt(),
-                month = monthNumber(match.groupValues[2]) ?: return null,
-                day = match.groupValues[1].toInt(),
-                time = match.groupValues[4],
-                meridiem = match.groupValues[5],
-            )
+    private fun parseMonthNamedDateTime(match: MatchResult): ZonedDateTime? {
+        val month = monthNumber(match.groupValues[2]) ?: return null
+        return localDateTime(
+            year = match.groupValues[3].toInt(),
+            month = month,
+            day = match.groupValues[1].toInt(),
+            time = match.groupValues[4],
+            meridiem = match.groupValues[5],
+        )
+    }
+
+    private fun parseMonthFirstNameDateTime(match: MatchResult): ZonedDateTime? {
+        val month = monthNumber(match.groupValues[1]) ?: return null
+        return localDateTime(
+            year = match.groupValues[3].toInt(),
+            month = month,
+            day = match.groupValues[2].toInt(),
+            time = match.groupValues[4],
+            meridiem = match.groupValues[5],
+        )
+    }
+
+    private fun parseNumericDateTime(match: MatchResult, hint: String): ZonedDateTime? {
+        val first = match.groupValues[1].toInt()
+        val second = match.groupValues[2].toInt()
+        val monthFirst = when {
+            first > 12 -> false
+            second > 12 -> true
+            hint.containsAny(MONTH_FIRST_HINTS) -> true
+            hint.containsAny(DAY_FIRST_HINTS) -> false
+            else -> false
         }
-        MONTH_FIRST_NAME_DATE.find(value)?.let { match ->
-            return localDateTime(
-                year = match.groupValues[3].toInt(),
-                month = monthNumber(match.groupValues[1]) ?: return null,
-                day = match.groupValues[2].toInt(),
-                time = match.groupValues[4],
-                meridiem = match.groupValues[5],
-            )
-        }
-        NUMERIC_DATE.find(value)?.let { match ->
-            val first = match.groupValues[1].toInt()
-            val second = match.groupValues[2].toInt()
-            val monthFirst = when {
-                first > 12 -> false
-                second > 12 -> true
-                hint.containsAny(MONTH_FIRST_HINTS) -> true
-                hint.containsAny(DAY_FIRST_HINTS) -> false
-                else -> false
-            }
-            return localDateTime(
-                year = match.groupValues[3].toInt(),
-                month = if (monthFirst) first else second,
-                day = if (monthFirst) second else first,
-                time = match.groupValues[4],
-                meridiem = match.groupValues[5],
-            )
-        }
-        return null
+        return localDateTime(
+            year = match.groupValues[3].toInt(),
+            month = if (monthFirst) first else second,
+            day = if (monthFirst) second else first,
+            time = match.groupValues[4],
+            meridiem = match.groupValues[5],
+        )
     }
 
     private fun parseSeparateDateAndTime(pass: PassImpl): ZonedDateTime? {
