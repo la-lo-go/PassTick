@@ -36,8 +36,8 @@ android {
         applicationId = "dev.lalogo.passtick"
         minSdk = 29
         targetSdk = 36
-        versionCode = 373
-        versionName = "3.7.3"
+        versionCode = 1
+        versionName = "0.1.0"
         testInstrumentationRunner = "org.ligi.passandroid.AppReplacingRunner"
         vectorDrawables.useSupportLibrary = true
     }
