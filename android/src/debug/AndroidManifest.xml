@@ -5,6 +5,7 @@
             android:name=".debug.PassDiagnosticsProvider"
             android:authorities="${applicationId}.diagnostics"
             android:exported="true"
+            android:permission="android.permission.DUMP"
             android:enabled="true" />
     </application>
 </manifest>
