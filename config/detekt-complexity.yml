@@ -3,9 +3,11 @@ complexity:
   CyclomaticComplexMethod:
     active: true
     threshold: 15
+    ignoreAnnotated: ['androidx.compose.runtime.Composable']
   CognitiveComplexMethod:
     active: true
     threshold: 15
+    ignoreAnnotated: ['androidx.compose.runtime.Composable']
   NestedBlockDepth:
     active: true
     threshold: 4
