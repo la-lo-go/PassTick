@@ -31,14 +31,14 @@ RepoType: git
 Repo: https://github.com/la-lo-go/PassTick.git
 
 Builds:
-  - versionName: 3.7.3
-    versionCode: 373
-    commit: 100d7a5ee836d64b7aa0799448676e55a84db441
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: 0.1.0
     subdir: android
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 3.7.3
-CurrentVersionCode: 373
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1
