@@ -1,0 +1,27 @@
+PassTick is an offline wallet for Apple Wallet (.pkpass) and esPass (.esPass) files.
+
+Import a pass from a file, an email attachment, or the Android share sheet. PassTick stores the pass on your device and shows the barcode when you need it. The app has no INTERNET permission, no account, no ads, and no trackers.
+
+FEATURES
+
+- Shows QR, Aztec, PDF417, Code 128, and other barcodes at maximum screen brightness.
+- Reminds you before an event and puts access actions in the notification.
+- Adds pass dates to your calendar.
+- Groups today's passes on the home screen and in a timeline.
+- Opens pass locations in your map app.
+- Organizes passes with tags, pins, archive, and trash with undo.
+- Protects passes with fingerprint or screen lock and can block screenshots.
+- Keeps protected content out of widgets, the lock screen, and notifications.
+- Shows home screen widgets with the passes that you select.
+- Exports and shares a pass image or the pass file.
+- Works fully offline.
+
+PRIVACY
+
+PassTick keeps all data in app-private storage on your device. The app collects no data and sends no data. Android Auto Backup is disabled.
+
+LICENSE
+
+PassTick is free software under GPL-3.0. It is an independent modernization of the PassAndroid project by ligi and contributors.
+
+Source code: https://github.com/la-lo-go/PassTick
