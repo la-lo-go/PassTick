@@ -43,7 +43,9 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.ViewAgenda
@@ -938,6 +940,7 @@ fun SettingsScreen(
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
                 item { NotificationSettings(settings, onAction, Modifier.bringIntoViewRequester(notificationRequester)) }
+                item { AboutSettings(onAction) }
             }
         }
     }
@@ -1038,6 +1041,18 @@ private fun CalendarSettings(settings: AppSettings, onAction: (SettingsAction) -
     SettingsGroup("Calendar") {
         SettingSwitch("Automatically add imported passes", settings.offerCalendarAfterImport) {
             onAction(SettingsAction.SetOfferCalendarAfterImport(it))
+        }
+    }
+}
+
+@Composable
+private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
+    SettingsGroup("About") {
+        PassListSetting(Icons.Default.PrivacyTip, "Privacy policy") {
+            onAction(SettingsAction.OpenPrivacyPolicy)
+        }
+        PassListSetting(Icons.Default.Code, "Source code and license") {
+            onAction(SettingsAction.OpenSourceCode)
         }
     }
 }

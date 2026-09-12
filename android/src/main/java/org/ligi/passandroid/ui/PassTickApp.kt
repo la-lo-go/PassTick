@@ -69,6 +69,8 @@ import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.PassDetailScreen
 import org.ligi.passandroid.ui.compose.PassCustomizationScreen
+import org.ligi.passandroid.ui.compose.PRIVACY_POLICY_URL
+import org.ligi.passandroid.ui.compose.PROJECT_REPOSITORY_URL
 import org.ligi.passandroid.ui.compose.PassHomeScreen
 import org.ligi.passandroid.ui.compose.SettingsScreen
 import org.ligi.passandroid.ui.compose.TimelineAction
@@ -857,6 +859,12 @@ fun PassTickApp(
                                 }
                                 is SettingsAction.SetBlockScreenshots -> viewModel.onAction(
                                     AppAction.SetBlockScreenshots(action.value),
+                                )
+                                SettingsAction.OpenPrivacyPolicy -> viewModel.onAction(
+                                    AppAction.OpenUrl(PRIVACY_POLICY_URL),
+                                )
+                                SettingsAction.OpenSourceCode -> viewModel.onAction(
+                                    AppAction.OpenUrl(PROJECT_REPOSITORY_URL),
                                 )
                             }
                         }

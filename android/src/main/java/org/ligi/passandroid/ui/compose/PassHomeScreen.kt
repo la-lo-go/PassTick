@@ -173,8 +173,6 @@ import org.ligi.passandroid.ui.theme.PassActionButtonGap
 import org.ligi.passandroid.ui.theme.PassIcons
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
 
-internal const val PROJECT_REPOSITORY_URL = "https://github.com/la-lo-go/PassTick"
-
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
     data class SelectCategory(val categoryId: String?) : HomeAction
