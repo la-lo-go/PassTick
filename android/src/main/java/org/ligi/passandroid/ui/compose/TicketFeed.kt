@@ -60,6 +60,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -460,6 +461,17 @@ private fun TicketSwipeContainer(
         )
     }
     SyncSwipeReveal(pass.id, reorderingActive, openSwipePassId, revealState)
+    LaunchedEffect(revealState) {
+        snapshotFlow { revealState.settledValue }
+            .distinctUntilChanged()
+            .collect { anchor ->
+                if (anchor == SwipeRevealAnchor.StartCommit) {
+                    if (openSwipePassId.value == pass.id) openSwipePassId.value = null
+                    onArchive(pass.id, restoring, pass.categoryId)
+                    revealState.animateTo(SwipeRevealAnchor.Closed)
+                }
+            }
+    }
     val hapticFeedback = LocalHapticFeedback.current
     LaunchedEffect(revealState, measuredCardWidthPx) {
         if (measuredCardWidthPx == 0) return@LaunchedEffect
@@ -591,11 +603,6 @@ private fun TicketSwipeContainer(
                     do {
                         pressed = awaitPointerEvent().changes.any { it.pressed }
                     } while (pressed)
-                    if (revealState.offset >= measuredCardWidthPx * FULL_SWIPE_COMMIT_FRACTION) {
-                        onArchive(pass.id, restoring, pass.categoryId)
-                        if (openSwipePassId.value == pass.id) openSwipePassId.value = null
-                        scope.launch { revealState.snapTo(SwipeRevealAnchor.Closed) }
-                    }
                 }
             }.anchoredDraggable(
                 state = revealState,
