@@ -303,6 +303,9 @@ private fun ReorderableTicketColumn(
                             scaleX = if (isLifted) 1.025f else 1f
                             scaleY = if (isLifted) 1.025f else 1f
                             shadowElevation = if (isLifted) 12.dp.toPx() else 0f
+                            // The lifted shadow must follow the card outline instead of the rectangular layer bounds.
+                            this.shape = shape
+                            clip = isLifted
                         },
                     shape = shape,
                     reorderingActive = draggedId != null,
