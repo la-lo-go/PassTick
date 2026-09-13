@@ -10,7 +10,7 @@ datastore = "1.2.1"
 espresso = "3.7.0"
 glance = "1.2.0"
 junit = "4.13.2"
-json = "20250517"
+json = "0.0.20131108.vaadin1"
 kotlinx-serialization = "1.9.0"
 kotlin = "2.4.20"
 koin = "4.2.2"
@@ -54,7 +54,7 @@ espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref =
 glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
 glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glance" }
 junit4 = { module = "junit:junit", version.ref = "junit" }
-json = { module = "org.json:json", version.ref = "json" }
+json = { module = "com.vaadin.external.google:android-json", version.ref = "json" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
