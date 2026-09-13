@@ -698,7 +698,7 @@ private fun TicketRow(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = shape,
-        modifier = modifier.fillMaxWidth().animateContentSize()
+        modifier = modifier.fillMaxWidth().clip(shape).animateContentSize()
             .indication(interactionSource, LocalIndication.current),
     ) {
         Box {
