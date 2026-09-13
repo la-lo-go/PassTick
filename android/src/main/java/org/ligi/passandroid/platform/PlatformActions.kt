@@ -99,7 +99,7 @@ class AndroidPlatformActions(
     }
 
     override fun shareImage(pass: PassUiModel, options: PassImageExportOptions) {
-        val directory = File(context.filesDir, "share").apply { mkdirs() }
+        val directory = File(context.cacheDir, "share").apply { mkdirs() }
         val file = File(directory, "${pass.id}.png")
         val bitmap = PassImageExporter.renderBitmap(pass, options)
         try {

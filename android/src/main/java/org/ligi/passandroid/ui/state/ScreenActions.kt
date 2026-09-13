@@ -13,6 +13,7 @@ sealed interface PassDetailAction {
     data object Edit : PassDetailAction
     data class EditDate(val field: PassDateField) : PassDetailAction
     data object Share : PassDetailAction
+    data object Export : PassDetailAction
     data object OpenImageExport : PassDetailAction
     data object SaveBarcodeImage : PassDetailAction
     data object AddToCalendar : PassDetailAction

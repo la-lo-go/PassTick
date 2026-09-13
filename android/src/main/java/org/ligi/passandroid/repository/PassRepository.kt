@@ -285,7 +285,7 @@ class FilePassRepository(
 
     override suspend fun prepareShare(id: String): Result<Uri> = withContext(ioDispatcher) {
         runCatching {
-            val target = File(context.filesDir, "share/$id.espass")
+            val target = File(context.cacheDir, "share/$id.espass")
             val exporter = PassExporter(passStore.getPathForID(id), target)
             exporter.export()
             exporter.exception?.let { throw it }

@@ -24,6 +24,7 @@ import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.reminder.AndroidReminderScheduler
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
+import java.io.File
 
 open class App : Application() {
 
@@ -52,6 +53,9 @@ open class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Shared pass and image files are transient; remove leftovers from a previous session.
+        File(cacheDir, "share").deleteRecursively()
 
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit

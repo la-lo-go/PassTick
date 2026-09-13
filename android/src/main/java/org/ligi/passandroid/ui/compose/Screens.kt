@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -89,6 +90,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -279,6 +281,11 @@ fun PassDetailScreen(
                                 text = { Text("Export as image") },
                                 leadingIcon = { Icon(Icons.Default.Image, null) },
                                 onClick = { overflowOpen = false; onAction(PassDetailAction.OpenImageExport) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Save pass file") },
+                                leadingIcon = { Icon(Icons.Default.SaveAlt, null) },
+                                onClick = { overflowOpen = false; onAction(PassDetailAction.Export) },
                             )
                             DropdownMenuItem(
                                 text = { Text("Save code") },
@@ -590,7 +597,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
     var description by remember(pass?.id) { mutableStateOf(pass?.description.orEmpty()) }
     var creator by remember(pass?.id) { mutableStateOf(pass?.creator.orEmpty()) }
     var passType by remember(pass?.id) { mutableStateOf(pass?.type ?: PassType.EVENT) }
-    var accentColor by remember(pass?.id) { mutableStateOf(pass?.accentColor ?: 0xFF3D73E9.toInt()) }
+    var accentColor by remember(pass?.id) { mutableIntStateOf(pass?.accentColor ?: 0xFF3D73E9.toInt()) }
     var barcodeFormat by remember(pass?.id) { mutableStateOf(pass?.barcodeFormat) }
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
@@ -1438,7 +1445,7 @@ private fun CategoryEditorDialog(
     onSave: (PassCategory) -> Unit,
 ) {
     var name by remember(category.id) { mutableStateOf(category.name) }
-    var color by remember(category.id) { mutableStateOf(category.colorArgb.toInt()) }
+    var color by remember(category.id) { mutableIntStateOf(category.colorArgb.toInt()) }
     var icon by remember(category.id) { mutableStateOf(category.icon) }
     AlertDialog(
         onDismissRequest = onDismiss,

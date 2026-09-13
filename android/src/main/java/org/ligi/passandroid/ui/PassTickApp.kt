@@ -5,7 +5,6 @@ import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.net.Uri
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -191,6 +191,14 @@ fun PassTickApp(
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
+    }
+    var exportPassId by remember { mutableStateOf<String?>(null) }
+    val exportPassLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.espass-espass+zip"),
+    ) { uri ->
+        val passId = exportPassId
+        exportPassId = null
+        if (uri != null && passId != null) viewModel.onAction(AppAction.Export(passId, uri))
     }
     var imageExporting by remember { mutableStateOf(false) }
     fun exportImageToGallery(pass: PassUiModel, barcodeOnly: Boolean, returnToPass: Boolean) {
@@ -380,6 +388,11 @@ fun PassTickApp(
             PassDetailAction.Edit -> backStack.add(AppDestination.EditPass(passId))
             is PassDetailAction.EditDate -> backStack.add(AppDestination.EditPass(passId, action.field))
             PassDetailAction.Share -> viewModel.onAction(AppAction.SharePass(passId))
+            PassDetailAction.Export -> {
+                val description = state.passes.firstOrNull { it.id == passId }?.description.orEmpty()
+                exportPassId = passId
+                exportPassLauncher.launch(exportFileName(description))
+            }
             PassDetailAction.OpenImageExport -> backStack.add(AppDestination.ExportImage(passId))
             PassDetailAction.SaveBarcodeImage -> {
                 state.passes.firstOrNull { it.id == passId }?.let { pass ->
@@ -414,7 +427,7 @@ fun PassTickApp(
                     activity.startActivity(
                         Intent(
                             Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                            Uri.parse("package:${activity.packageName}"),
+                            "package:${activity.packageName}".toUri(),
                         ),
                     )
                     coroutineScope.launch {
@@ -813,7 +826,7 @@ fun PassTickApp(
                                         activity.startActivity(
                                             Intent(
                                                 Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                                Uri.parse("package:${activity.packageName}"),
+                                                "package:${activity.packageName}".toUri(),
                                             ),
                                         )
                                         coroutineScope.launch {
@@ -938,4 +951,13 @@ private fun imageExportFileName(description: String?): String {
         .trim()
         .ifBlank { "pass" }
     return "$base ${org.threeten.bp.LocalDate.now()}.png"
+}
+
+private fun exportFileName(description: String?): String {
+    val base = description.orEmpty()
+        .replace(Regex("[^A-Za-z0-9 _-]"), "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .ifBlank { "pass" }
+    return "$base.espass"
 }
