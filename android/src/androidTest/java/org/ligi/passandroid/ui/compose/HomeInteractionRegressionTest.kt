@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Rule
 import org.junit.Test
@@ -79,6 +80,20 @@ class HomeInteractionRegressionTest {
         composeRule.onNodeWithText("First").performTouchInput { swipeLeft() }
         composeRule.onNodeWithText("Second").performTouchInput { swipeLeft() }
         composeRule.onAllNodesWithContentDescription("Delete").assertCountEquals(1)
+    }
+
+    @Test
+    fun swipingArchivedCardRightDispatchesRestore() {
+        val actions = mutableListOf<HomeAction>()
+        val state = MainUiState(
+            passes = listOf(pass("one", "Ticket").copy(isArchived = true)),
+            selectedCategoryId = "archived",
+            isContentLoading = false,
+        )
+        composeRule.setContent { PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, actions::add) } }
+        composeRule.onNodeWithText("Ticket").performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+        assertThat(actions.filterIsInstance<HomeAction.Restore>()).hasSize(1)
     }
 
     @Test
