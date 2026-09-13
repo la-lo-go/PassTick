@@ -78,7 +78,7 @@ fun CategorySettingsScreen(
         AlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text(stringResource(R.string.category_delete_tag)) },
-            text = { Text("The tag will be removed from passes in ${category.name}.") },
+            text = { Text(stringResource(R.string.category_tag_removed_from_passes, category.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     onAction(CategorySettingsAction.Delete(category.id))
@@ -100,6 +100,7 @@ fun CategorySettingsScreen(
             )
         },
         floatingActionButton = {
+            val addTagDescription = stringResource(R.string.category_add_tag)
             ExtendedFloatingActionButton(
                 onClick = {
                     editing = PassCategory(
@@ -108,7 +109,7 @@ fun CategorySettingsScreen(
                         colorArgb = 0xFF6750A4,
                     )
                 },
-                modifier = Modifier.semantics { contentDescription = "Add tag" },
+                modifier = Modifier.semantics { contentDescription = addTagDescription },
                 icon = { Icon(Icons.Default.Add, null) },
                 text = { Text(stringResource(R.string.category_add_tag)) },
             )
@@ -135,14 +136,14 @@ fun CategorySettingsScreen(
                     trailingContent = {
                         Row {
                             IconButton(onClick = { onAction(CategorySettingsAction.Move(category.id, -1)) }) {
-                                Icon(Icons.Default.ArrowUpward, "Move ${category.name} up")
+                                Icon(Icons.Default.ArrowUpward, stringResource(R.string.category_move_tag_up, category.name))
                             }
                             IconButton(onClick = { onAction(CategorySettingsAction.Move(category.id, 1)) }) {
-                                Icon(Icons.Default.ArrowDownward, "Move ${category.name} down")
+                                Icon(Icons.Default.ArrowDownward, stringResource(R.string.category_move_tag_down, category.name))
                             }
                             if (category.role == PassCategoryRole.CUSTOM) {
                                 IconButton(onClick = { deleting = category }) {
-                                    Icon(Icons.Default.Delete, "Delete ${category.name} tag")
+                                    Icon(Icons.Default.Delete, stringResource(R.string.category_delete_tag_description, category.name))
                                 }
                             }
                         }
@@ -167,7 +168,12 @@ private fun CategoryEditorDialog(
     var icon by remember(category.id) { mutableStateOf(category.icon) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (category.name.isBlank()) "Add tag" else "Edit tag") },
+        title = {
+            Text(
+                if (category.name.isBlank()) stringResource(R.string.category_add_tag)
+                else stringResource(R.string.category_edit_tag),
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.category_name)) }, singleLine = true)

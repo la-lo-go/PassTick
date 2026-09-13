@@ -213,7 +213,7 @@ fun PassDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(pass?.description ?: "Pass") },
+                title = { Text(pass?.description ?: stringResource(R.string.pass_detail_fallback_title)) },
                 navigationIcon = {
                     FilledTonalIconButton(onClick = { onAction(PassDetailAction.Back) }, shape = CircleShape) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
@@ -274,9 +274,9 @@ fun PassDetailScreen(
                                 text = {
                                     Text(
                                         when {
-                                            allPassesProtected -> "Protected by privacy settings"
-                                            pass?.isProtected == true -> "Remove protection"
-                                            else -> "Protect pass"
+                                            allPassesProtected -> stringResource(R.string.pass_detail_protected_by_privacy_settings)
+                                            pass?.isProtected == true -> stringResource(R.string.home_remove_protection)
+                                            else -> stringResource(R.string.home_protect_pass)
                                         },
                                     )
                                 },
@@ -480,8 +480,8 @@ fun PassDetailScreen(
 @Composable
 private fun ReminderActionSetting(action: NotificationAction, enabled: Boolean, onEnabled: (Boolean) -> Unit) {
     val label = when (action) {
-        NotificationAction.OPEN_CODE -> "Open code"
-        NotificationAction.DIRECTIONS -> "Directions"
+        NotificationAction.OPEN_CODE -> stringResource(R.string.pass_detail_open_code)
+        NotificationAction.DIRECTIONS -> stringResource(R.string.pass_detail_directions)
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(enabled, onCheckedChange = onEnabled)
@@ -496,7 +496,7 @@ private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>
         bytes = artwork.bytes,
         kind = artwork.kind,
         accentColor = pass.accentColor,
-        contentDescription = "Pass artwork",
+        contentDescription = stringResource(R.string.pass_detail_pass_artwork),
         modifier = modifier,
     )
 }

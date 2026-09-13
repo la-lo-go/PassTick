@@ -76,11 +76,11 @@ fun PassDetailLayoutSettingsScreen(
                                 IconButton(
                                     enabled = index > 0,
                                     onClick = { onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, -1)) },
-                                ) { Icon(Icons.Default.ArrowUpward, "Move ${section.displayName()} up") }
+                                ) { Icon(Icons.Default.ArrowUpward, stringResource(R.string.layout_move_section_up, section.displayName())) }
                                 IconButton(
                                     enabled = index < order.lastIndex,
                                     onClick = { onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Move(section, 1)) },
-                                ) { Icon(Icons.Default.ArrowDownward, "Move ${section.displayName()} down") }
+                                ) { Icon(Icons.Default.ArrowDownward, stringResource(R.string.layout_move_section_down, section.displayName())) }
                                 Switch(
                                     checked = section !in hidden,
                                     onCheckedChange = { visible ->
@@ -97,12 +97,13 @@ fun PassDetailLayoutSettingsScreen(
     }
 }
 
+@Composable
 private fun PassDetailSection.displayName() = when (this) {
-    PassDetailSection.ARTWORK -> "Pass image"
-    PassDetailSection.BARCODE -> "Barcode"
-    PassDetailSection.FIELDS -> "Pass details"
-    PassDetailSection.LOCATIONS -> "Locations"
-    PassDetailSection.CALENDAR -> "Date and time"
+    PassDetailSection.ARTWORK -> stringResource(R.string.layout_pass_image)
+    PassDetailSection.BARCODE -> stringResource(R.string.layout_barcode)
+    PassDetailSection.FIELDS -> stringResource(R.string.layout_pass_details)
+    PassDetailSection.LOCATIONS -> stringResource(R.string.edit_pass_locations)
+    PassDetailSection.CALENDAR -> stringResource(R.string.pass_detail_date_and_time)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -170,11 +171,11 @@ fun HomeCardLayoutSettingsScreen(
                                 IconButton(
                                     enabled = index > 0,
                                     onClick = { onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Move(section, -1)) },
-                                ) { Icon(Icons.Default.ArrowUpward, "Move ${section.displayName()} up") }
+                                ) { Icon(Icons.Default.ArrowUpward, stringResource(R.string.layout_move_section_up, section.displayName())) }
                                 IconButton(
                                     enabled = index < textSections.lastIndex,
                                     onClick = { onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Move(section, 1)) },
-                                ) { Icon(Icons.Default.ArrowDownward, "Move ${section.displayName()} down") }
+                                ) { Icon(Icons.Default.ArrowDownward, stringResource(R.string.layout_move_section_down, section.displayName())) }
                                 Switch(
                                     checked = section !in hidden,
                                     onCheckedChange = { visible ->
@@ -191,12 +192,13 @@ fun HomeCardLayoutSettingsScreen(
     }
 }
 
+@Composable
 private fun HomeCardSection.displayName() = when (this) {
-    HomeCardSection.ARTWORK -> "Pass image"
-    HomeCardSection.TITLE -> "Title"
-    HomeCardSection.PRIMARY_FIELD -> "Primary field"
-    HomeCardSection.DATE -> "Date and time"
-    HomeCardSection.CREATOR -> "Creator"
-    HomeCardSection.CATEGORY -> "Tag"
-    HomeCardSection.PASS_TYPE -> "Pass type"
+    HomeCardSection.ARTWORK -> stringResource(R.string.layout_pass_image)
+    HomeCardSection.TITLE -> stringResource(R.string.layout_title)
+    HomeCardSection.PRIMARY_FIELD -> stringResource(R.string.layout_primary_field)
+    HomeCardSection.DATE -> stringResource(R.string.pass_detail_date_and_time)
+    HomeCardSection.CREATOR -> stringResource(R.string.edit_pass_creator)
+    HomeCardSection.CATEGORY -> stringResource(R.string.layout_tag)
+    HomeCardSection.PASS_TYPE -> stringResource(R.string.layout_pass_type)
 }

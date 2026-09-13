@@ -420,6 +420,7 @@ private fun TicketSwipeContainer(
     val archiveLabel = if (restoring) stringResource(R.string.home_restore) else stringResource(R.string.home_archive)
     val pinnedLabel = if (pass.isPinned) stringResource(R.string.home_unpin_pass) else stringResource(R.string.home_pin_pass)
     val protectLabel = if (pass.isProtected) stringResource(R.string.home_remove_protection) else stringResource(R.string.home_protect_pass)
+    val deleteLabel = stringResource(R.string.category_delete)
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val startRevealWidth = passActionButtonGroupWidth(1)
@@ -562,7 +563,7 @@ private fun TicketSwipeContainer(
                     buttonGroupContent = {
                         PassActionButton(
                             icon = Icons.Default.Delete,
-                            label = "Delete",
+                            label = stringResource(R.string.category_delete),
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer,
                             index = 2,
@@ -613,7 +614,7 @@ private fun TicketSwipeContainer(
                             runSwipeAction { onArchive(pass.id, restoring, pass.categoryId) }
                             true
                         },
-                        CustomAccessibilityAction("Delete") {
+                        CustomAccessibilityAction(deleteLabel) {
                             runSwipeAction { onDelete(pass.id, pass.categoryId) }
                             true
                         },
@@ -704,6 +705,12 @@ private fun TicketRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val contentBlurred = pass.isProtected && blurProtectedPassCards
+            val blurredDescription = stringResource(R.string.home_protected_pass_information_blurred)
+            val openLabel = if (contentBlurred) {
+                stringResource(R.string.home_open_protected_pass)
+            } else {
+                stringResource(R.string.home_open_pass_description, pass.description)
+            }
             Box(Modifier.weight(1f)) {
             Row(
                 Modifier.fillMaxWidth()
@@ -711,15 +718,9 @@ private fun TicketRow(
                     .semantics(mergeDescendants = true) {
                         role = Role.Button
                         if (pass.isProtected && blurProtectedPassCards) {
-                            contentDescription = "Protected pass information blurred"
+                            contentDescription = blurredDescription
                         }
-                        onClick(
-                            label = if (pass.isProtected && blurProtectedPassCards) {
-                                "Open protected pass"
-                            } else {
-                                "Open ${pass.description}"
-                            },
-                        ) {
+                        onClick(label = openLabel) {
                             onOpen(pass.id)
                             true
                         }
@@ -854,7 +855,7 @@ private fun TicketRow(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     Icons.Default.DragHandle,
-                    "Reorder ${pass.description}",
+                    stringResource(R.string.home_reorder_pass_description, pass.description),
                     Modifier.size(40.dp).pointerInput(pass.id) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = { onReorderStart() },
@@ -910,7 +911,7 @@ internal fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modi
                         message = pass.barcodeMessage,
                         modifier = Modifier.fillMaxWidth().height(if (pass.barcodeFormat.isQuadratic()) 280.dp else 160.dp)
                             .padding(12.dp),
-                        contentDescription = "Preview pass code",
+                        contentDescription = stringResource(R.string.home_preview_pass_code),
                     )
                 }
             }
@@ -924,19 +925,20 @@ internal fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modi
 
 @Composable
 private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
+    val artworkDescription = stringResource(R.string.pass_detail_pass_artwork)
     val artwork = pass.displayArtwork(listOf(PassArtworkKind.ICON, PassArtworkKind.THUMBNAIL, PassArtworkKind.LOGO))
     if (artwork != null) {
         AdaptivePassArtwork(
             bytes = artwork.bytes,
             kind = artwork.kind,
             accentColor = pass.accentColor,
-            contentDescription = "Pass artwork",
+            contentDescription = artworkDescription,
             modifier = modifier,
             context = PassArtworkContext.HOME_THUMBNAIL,
         )
     } else {
         Surface(
-            modifier = modifier.semantics { contentDescription = "Pass artwork" },
+            modifier = modifier.semantics { contentDescription = artworkDescription },
             shape = RoundedCornerShape(16),
             color = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.primary,

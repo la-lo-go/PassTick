@@ -225,7 +225,7 @@ private fun TimelineOpenAction(
             buttonGroupContent = {
                 PassActionButton(
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
-                    label = "Open pass",
+                    label = stringResource(R.string.timeline_open_pass),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     index = 0,
@@ -252,7 +252,7 @@ private fun TimelineSecondaryActions(
             buttonGroupContent = {
                 TimelineActionButton(
                     icon = Icons.Default.CalendarToday,
-                    label = "Add to calendar",
+                    label = stringResource(R.string.pass_detail_add_to_calendar),
                     index = 0,
                     onClick = { onAction(TimelineAction.AddToCalendar(event.id)) },
                 )
@@ -380,10 +380,10 @@ private fun EventSummary(
 }
 
 private val EventTemporalState.label: String
-    get() = when (this) {
-        EventTemporalState.TODAY -> "Today"
-        EventTemporalState.UPCOMING -> "Upcoming"
-        EventTemporalState.PAST -> "Past"
+    @Composable get() = when (this) {
+        EventTemporalState.TODAY -> stringResource(R.string.timeline_today)
+        EventTemporalState.UPCOMING -> stringResource(R.string.timeline_upcoming)
+        EventTemporalState.PAST -> stringResource(R.string.timeline_past)
     }
 
 @Composable

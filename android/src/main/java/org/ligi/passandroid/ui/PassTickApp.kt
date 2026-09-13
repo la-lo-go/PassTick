@@ -171,7 +171,7 @@ fun PassTickApp(
         if (!passAuthenticator.canAuthenticate()) {
             coroutineScope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar("Set a screen lock before protecting every pass")
+                snackbarHostState.showSnackbar(activity.getString(R.string.app_set_screen_lock_before_protecting_every_pass))
             }
         } else {
             passAuthenticator.authenticate { authenticated ->
@@ -229,9 +229,9 @@ fun PassTickApp(
                     }
                 }.onSuccess {
                     if (returnToPass) popBackStack()
-                    snackbarHostState.showSnackbar("Image saved to gallery")
+                                            snackbarHostState.showSnackbar(activity.getString(R.string.app_image_saved_to_gallery))
                 }.onFailure { error ->
-                    snackbarHostState.showSnackbar("Image export failed: ${error.message.orEmpty()}")
+                    snackbarHostState.showSnackbar(activity.getString(R.string.app_image_export_failed, error.message.orEmpty()))
                 }
             } finally {
                 imageExporting = false
@@ -261,7 +261,7 @@ fun PassTickApp(
         viewModel.onAction(AppAction.SetOfferCalendarAfterImport(granted))
         if (!granted) coroutineScope.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar("Calendar permission is required for automatic events")
+            snackbarHostState.showSnackbar(activity.getString(R.string.app_calendar_permission_required))
         }
     }
 
@@ -274,8 +274,8 @@ fun PassTickApp(
                 snackbarHostState.currentSnackbarData?.dismiss()
             }
             val result = snackbarHostState.showSnackbar(
-                message = "Pass deleted",
-                actionLabel = "Undo",
+                            message = activity.getString(R.string.app_pass_deleted),
+                            actionLabel = activity.getString(R.string.home_undo),
                 withDismissAction = false,
                 duration = SnackbarDuration.Indefinite,
             )
@@ -300,7 +300,7 @@ fun PassTickApp(
         } else if (!passAuthenticator.canAuthenticate()) {
             coroutineScope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar("Set a screen lock before opening protected passes")
+                snackbarHostState.showSnackbar(activity.getString(R.string.app_set_screen_lock_before_opening_protected_passes))
             }
         } else {
             passAuthenticator.authenticate { authenticated ->
@@ -316,7 +316,7 @@ fun PassTickApp(
         if (!passAuthenticator.canAuthenticate()) {
             coroutineScope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar("Set a screen lock before protecting passes")
+                snackbarHostState.showSnackbar(activity.getString(R.string.app_set_screen_lock_before_protecting_passes))
             }
             return
         }
@@ -339,7 +339,7 @@ fun PassTickApp(
                 if (!passAuthenticator.canAuthenticate()) {
                     coroutineScope.launch {
                         snackbarHostState.currentSnackbarData?.dismiss()
-                        snackbarHostState.showSnackbar("Set a screen lock before opening protected passes")
+                        snackbarHostState.showSnackbar(activity.getString(R.string.app_set_screen_lock_before_opening_protected_passes))
                     }
                 } else {
                     passAuthenticator.authenticate { authenticated ->
@@ -431,7 +431,7 @@ fun PassTickApp(
                         ),
                     )
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar("Allow exact alarms, then select this option again")
+                        snackbarHostState.showSnackbar(activity.getString(R.string.app_allow_exact_alarms_then_select_again))
                     }
                 }
             }
@@ -498,10 +498,9 @@ fun PassTickApp(
                 onDismissRequest = { showCalendarPermissionWarning = false },
                 title = { Text(stringResource(R.string.app_add_events_automatically)) },
                 text = {
-                    Text(
-                        "Dated passes will be added directly to your primary writable calendar after import. " +
-                            "You can turn this off at any time.",
-                    )
+                            Text(
+                                stringResource(R.string.app_calendar_auto_add_message),
+                            )
                 },
                 confirmButton = {
                     TextButton(
@@ -579,7 +578,7 @@ fun PassTickApp(
                                         if (!passAuthenticator.canAuthenticate()) {
                                             popBackStack()
                                             snackbarHostState.showSnackbar(
-                                                "Set a screen lock before opening protected passes",
+                                                activity.getString(R.string.app_set_screen_lock_before_opening_protected_passes),
                                             )
                                         } else {
                                             passAuthenticator.authenticate { authenticated ->
@@ -802,7 +801,7 @@ fun PassTickApp(
                                         coroutineScope.launch {
                                             snackbarHostState.currentSnackbarData?.dismiss()
                                             snackbarHostState.showSnackbar(
-                                                "Allow pass reminders in Android notification settings",
+                                                activity.getString(R.string.app_allow_pass_reminders_in_settings),
                                             )
                                         }
                                     } else {
@@ -830,7 +829,7 @@ fun PassTickApp(
                                             ),
                                         )
                                         coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("Allow exact alarms, then enable this option again")
+                                            snackbarHostState.showSnackbar(activity.getString(R.string.app_allow_exact_alarms_then_enable_again))
                                         }
                                     }
                                 }
@@ -844,7 +843,7 @@ fun PassTickApp(
                                     if (action.value && !passAuthenticator.canAuthenticate()) {
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                "Set a screen lock before protecting every pass",
+                                                activity.getString(R.string.app_set_screen_lock_before_protecting_every_pass),
                                             )
                                         }
                                     } else {

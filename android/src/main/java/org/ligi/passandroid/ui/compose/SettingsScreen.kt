@@ -218,12 +218,12 @@ private fun NotificationSettings(settings: AppSettings, onAction: (SettingsActio
         }
         Text(stringResource(R.string.settings_reminder_times), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
         reminderOptions.forEach { (minutes, label) ->
-            ReminderSetting(minutes, label, settings, onAction)
+            ReminderSetting(minutes, stringResource(label), settings, onAction)
         }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
         Text(stringResource(R.string.settings_event_access), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-        listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour").forEach { (minutes, label) ->
-            ReminderChoice(label, settings.notificationAccessWindowMinutes == minutes) {
+        listOf(15 to R.string.settings_minutes_15, 30 to R.string.settings_minutes_30, 60 to R.string.settings_hour_1).forEach { (minutes, label) ->
+            ReminderChoice(stringResource(label), settings.notificationAccessWindowMinutes == minutes) {
                 onAction(SettingsAction.SetNotificationAccessWindow(minutes))
             }
         }
@@ -244,17 +244,18 @@ private fun NotificationSettings(settings: AppSettings, onAction: (SettingsActio
     }
 }
 
+@Composable
 private fun NotificationLockScreenDetail.displayName() = when (this) {
-    NotificationLockScreenDetail.FULL -> "Show all"
-    NotificationLockScreenDetail.HIDE_SENSITIVE -> "Hide protected details"
-    NotificationLockScreenDetail.HIDDEN -> "Hide on lock screen"
+    NotificationLockScreenDetail.FULL -> stringResource(R.string.settings_show_all)
+    NotificationLockScreenDetail.HIDE_SENSITIVE -> stringResource(R.string.settings_hide_protected_details)
+    NotificationLockScreenDetail.HIDDEN -> stringResource(R.string.settings_hide_on_lock_screen)
 }
 
 private val reminderOptions = listOf(
-    15 to "15 minutes before",
-    30 to "30 minutes before",
-    60 to "1 hour before",
-    1440 to "1 day before",
+    15 to R.string.settings_reminder_before_15_minutes,
+    30 to R.string.settings_reminder_before_30_minutes,
+    60 to R.string.settings_reminder_before_1_hour,
+    1440 to R.string.settings_reminder_before_1_day,
 )
 
 @Composable

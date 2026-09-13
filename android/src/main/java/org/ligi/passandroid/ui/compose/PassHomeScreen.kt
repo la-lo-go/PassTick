@@ -286,6 +286,11 @@ fun PassHomeScreen(
         }
     }
 
+    val undoLabel = stringResource(R.string.home_undo)
+    val unlockPreviewMessage = stringResource(R.string.home_unlock_the_pass_to_preview)
+    val passRestoredMessage = stringResource(R.string.home_pass_restored)
+    val passArchivedMessage = stringResource(R.string.home_pass_archived)
+
     fun dispatchReversible(action: HomeAction, operation: UndoOperation, message: String) {
         onAction(action)
         undoSnackbarJob?.cancel()
@@ -297,7 +302,7 @@ fun PassHomeScreen(
             }
             if (snackbarHostState.showSnackbar(
                     message = message,
-                    actionLabel = "Undo",
+                    actionLabel = undoLabel,
                     withDismissAction = false,
                     duration = SnackbarDuration.Indefinite,
                 ) ==
@@ -473,8 +478,8 @@ fun PassHomeScreen(
                             blurProtectedPassCards = state.settings.blurProtectedPassCards,
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring, originalCategoryId ->
-                                if (restoring) dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
-                                else dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                                if (restoring) dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), passRestoredMessage)
+                                else dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), passArchivedMessage)
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
                             onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
@@ -503,9 +508,9 @@ fun PassHomeScreen(
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring, originalCategoryId ->
                                 if (restoring) {
-                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
+                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), passRestoredMessage)
                                 } else {
-                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), passArchivedMessage)
                                 }
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
@@ -518,7 +523,7 @@ fun PassHomeScreen(
                             },
                             onPreviewOpeningChanged = { previewOpeningPassId = it },
                             onProtectedPreviewRequested = {
-                                scope.launch { snackbarHostState.showSnackbar("Unlock the pass to preview it") }
+                                scope.launch { snackbarHostState.showSnackbar(unlockPreviewMessage) }
                             },
                             openSwipePassId = openSwipePassId,
                             tagCategories = state.categories,
@@ -540,9 +545,9 @@ fun PassHomeScreen(
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring, originalCategoryId ->
                                 if (restoring) {
-                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
+                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), passRestoredMessage)
                                 } else {
-                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), passArchivedMessage)
                                 }
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
@@ -555,7 +560,7 @@ fun PassHomeScreen(
                             },
                             onPreviewOpeningChanged = { previewOpeningPassId = it },
                             onProtectedPreviewRequested = {
-                                scope.launch { snackbarHostState.showSnackbar("Unlock the pass to preview it") }
+                                scope.launch { snackbarHostState.showSnackbar(unlockPreviewMessage) }
                             },
                             openSwipePassId = openSwipePassId,
                             tagCategories = state.categories,
@@ -579,9 +584,9 @@ fun PassHomeScreen(
                             onOpen = { onAction(HomeAction.OpenPass(it)) },
                             onArchive = { id, restoring, originalCategoryId ->
                                 if (restoring) {
-                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), "Pass restored")
+                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), passRestoredMessage)
                                 } else {
-                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), "Pass archived")
+                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), passArchivedMessage)
                                 }
                             },
                             onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
