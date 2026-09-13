@@ -10,6 +10,11 @@
 }
 -keep class org.ligi.passandroid.model.** { *; }
 
+# Room loads the generated database implementation by class name.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class androidx.work.impl.WorkDatabase_Impl { *; }
+-dontwarn androidx.room.paging.**
+
 # Stack traces
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable
