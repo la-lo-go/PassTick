@@ -531,8 +531,13 @@ fun PassHomeScreen(
                     }
                 }
                 if (remainingPasses.isNotEmpty()) {
-                    item(key = "passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
-                    if (otherExpanded) item(key = "pass-feed") {
+                    // The heading only labels the leftover group; without other sections it has no contrast.
+                    val showOtherPassesHeading = todayPasses.isNotEmpty() || pinnedPasses.isNotEmpty() ||
+                        separatedProtectedPasses.isNotEmpty() || showLockedSection
+                    if (showOtherPassesHeading) {
+                        item(key = "passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
+                    }
+                    if (otherExpanded || !showOtherPassesHeading) item(key = "pass-feed") {
                         TicketFeed(
                             passes = remainingPasses,
                             categories = state.categories,
