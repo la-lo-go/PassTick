@@ -21,11 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -291,6 +293,26 @@ fun PassDetailScreen(
                                 onClick = {
                                     overflowOpen = false
                                     onAction(PassDetailAction.SetProtected(pass?.isProtected != true))
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            if (pass?.isArchived == true) R.string.home_restore else R.string.home_archive,
+                                        ),
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        if (pass?.isArchived == true) Icons.Default.Restore else Icons.Default.Archive,
+                                        null,
+                                    )
+                                },
+                                enabled = pass != null,
+                                onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.SetArchived(pass?.isArchived != true))
                                 },
                             )
                             DropdownMenuItem(
