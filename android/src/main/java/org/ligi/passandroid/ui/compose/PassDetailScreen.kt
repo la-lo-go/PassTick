@@ -83,6 +83,8 @@ import org.ligi.passandroid.ui.state.displayArtwork
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
 import org.threeten.bp.format.DateTimeFormatter
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -134,17 +136,17 @@ fun PassDetailScreen(
     if (configureReminder) {
         AlertDialog(
             onDismissRequest = { configureReminder = false },
-            title = { Text("Pass reminder") },
+            title = { Text(stringResource(R.string.pass_detail_pass_reminder)) },
             text = {
                 Column {
                     ReminderChoice(
-                        label = "Use default reminder times",
+                        label = stringResource(R.string.pass_detail_use_default_reminder_times),
                         selected = passReminderEnabled && reminderLeadMinutes == null && !reminderExactAtEvent,
                     ) {
                         configureReminder = false
                         onAction(PassDetailAction.ConfigureReminder(true, null))
                     }
-                    ReminderChoice("At event time", passReminderEnabled && reminderExactAtEvent) {
+                    ReminderChoice(stringResource(R.string.pass_detail_at_event_time), passReminderEnabled && reminderExactAtEvent) {
                         configureReminder = false
                         onAction(PassDetailAction.ConfigureReminder(true, 0, exactAtEvent = true))
                     }
@@ -155,12 +157,12 @@ fun PassDetailScreen(
                                 onAction(PassDetailAction.ConfigureReminder(true, minutes))
                             }
                         }
-                    ReminderChoice("Off for this pass", !passReminderEnabled) {
+                    ReminderChoice(stringResource(R.string.pass_detail_off_for_this_pass), !passReminderEnabled) {
                         configureReminder = false
                         onAction(PassDetailAction.ConfigureReminder(false, null))
                     }
                     TextButton(onClick = { advancedReminderActions = !advancedReminderActions }) {
-                        Text(if (advancedReminderActions) "Hide actions" else "Notification actions")
+                        Text(if (advancedReminderActions) stringResource(R.string.pass_detail_hide_actions) else stringResource(R.string.settings_notification_actions))
                     }
                     if (advancedReminderActions) {
                         val available = buildSet {
@@ -170,7 +172,7 @@ fun PassDetailScreen(
                         val selected = reminderActionOverride ?: available
                         if (reminderActionOverride != null) {
                             TextButton(onClick = { onAction(PassDetailAction.SetReminderActions(null)) }) {
-                                Text("Use default actions")
+                                Text(stringResource(R.string.pass_detail_use_default_actions))
                             }
                         }
                         available.forEach { action ->
@@ -187,23 +189,23 @@ fun PassDetailScreen(
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { configureReminder = false }) { Text("Cancel") }
+                TextButton(onClick = { configureReminder = false }) { Text(stringResource(R.string.pass_detail_cancel)) }
             },
         )
     }
     if (editDateDialog) {
         AlertDialog(
             onDismissRequest = { editDateDialog = false },
-            title = { Text("Edit date") },
-            text = { Text("Select the date to edit.") },
+            title = { Text(stringResource(R.string.pass_detail_edit_date)) },
+            text = { Text(stringResource(R.string.pass_detail_select_the_date_to_edit)) },
             confirmButton = {
                 TextButton(onClick = { editDateDialog = false; onAction(PassDetailAction.EditDate(PassDateField.START)) }) {
-                    Text("Start")
+                    Text(stringResource(R.string.pass_detail_start))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editDateDialog = false; onAction(PassDetailAction.EditDate(PassDateField.END)) }) {
-                    Text("End")
+                    Text(stringResource(R.string.pass_detail_end))
                 }
             },
         )
@@ -214,33 +216,33 @@ fun PassDetailScreen(
                 title = { Text(pass?.description ?: "Pass") },
                 navigationIcon = {
                     FilledTonalIconButton(onClick = { onAction(PassDetailAction.Back) }, shape = CircleShape) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
                     }
                 },
                 actions = {
                     Box {
                         FilledTonalIconButton(onClick = { overflowOpen = true }, enabled = pass != null, shape = CircleShape) {
-                            Icon(Icons.Default.MoreVert, "Pass actions")
+                            Icon(Icons.Default.MoreVert, stringResource(R.string.pass_detail_pass_actions))
                         }
                         DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Export as image") },
+                                text = { Text(stringResource(R.string.pass_detail_export_as_image)) },
                                 leadingIcon = { Icon(Icons.Default.Image, null) },
                                 onClick = { overflowOpen = false; onAction(PassDetailAction.OpenImageExport) },
                             )
                             DropdownMenuItem(
-                                text = { Text("Save pass file") },
+                                text = { Text(stringResource(R.string.pass_detail_save_pass_file)) },
                                 leadingIcon = { Icon(Icons.Default.SaveAlt, null) },
                                 onClick = { overflowOpen = false; onAction(PassDetailAction.Export) },
                             )
                             DropdownMenuItem(
-                                text = { Text("Save code") },
+                                text = { Text(stringResource(R.string.pass_detail_save_code)) },
                                 leadingIcon = { Icon(Icons.Default.QrCode, null) },
                                 enabled = pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank(),
                                 onClick = { overflowOpen = false; onAction(PassDetailAction.SaveBarcodeImage) },
                             )
                             DropdownMenuItem(
-                                text = { Text("Customize pass") },
+                                text = { Text(stringResource(R.string.pass_detail_customize_pass)) },
                                 leadingIcon = { Icon(Icons.Default.Visibility, null) },
                                 onClick = {
                                     overflowOpen = false
@@ -248,7 +250,7 @@ fun PassDetailScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Configure reminder") },
+                                text = { Text(stringResource(R.string.pass_detail_configure_reminder)) },
                                 leadingIcon = { Icon(Icons.Default.Notifications, null) },
                                 enabled = pass?.calendarEvent != null,
                                 onClick = {
@@ -261,7 +263,7 @@ fun PassDetailScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Manage tags") },
+                                text = { Text(stringResource(R.string.pass_detail_manage_tags)) },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
                                 onClick = {
                                     overflowOpen = false
@@ -292,7 +294,7 @@ fun PassDetailScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Delete pass") },
+                                text = { Text(stringResource(R.string.pass_detail_delete_pass)) },
                                 leadingIcon = { Icon(Icons.Default.Delete, null) },
                                 onClick = {
                                     overflowOpen = false
@@ -321,7 +323,7 @@ fun PassDetailScreen(
                             }
                             if (tags.isNotEmpty()) HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Add new tag") },
+                                text = { Text(stringResource(R.string.pass_detail_add_new_tag)) },
                                 leadingIcon = { Icon(Icons.Default.Add, null) },
                                 onClick = {
                                     tagMenuOpen = false
@@ -340,12 +342,12 @@ fun PassDetailScreen(
                     colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
                     floatingActionButton = {
                         FloatingToolbarDefaults.StandardFloatingActionButton(onClick = { onAction(PassDetailAction.Edit) }) {
-                            Icon(Icons.Default.Edit, "Edit pass")
+                            Icon(Icons.Default.Edit, stringResource(R.string.pass_detail_edit_pass))
                         }
                     },
                 ) {
                     IconButton(onClick = { onAction(PassDetailAction.Share) }) {
-                        Icon(Icons.Default.Share, "Share pass")
+                        Icon(Icons.Default.Share, stringResource(R.string.pass_detail_share_pass))
                     }
                     if (!pass.barcodeMessage.isNullOrBlank()) {
                         IconButton(
@@ -354,7 +356,7 @@ fun PassDetailScreen(
                         ) {
                             Icon(
                                 if (flashlightEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                                if (flashlightEnabled) "Turn flashlight off" else "Turn flashlight on",
+                                if (flashlightEnabled) stringResource(R.string.pass_detail_turn_flashlight_off) else stringResource(R.string.pass_detail_turn_flashlight_on),
                             )
                         }
                     }
@@ -363,7 +365,7 @@ fun PassDetailScreen(
         },
     ) { padding ->
         if (pass == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("Pass not found") }
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text(stringResource(R.string.pass_detail_pass_not_found)) }
         } else {
             Box(Modifier.fillMaxSize().padding(padding)) {
                 LazyColumn(
@@ -383,12 +385,11 @@ fun PassDetailScreen(
                             leadingContent = { Icon(Icons.Default.Lock, null) },
                             supportingContent = {
                                 Text(
-                                    if (allPassesProtected) "Locked by app protection"
-                                    else "Unlocked with fingerprint or screen lock",
+                                    if (allPassesProtected) stringResource(R.string.pass_detail_locked_by_app_protection) else stringResource(R.string.pass_detail_unlocked_with_fingerprint_or_screen_lock),
                                 )
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        ) { Text("Protected pass") }
+                        ) { Text(stringResource(R.string.pass_detail_protected_pass)) }
                     }
                 }
                 passDetailSectionOrder
@@ -435,7 +436,7 @@ fun PassDetailScreen(
                                             ) {
                                                 ListItem(
                                                     leadingContent = { Icon(Icons.Default.LocationOn, null) },
-                                                    supportingContent = { Text("Open in Maps") },
+                                                    supportingContent = { Text(stringResource(R.string.pass_detail_open_in_maps)) },
                                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                                 ) { Text(label) }
                                             }
@@ -451,8 +452,8 @@ fun PassDetailScreen(
                                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                                     pass.calendarDateTimeLines().forEach { Text(it) }
                                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                        Text(if (calendarEventPresent) "Already in calendar" else "Add to calendar")
-                                                        if (calendarEventPresent) Icon(Icons.Default.Check, "In calendar", Modifier.size(18.dp))
+                                                        Text(if (calendarEventPresent) stringResource(R.string.pass_detail_already_in_calendar) else stringResource(R.string.pass_detail_add_to_calendar))
+                                                        if (calendarEventPresent) Icon(Icons.Default.Check, stringResource(R.string.pass_detail_in_calendar), Modifier.size(18.dp))
                                                     }
                                                 }
                                             },
@@ -464,7 +465,7 @@ fun PassDetailScreen(
                                                 onLongClick = { editDateDialog = true },
                                             ),
                                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                        ) { Text("Date and time") }
+                                        ) { Text(stringResource(R.string.pass_detail_date_and_time)) }
                                     }
                                 }
                             }
@@ -523,7 +524,7 @@ private fun BarcodeCard(
                     }
                     PassCodePreview(format, message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
                 }
-            } else Text("No barcode", style = MaterialTheme.typography.titleMedium)
+            } else Text(stringResource(R.string.pass_detail_no_barcode), style = MaterialTheme.typography.titleMedium)
         }
     }
 }

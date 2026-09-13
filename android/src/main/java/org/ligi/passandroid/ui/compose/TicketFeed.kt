@@ -103,6 +103,8 @@ import org.ligi.passandroid.ui.theme.PassActionButtonGroup
 import org.ligi.passandroid.ui.theme.PassActionButton
 import org.ligi.passandroid.ui.theme.PassActionButtonGap
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @Composable
 internal fun TicketFeed(
@@ -415,9 +417,9 @@ private fun TicketSwipeContainer(
     tagCategories: List<PassCategory>,
 ) {
     val restoring = pass.isArchived
-    val archiveLabel = if (restoring) "Restore" else "Archive"
-    val pinnedLabel = if (pass.isPinned) "Unpin pass" else "Pin pass"
-    val protectLabel = if (pass.isProtected) "Remove protection" else "Protect pass"
+    val archiveLabel = if (restoring) stringResource(R.string.home_restore) else stringResource(R.string.home_archive)
+    val pinnedLabel = if (pass.isPinned) stringResource(R.string.home_unpin_pass) else stringResource(R.string.home_pin_pass)
+    val protectLabel = if (pass.isProtected) stringResource(R.string.home_remove_protection) else stringResource(R.string.home_protect_pass)
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val startRevealWidth = passActionButtonGroupWidth(1)
@@ -874,7 +876,7 @@ private fun TicketRow(
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 shape = RoundedCornerShape(bottomStart = 18.dp),
             ) {
-                Icon(Icons.Default.Lock, "Protected pass", Modifier.padding(8.dp).size(18.dp))
+                Icon(Icons.Default.Lock, stringResource(R.string.pass_detail_protected_pass), Modifier.padding(8.dp).size(18.dp))
             }
         }
         }

@@ -75,6 +75,8 @@ import org.ligi.passandroid.repository.PassImageExportOptions
 import org.ligi.passandroid.repository.PassImageOrientation
 import org.ligi.passandroid.ui.state.PassImageExportAction
 import org.ligi.passandroid.ui.state.PassUiModel
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -87,10 +89,10 @@ fun ExportImageScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Export image") },
+                title = { Text(stringResource(R.string.export_export_image)) },
                 navigationIcon = {
                     FilledTonalIconButton(onClick = { onAction(PassImageExportAction.Back) }, shape = CircleShape) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
                     }
                 },
             )
@@ -110,16 +112,16 @@ fun ExportImageScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                             } else {
-                                Icon(Icons.Default.Save, "Save PNG")
+                                Icon(Icons.Default.Save, stringResource(R.string.export_save_png))
                             }
                         }
                     },
                 ) {
                     IconButton(onClick = { if (!isBusy) onAction(PassImageExportAction.Share) }) {
-                        Icon(Icons.Default.Share, "Share image")
+                        Icon(Icons.Default.Share, stringResource(R.string.export_share_image))
                     }
                     IconButton(onClick = { if (!isBusy) onAction(PassImageExportAction.Print) }) {
-                        Icon(Icons.Default.Print, "Print pass")
+                        Icon(Icons.Default.Print, stringResource(R.string.export_print_pass))
                     }
                 }
             }
@@ -127,7 +129,7 @@ fun ExportImageScreen(
     ) { padding ->
         if (pass == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Pass not found")
+                Text(stringResource(R.string.pass_detail_pass_not_found))
             }
         } else {
             Column(Modifier.fillMaxSize().padding(padding)) {
@@ -178,7 +180,7 @@ private fun ExportOptions(
                         FilterChip(
                             selected = options.orientation == orientation,
                             onClick = { setOptions(options.copy(orientation = orientation)) },
-                            label = { Text(if (portrait) "Vertical" else "Horizontal") },
+                            label = { Text(if (portrait) stringResource(R.string.export_vertical) else stringResource(R.string.export_horizontal)) },
                             leadingIcon = {
                                 Icon(if (portrait) Icons.Default.CropPortrait else Icons.Default.CropLandscape, null)
                             },
@@ -192,20 +194,20 @@ private fun ExportOptions(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (pass.artwork.isNotEmpty()) {
-                    ContentChip("Artwork", content.artwork) { setContent(content.copy(artwork = !content.artwork)) }
+                    ContentChip(stringResource(R.string.export_artwork), content.artwork) { setContent(content.copy(artwork = !content.artwork)) }
                 }
-                ContentChip("Details", content.details) { setContent(content.copy(details = !content.details)) }
+                ContentChip(stringResource(R.string.export_details), content.details) { setContent(content.copy(details = !content.details)) }
                 if (pass.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
-                    ContentChip("Code", content.barcode) { setContent(content.copy(barcode = !content.barcode)) }
+                    ContentChip(stringResource(R.string.edit_pass_code), content.barcode) { setContent(content.copy(barcode = !content.barcode)) }
                 }
                 if (pass.calendarTimeSpan?.from != null || pass.calendarTimeSpan?.to != null) {
-                    ContentChip("Date", content.dateTime) { setContent(content.copy(dateTime = !content.dateTime)) }
+                    ContentChip(stringResource(R.string.export_date), content.dateTime) { setContent(content.copy(dateTime = !content.dateTime)) }
                 }
                 if (pass.locations.isNotEmpty()) {
-                    ContentChip("Location", content.location) { setContent(content.copy(location = !content.location)) }
+                    ContentChip(stringResource(R.string.export_location), content.location) { setContent(content.copy(location = !content.location)) }
                 }
                 if (pass.fields.any { it.hidden }) {
-                    ContentChip("Hidden", content.hiddenFields) { setContent(content.copy(hiddenFields = !content.hiddenFields)) }
+                    ContentChip(stringResource(R.string.export_hidden), content.hiddenFields) { setContent(content.copy(hiddenFields = !content.hiddenFields)) }
                 }
             }
         }

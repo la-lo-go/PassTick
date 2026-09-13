@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,10 +43,10 @@ fun PassDetailLayoutSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pass view") },
+                title = { Text(stringResource(R.string.layout_pass_view)) },
                 navigationIcon = {
                     IconButton(onClick = { onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.Back) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
                     }
                 },
             )
@@ -57,7 +59,7 @@ fun PassDetailLayoutSettingsScreen(
         ) {
             item {
                 Text(
-                    "Show or hide sections, then arrange their order.",
+                    stringResource(R.string.layout_show_or_hide_sections_then_arrange_their_order),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
@@ -113,10 +115,10 @@ fun HomeCardLayoutSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Home cards") },
+                title = { Text(stringResource(R.string.layout_home_cards)) },
                 navigationIcon = {
                     IconButton(onClick = { onAction(org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction.Back) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
                     }
                 },
             )
@@ -129,7 +131,7 @@ fun HomeCardLayoutSettingsScreen(
         ) {
             item {
                 Text(
-                    "Choose the card image and arrange the text lines.",
+                    stringResource(R.string.layout_choose_the_card_image_and_arrange_the_text_lines),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
@@ -137,7 +139,7 @@ fun HomeCardLayoutSettingsScreen(
             item(key = "artwork") {
                 Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                     ListItem(
-                        supportingContent = { Text("The image stays beside the text") },
+                        supportingContent = { Text(stringResource(R.string.layout_the_image_stays_beside_the_text)) },
                         trailingContent = {
                             Switch(
                                 checked = HomeCardSection.ARTWORK !in hidden,
@@ -152,7 +154,7 @@ fun HomeCardLayoutSettingsScreen(
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    ) { Text("Pass image") }
+                    ) { Text(stringResource(R.string.layout_pass_image)) }
                 }
             }
             val textSections = order.filterNot { it == HomeCardSection.ARTWORK }

@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.PassUiModel
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,17 +47,17 @@ fun PassCustomizationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Customize pass") },
+                title = { Text(stringResource(R.string.pass_detail_customize_pass)) },
                 navigationIcon = {
                     FilledTonalIconButton(onClick = { onAction(PassCustomizationAction.Back) }, shape = CircleShape) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
                     }
                 },
             )
         },
     ) { padding ->
         if (pass == null) {
-            Column(Modifier.fillMaxSize().padding(padding).padding(24.dp)) { Text("Pass not found") }
+            Column(Modifier.fillMaxSize().padding(padding).padding(24.dp)) { Text(stringResource(R.string.pass_detail_pass_not_found)) }
             return@Scaffold
         }
         LazyColumn(
@@ -64,16 +66,16 @@ fun PassCustomizationScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text("Pass image", style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.layout_pass_image), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Choose an image stored in this pass. Automatic uses the best image for each view.",
+                    stringResource(R.string.customize_choose_an_image_stored_in_this_pass_automatic_us),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             item {
                 ArtworkChoice(
-                    label = "Automatic",
+                    label = stringResource(R.string.customize_automatic),
                     selected = pass.preferredArtworkKind == null,
                     onClick = { onAction(PassCustomizationAction.SelectArtwork(null)) },
                 )
@@ -96,11 +98,11 @@ fun PassCustomizationScreen(
             }
             item {
                 ListItem(
-                    supportingContent = { Text("Choose the sections shown in the pass") },
+                    supportingContent = { Text(stringResource(R.string.customize_choose_the_sections_shown_in_the_pass)) },
                     leadingContent = { Icon(Icons.Default.ViewAgenda, null) },
                     modifier = Modifier.fillMaxWidth().clickable { onAction(PassCustomizationAction.OpenLayout) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                ) { Text("Pass layout") }
+                ) { Text(stringResource(R.string.customize_pass_layout)) }
             }
         }
     }

@@ -49,6 +49,8 @@ import org.threeten.bp.ZonedDateTime
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 private val PickerColors = listOf(
     0xFF2859C5.toInt(),
@@ -115,17 +117,17 @@ fun ColorPickerDialog(
                 OutlinedTextField(
                     value = customColor,
                     onValueChange = { customColor = it },
-                    label = { Text("Custom color (#AARRGGBB)") },
-                    supportingText = if (parsed == null) ({ Text("Enter a valid hex color") }) else null,
+                    label = { Text(stringResource(R.string.picker_custom_color_aarrggbb)) },
+                    supportingText = if (parsed == null) ({ Text(stringResource(R.string.picker_enter_a_valid_hex_color)) }) else null,
                     isError = parsed == null,
                     singleLine = true,
                 )
             }
         },
         confirmButton = {
-            TextButton(enabled = parsed != null, onClick = { parsed?.let(onColorSelected) }) { Text("Use color") }
+            TextButton(enabled = parsed != null, onClick = { parsed?.let(onColorSelected) }) { Text(stringResource(R.string.picker_use_color)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.pass_detail_cancel)) } },
     )
 }
 
@@ -167,9 +169,9 @@ fun DatePickerField(
                         openTime = true
                     }
                     open = false
-                }) { Text("Select") }
+                }) { Text(stringResource(R.string.picker_select)) }
             },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.pass_detail_cancel)) } },
         ) {
             DatePicker(state = state)
         }
@@ -186,7 +188,7 @@ fun DatePickerField(
                 openTime = false
                 pendingDate = null
             },
-            title = { Text("Select time") },
+            title = { Text(stringResource(R.string.picker_select_time)) },
             text = { TimePicker(state = timeState) },
             confirmButton = {
                 TextButton(onClick = {
@@ -203,13 +205,13 @@ fun DatePickerField(
                     }
                     openTime = false
                     pendingDate = null
-                }) { Text("Select") }
+                }) { Text(stringResource(R.string.picker_select)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     openTime = false
                     pendingDate = null
-                }) { Text("Cancel") }
+                }) { Text(stringResource(R.string.pass_detail_cancel)) }
             },
         )
     }

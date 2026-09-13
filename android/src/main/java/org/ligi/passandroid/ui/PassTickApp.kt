@@ -496,7 +496,7 @@ fun PassTickApp(
         if (showCalendarPermissionWarning) {
             AlertDialog(
                 onDismissRequest = { showCalendarPermissionWarning = false },
-                title = { Text("Add events automatically?") },
+                title = { Text(stringResource(R.string.app_add_events_automatically)) },
                 text = {
                     Text(
                         "Dated passes will be added directly to your primary writable calendar after import. " +
@@ -521,10 +521,10 @@ fun PassTickApp(
                                 calendarPermissionLauncher.launch(permissions)
                             }
                         },
-                    ) { Text("Allow") }
+                    ) { Text(stringResource(R.string.app_allow)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showCalendarPermissionWarning = false }) { Text("Cancel") }
+                    TextButton(onClick = { showCalendarPermissionWarning = false }) { Text(stringResource(R.string.pass_detail_cancel)) }
                 },
             )
         }
@@ -538,7 +538,7 @@ fun PassTickApp(
                 ) {
                     Icon(Icons.Default.Lock, null)
                     Text(stringResource(R.string.protected_pass_message, stringResource(R.string.app_name)))
-                    Button(onClick = ::requestAppUnlock) { Text("Unlock") }
+                    Button(onClick = ::requestAppUnlock) { Text(stringResource(R.string.app_unlock)) }
                 }
             } else {
             NavDisplay(
@@ -592,7 +592,7 @@ fun PassTickApp(
                                         }
                                     }
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text("Unlocking protected pass...")
+                                        Text(stringResource(R.string.app_unlocking_protected_pass))
                                     }
                                 } else {
                                 var calendarEventPresent by remember(selected.passId) { mutableStateOf(false) }
@@ -692,7 +692,7 @@ fun PassTickApp(
                                 backStack.add(AppDestination.PassDetail(destination.passId))
                             }
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("Unlocking protected pass...")
+                                Text(stringResource(R.string.app_unlocking_protected_pass))
                             }
                         } else EditPassScreen(
                             pass = pass,

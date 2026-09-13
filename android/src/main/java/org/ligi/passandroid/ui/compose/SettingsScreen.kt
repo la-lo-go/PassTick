@@ -53,6 +53,8 @@ import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.reminder.NotificationLockScreenDetail
 import org.ligi.passandroid.ui.state.SettingsAction
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @Composable
 internal fun ReminderChoice(label: String, selected: Boolean, onClick: () -> Unit) {
@@ -78,7 +80,7 @@ fun SettingsScreen(
             onNotificationScrollConsumed()
         }
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.settings_settings)) }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back)) } }) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 modifier = Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter).testTag("settings_list"),
@@ -99,16 +101,16 @@ fun SettingsScreen(
 
 @Composable
 private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup("Appearance") {
-        Text("Theme", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+    SettingsGroup(stringResource(R.string.settings_appearance)) {
+        Text(stringResource(R.string.settings_theme), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
         ThemeMode.entries.forEach { mode -> ThemeSetting(mode, settings.themeMode, onAction) }
         if (settings.themeMode == ThemeMode.DARK) {
-            SettingSwitch("Use AMOLED black background", settings.amoledBlackBackground) {
+            SettingSwitch(stringResource(R.string.settings_use_amoled_black_background), settings.amoledBlackBackground) {
                 onAction(SettingsAction.SetAmoledBlackBackground(it))
             }
         }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-        SettingSwitch("Use HDR and maximum code brightness", settings.automaticBrightness) {
+        SettingSwitch(stringResource(R.string.settings_use_hdr_and_maximum_code_brightness), settings.automaticBrightness) {
             onAction(SettingsAction.SetAutomaticBrightness(it))
         }
     }
@@ -125,18 +127,18 @@ private fun ThemeSetting(mode: ThemeMode, selectedMode: ThemeMode, onAction: (Se
 
 @Composable
 private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup("Home") {
+    SettingsGroup(stringResource(R.string.settings_home)) {
         SettingSwitch(
-            "Highlight today's passes",
+            stringResource(R.string.settings_highlight_todays_passes),
             settings.highlightTodayPasses,
-            supportingText = "Show today's passes before other passes",
+            supportingText = stringResource(R.string.settings_show_todays_passes_before_other_passes),
         ) { onAction(SettingsAction.SetHighlightTodayPasses(it)) }
     }
 }
 
 @Composable
 private fun PassListSettings(onAction: (SettingsAction) -> Unit) {
-    SettingsGroup("Customize pass list") {
+    SettingsGroup(stringResource(R.string.settings_customize_pass_list)) {
         PassListSetting(Icons.Default.ViewAgenda, "Home cards") {
             onAction(SettingsAction.OpenHomeCardSettings)
         }
@@ -164,33 +166,33 @@ private fun PassListSetting(
 
 @Composable
 private fun PrivacySettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup("Privacy") {
+    SettingsGroup(stringResource(R.string.settings_privacy)) {
         SettingSwitch(
-            "Protect the app",
+            stringResource(R.string.settings_protect_the_app),
             settings.lockAllPasses,
-            supportingText = "Require fingerprint or screen lock to open the app",
+            supportingText = stringResource(R.string.settings_require_fingerprint_or_screen_lock_to_open_the_a),
         ) { onAction(SettingsAction.SetLockAllPasses(it)) }
-        SettingSwitch("Show a lock icon on protected passes", settings.showProtectedPassLockIcon) {
+        SettingSwitch(stringResource(R.string.settings_show_a_lock_icon_on_protected_passes), settings.showProtectedPassLockIcon) {
             onAction(SettingsAction.SetShowProtectedPassLockIcon(it))
         }
-        SettingSwitch("Blur protected pass information", settings.blurProtectedPassCards) {
+        SettingSwitch(stringResource(R.string.settings_blur_protected_pass_information), settings.blurProtectedPassCards) {
             onAction(SettingsAction.SetBlurProtectedPassCards(it))
         }
-        SettingSwitch("Keep protected passes in a locked section", settings.separateProtectedPasses) {
+        SettingSwitch(stringResource(R.string.settings_keep_protected_passes_in_a_locked_section), settings.separateProtectedPasses) {
             onAction(SettingsAction.SetSeparateProtectedPasses(it))
         }
         SettingSwitch(
-            "Block screenshots",
+            stringResource(R.string.settings_block_screenshots),
             settings.blockScreenshots,
-            supportingText = "Prevent screenshots on protected content",
+            supportingText = stringResource(R.string.settings_prevent_screenshots_on_protected_content),
         ) { onAction(SettingsAction.SetBlockScreenshots(it)) }
     }
 }
 
 @Composable
 private fun CalendarSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup("Calendar") {
-        SettingSwitch("Automatically add imported passes", settings.offerCalendarAfterImport) {
+    SettingsGroup(stringResource(R.string.edit_pass_calendar)) {
+        SettingSwitch(stringResource(R.string.settings_automatically_add_imported_passes), settings.offerCalendarAfterImport) {
             onAction(SettingsAction.SetOfferCalendarAfterImport(it))
         }
     }
@@ -198,7 +200,7 @@ private fun CalendarSettings(settings: AppSettings, onAction: (SettingsAction) -
 
 @Composable
 private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
-    SettingsGroup("About") {
+    SettingsGroup(stringResource(R.string.settings_about)) {
         PassListSetting(Icons.Default.PrivacyTip, "Privacy policy") {
             onAction(SettingsAction.OpenPrivacyPolicy)
         }
@@ -210,30 +212,30 @@ private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
 
 @Composable
 private fun NotificationSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit, modifier: Modifier = Modifier) {
-    SettingsGroup("Notifications", modifier) {
-        SettingSwitch("Pass reminders", settings.remindersEnabled) {
+    SettingsGroup(stringResource(R.string.settings_notifications), modifier) {
+        SettingSwitch(stringResource(R.string.settings_pass_reminders), settings.remindersEnabled) {
             onAction(SettingsAction.SetRemindersEnabled(it))
         }
-        Text("Reminder times", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.settings_reminder_times), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
         reminderOptions.forEach { (minutes, label) ->
             ReminderSetting(minutes, label, settings, onAction)
         }
         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-        Text("Event access", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.settings_event_access), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
         listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour").forEach { (minutes, label) ->
             ReminderChoice(label, settings.notificationAccessWindowMinutes == minutes) {
                 onAction(SettingsAction.SetNotificationAccessWindow(minutes))
             }
         }
         SettingSwitch(
-            "Exact reminders",
+            stringResource(R.string.settings_exact_reminders),
             settings.notificationExactTiming,
-            supportingText = "Use exact alarms when Android allows them",
+            supportingText = stringResource(R.string.settings_use_exact_alarms_when_android_allows_them),
         ) { onAction(SettingsAction.SetNotificationExactTiming(it)) }
-        SettingSwitch("Notification actions", settings.notificationActionsEnabled) {
+        SettingSwitch(stringResource(R.string.settings_notification_actions), settings.notificationActionsEnabled) {
             onAction(SettingsAction.SetNotificationActionsEnabled(it))
         }
-        Text("Lock screen", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.settings_lock_screen), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
         NotificationLockScreenDetail.entries.forEach { detail ->
             ReminderChoice(detail.displayName(), settings.notificationLockScreenDetail == detail) {
                 onAction(SettingsAction.SetNotificationLockScreenDetail(detail))

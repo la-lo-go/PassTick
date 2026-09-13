@@ -98,6 +98,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.pluralStringResource
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -111,6 +112,8 @@ import org.ligi.passandroid.ui.state.searchDocument
 import org.ligi.passandroid.ui.state.searchTerms
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.theme.PassIcons
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
@@ -318,7 +321,7 @@ fun PassHomeScreen(
             ModalDrawerSheet {
                 Column(Modifier.fillMaxSize()) {
                     NavigationDrawerItem(
-                        label = { Text("Timeline") },
+                        label = { Text(stringResource(R.string.home_timeline)) },
                         selected = false,
                         icon = { Icon(Icons.Default.Timeline, null) },
                         onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenTimeline) },
@@ -326,14 +329,14 @@ fun PassHomeScreen(
                     )
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     NavigationDrawerItem(
-                        label = { Text("All") },
+                        label = { Text(stringResource(R.string.home_all)) },
                         selected = state.selectedCategoryId == null,
                         icon = { Icon(Icons.Default.ViewAgenda, null) },
                         onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(null)) },
                         modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_all"),
                     )
                     NavigationDrawerItem(
-                        label = { Text("Protected") },
+                        label = { Text(stringResource(R.string.home_protected)) },
                         selected = state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID,
                         icon = { Icon(Icons.Default.Lock, null) },
                         onClick = {
@@ -346,14 +349,14 @@ fun PassHomeScreen(
                         modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_protected"),
                     )
                     NavigationDrawerItem(
-                        label = { Text("Pinned") },
+                        label = { Text(stringResource(R.string.home_pinned)) },
                         selected = state.selectedCategoryId == "pinned",
                         icon = { Icon(Icons.Default.PushPin, null) },
                         onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("pinned")) },
                         modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_pinned"),
                     )
                     NavigationDrawerItem(
-                        label = { Text("Archived") },
+                        label = { Text(stringResource(R.string.home_archived)) },
                         selected = state.selectedCategoryId == "archived",
                         icon = { Icon(Icons.Default.Archive, null) },
                         onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
@@ -361,7 +364,7 @@ fun PassHomeScreen(
                     )
                     if (visibleCategories.isNotEmpty()) {
                         Text(
-                            "Tags",
+                            stringResource(R.string.category_tags),
                             modifier = Modifier.padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 4.dp),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -385,14 +388,14 @@ fun PassHomeScreen(
                     }
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     NavigationDrawerItem(
-                        label = { Text("Github Repo") },
+                        label = { Text(stringResource(R.string.home_github_repo)) },
                         selected = false,
                         icon = { Icon(PassIcons.GitHub, null) },
                         onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenUrl(PROJECT_REPOSITORY_URL)) },
                         modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_open_repository"),
                     )
                     NavigationDrawerItem(
-                        label = { Text("Settings") },
+                        label = { Text(stringResource(R.string.settings_settings)) },
                         selected = false,
                         icon = { Icon(Icons.Default.Settings, null) },
                         onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenSettings) },
@@ -457,7 +460,7 @@ fun PassHomeScreen(
                     }
                 }
                 if (todayPasses.isNotEmpty()) {
-                    item(key = "today-heading") { SectionHeading("Today", todayExpanded) { todayExpanded = !todayExpanded } }
+                    item(key = "today-heading") { SectionHeading(stringResource(R.string.home_today), todayExpanded) { todayExpanded = !todayExpanded } }
                     if (todayExpanded) item(key = "today-feed") {
                         TicketFeed(
                             passes = todayPasses,
@@ -486,7 +489,7 @@ fun PassHomeScreen(
                     }
                 }
                 if (pinnedPasses.isNotEmpty()) {
-                    item(key = "pinned-heading") { SectionHeading("Pinned", pinnedExpanded) { pinnedExpanded = !pinnedExpanded } }
+                    item(key = "pinned-heading") { SectionHeading(stringResource(R.string.home_pinned), pinnedExpanded) { pinnedExpanded = !pinnedExpanded } }
                     if (pinnedExpanded) item(key = "pinned-feed") {
                         TicketFeed(
                             passes = pinnedPasses,
@@ -523,7 +526,7 @@ fun PassHomeScreen(
                     }
                 }
                 if (remainingPasses.isNotEmpty()) {
-                    item(key = "passes-heading") { SectionHeading("Other passes", otherExpanded) { otherExpanded = !otherExpanded } }
+                    item(key = "passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
                     if (otherExpanded) item(key = "pass-feed") {
                         TicketFeed(
                             passes = remainingPasses,
@@ -561,7 +564,7 @@ fun PassHomeScreen(
                 }
                 if (separatedProtectedPasses.isNotEmpty()) {
                     item(key = "protected-heading") {
-                        SectionHeading("Protected passes", protectedExpanded) { protectedExpanded = !protectedExpanded }
+                        SectionHeading(stringResource(R.string.home_protected_passes), protectedExpanded) { protectedExpanded = !protectedExpanded }
                     }
                     if (protectedExpanded) item(key = "protected-feed") {
                         TicketFeed(
@@ -657,7 +660,7 @@ private fun HomeToolbar(
                         Box(Modifier.weight(1f).padding(start = 16.dp), contentAlignment = Alignment.CenterStart) {
                             if (searchQuery.isEmpty()) {
                                 Text(
-                                    "Search passes",
+                                    stringResource(R.string.home_search_passes),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -674,18 +677,18 @@ private fun HomeToolbar(
                             )
                         }
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Close, "Clear search") }
+                            IconButton(onClick = { onSearchQueryChange("") }) { Icon(Icons.Default.Close, stringResource(R.string.home_clear_search)) }
                         }
                     }
                 }
             }
         },
         navigationIcon = {
-            IconButton(onClick = onOpenDrawer) { Icon(Icons.Default.Menu, "Navigation menu") }
+            IconButton(onClick = onOpenDrawer) { Icon(Icons.Default.Menu, stringResource(R.string.home_navigation_menu)) }
         },
         actions = {
             if (!searchExpanded) {
-                IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, "Search passes") }
+                IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, stringResource(R.string.home_search_passes)) }
             }
         },
     )
@@ -744,18 +747,20 @@ private data class HomeSortOption(val order: PassSortOrder, val label: String) {
     }
 }
 
+@Composable
 private fun homeSortOptions(selectedSort: PassSortOrder, showManual: Boolean) = buildList {
-    if (showManual) add(HomeSortOption(PassSortOrder.MANUAL, "Manual"))
-    add(HomeSortOption(PassSortOrder.DATE_DESC, if (selectedSort == PassSortOrder.DATE_ASC) "Oldest" else "Newest"))
-    add(HomeSortOption(PassSortOrder.DATE_DIFF, "Nearest"))
-    add(HomeSortOption(PassSortOrder.TYPE, "Type"))
+    if (showManual) add(HomeSortOption(PassSortOrder.MANUAL, stringResource(R.string.home_manual)))
+    add(HomeSortOption(PassSortOrder.DATE_DESC, if (selectedSort == PassSortOrder.DATE_ASC) stringResource(R.string.home_oldest) else stringResource(R.string.home_newest)))
+    add(HomeSortOption(PassSortOrder.DATE_DIFF, stringResource(R.string.home_nearest)))
+    add(HomeSortOption(PassSortOrder.TYPE, stringResource(R.string.home_type)))
 }
 
 @Composable
 private fun LockedPassSection(passCount: Int, onUnlock: () -> Unit) {
+    val unlockDescription = stringResource(R.string.home_unlock_protected_passes)
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onUnlock)
-            .semantics { contentDescription = "Unlock protected passes" },
+            .semantics { contentDescription = unlockDescription },
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
@@ -766,9 +771,9 @@ private fun LockedPassSection(passCount: Int, onUnlock: () -> Unit) {
         ) {
             Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f)) {
-                Text("Protected passes", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.home_protected_passes), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "$passCount ${if (passCount == 1) "pass" else "passes"} · Tap to unlock",
+                    pluralStringResource(R.plurals.home_locked_passes, passCount, passCount),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -795,8 +800,8 @@ private fun EmptyHome() {
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Your passes live here", style = MaterialTheme.typography.headlineSmall)
-        Text("Import one or more pass files.", style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.home_your_passes_live_here), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.home_import_one_or_more_pass_files), style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -807,7 +812,7 @@ private fun EmptySearch(query: String) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("No matching passes", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.home_no_matching_passes), style = MaterialTheme.typography.headlineSmall)
         Text("Try fewer or different words for “${query.trim()}”.", style = MaterialTheme.typography.bodyLarge)
     }
 }

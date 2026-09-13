@@ -61,6 +61,8 @@ import org.ligi.passandroid.ui.theme.PassActionButton
 import org.ligi.passandroid.ui.theme.PassActionButtonGroup
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
 import org.threeten.bp.format.DateTimeFormatter
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @Immutable
 data class TimelineUiState(
@@ -86,10 +88,10 @@ fun TimelineScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Timeline") },
+                title = { Text(stringResource(R.string.home_timeline)) },
                 navigationIcon = {
                     IconButton(onClick = { onAction(TimelineAction.Back) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.pass_detail_back))
                     }
                 },
             )
@@ -101,8 +103,8 @@ fun TimelineScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("No dated passes", style = MaterialTheme.typography.headlineSmall)
-                Text("Dates from your passes will appear here.")
+                Text(stringResource(R.string.timeline_no_dated_passes), style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.timeline_dates_from_your_passes_will_appear_here))
             }
         } else {
             TimelineContent(state, onAction, Modifier.padding(padding))
@@ -261,7 +263,7 @@ private fun TimelineSecondaryActions(
             buttonGroupContent = {
                 TimelineActionButton(
                     icon = Icons.Default.AddAlarm,
-                    label = if (reminderEnabled) "Turn reminder off" else "Remind me",
+                    label = if (reminderEnabled) stringResource(R.string.timeline_turn_reminder_off) else stringResource(R.string.timeline_remind_me),
                     index = 1,
                     onClick = { onAction(TimelineAction.ConfigureReminder(event.id)) },
                 )

@@ -53,6 +53,8 @@ import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.ui.state.CategorySettingsAction
 import java.util.UUID
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,24 +77,24 @@ fun CategorySettingsScreen(
     deleting?.let { category ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete tag?") },
+            title = { Text(stringResource(R.string.category_delete_tag)) },
             text = { Text("The tag will be removed from passes in ${category.name}.") },
             confirmButton = {
                 TextButton(onClick = {
                     onAction(CategorySettingsAction.Delete(category.id))
                     deleting = null
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.category_delete)) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.pass_detail_cancel)) } },
         )
     }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tags") },
+                title = { Text(stringResource(R.string.category_tags)) },
                 navigationIcon = {
                     IconButton(onClick = { onAction(CategorySettingsAction.Back) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
                     }
                 },
             )
@@ -108,7 +110,7 @@ fun CategorySettingsScreen(
                 },
                 modifier = Modifier.semantics { contentDescription = "Add tag" },
                 icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Add tag") },
+                text = { Text(stringResource(R.string.category_add_tag)) },
             )
         },
     ) { padding ->
@@ -168,9 +170,9 @@ private fun CategoryEditorDialog(
         title = { Text(if (category.name.isBlank()) "Add tag" else "Edit tag") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
-                ColorPickerField("Tag color", color, { color = it }, Modifier.fillMaxWidth())
-                Text("Tag icon", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.category_name)) }, singleLine = true)
+                ColorPickerField(stringResource(R.string.category_tag_color), color, { color = it }, Modifier.fillMaxWidth())
+                Text(stringResource(R.string.category_tag_icon), style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("label", "star", "event", "flight").forEach { option ->
                         IconButton(onClick = { icon = option }) {
@@ -186,9 +188,9 @@ private fun CategoryEditorDialog(
                 onClick = {
                     onSave(category.copy(name = name.trim(), colorArgb = color.toUInt().toLong(), icon = icon))
                 },
-            ) { Text("Save") }
+            ) { Text(stringResource(R.string.category_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.pass_detail_cancel)) } },
     )
 }
 

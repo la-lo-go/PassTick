@@ -68,6 +68,8 @@ import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.threeten.bp.ZonedDateTime
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,15 +139,15 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Edit pass") },
+                title = { Text(stringResource(R.string.pass_detail_edit_pass)) },
                 navigationIcon = {
-                    IconButton(onClick = ::saveAndClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Save and go back") }
+                    IconButton(onClick = ::saveAndClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.edit_pass_save_and_go_back)) }
                 },
                 actions = {
                     Box {
-                        IconButton(onClick = { editorMenuOpen = true }) { Icon(Icons.Default.MoreVert, "Editor actions") }
+                        IconButton(onClick = { editorMenuOpen = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.edit_pass_editor_actions)) }
                         DropdownMenu(editorMenuOpen, { editorMenuOpen = false }) {
-                            DropdownMenuItem(text = { Text("Discard changes") }, onClick = {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.edit_pass_discard_changes)) }, onClick = {
                                 editorMenuOpen = false
                                 onAction(EditPassAction.Back)
                             })
@@ -161,9 +163,9 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                EditorSection("Pass") {
-                    OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(creator, { creator = it }, label = { Text("Creator") }, modifier = Modifier.fillMaxWidth())
+                EditorSection(stringResource(R.string.edit_pass_pass)) {
+                    OutlinedTextField(description, { description = it }, label = { Text(stringResource(R.string.edit_pass_description)) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(creator, { creator = it }, label = { Text(stringResource(R.string.edit_pass_creator)) }, modifier = Modifier.fillMaxWidth())
                     Box {
                         OutlinedButton(onClick = { typeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Type: ${passType.displayName()}") }
                         DropdownMenu(typeMenuOpen, { typeMenuOpen = false }) {
@@ -172,34 +174,34 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                             }
                         }
                     }
-                    ColorPickerField("Accent color", accentColor, { accentColor = it }, Modifier.fillMaxWidth())
+                    ColorPickerField(stringResource(R.string.edit_pass_accent_color), accentColor, { accentColor = it }, Modifier.fillMaxWidth())
                 }
             }
             item {
-                EditorSection("Code", initiallyExpanded = false) {
+                EditorSection(stringResource(R.string.edit_pass_code), initiallyExpanded = false) {
                     Box {
                         OutlinedButton(onClick = { barcodeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
                             Text("Barcode: ${barcodeFormat?.name?.replace('_', ' ') ?: "None"}")
                         }
                         DropdownMenu(barcodeMenuOpen, { barcodeMenuOpen = false }) {
-                            DropdownMenuItem({ Text("None") }, onClick = { barcodeFormat = null; barcodeMenuOpen = false })
+                            DropdownMenuItem({ Text(stringResource(R.string.edit_pass_none)) }, onClick = { barcodeFormat = null; barcodeMenuOpen = false })
                             PassBarCodeFormat.entries.forEach { format ->
                                 DropdownMenuItem({ Text(format.name.replace('_', ' ')) }, onClick = { barcodeFormat = format; barcodeMenuOpen = false })
                             }
                         }
                     }
-                    OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text("Barcode data") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text("Barcode text") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text(stringResource(R.string.edit_pass_barcode_data)) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text(stringResource(R.string.edit_pass_barcode_text)) }, modifier = Modifier.fillMaxWidth())
                 }
             }
             item {
-                EditorSection("Calendar") {
-                    DatePickerField("Start date", calendarStart, {
+                EditorSection(stringResource(R.string.edit_pass_calendar)) {
+                    DatePickerField(stringResource(R.string.edit_pass_start_date), calendarStart, {
                         calendarStart = it
                         if (it != null && calendarEnd == null) calendarEnd = it.plusHours(2)
                     }, Modifier.fillMaxWidth(), initiallyOpen = initialDateField == PassDateField.START)
                     DatePickerField(
-                        "End date",
+                        stringResource(R.string.edit_pass_end_date),
                         calendarEnd,
                         { calendarEnd = it },
                         Modifier.fillMaxWidth(),
@@ -208,7 +210,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                 }
             }
             item {
-                EditorSection("Locations") {
+                EditorSection(stringResource(R.string.edit_pass_locations)) {
                     locations.forEachIndexed { index, location ->
                         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -216,27 +218,27 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                                     OutlinedTextField(
                                         location.name,
                                         { value -> locations = locations.replace(index, location.copy(name = value)) },
-                                        label = { Text("Address or place") },
+                                        label = { Text(stringResource(R.string.edit_pass_address_or_place)) },
                                         modifier = Modifier.weight(1f),
                                     )
                                     IconButton(onClick = { locations = locations.toMutableList().also { it.removeAt(index) } }) {
-                                        Icon(Icons.Default.Delete, "Delete location")
+                                        Icon(Icons.Default.Delete, stringResource(R.string.edit_pass_delete_location))
                                     }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(location.latitude, { value -> locations = locations.replace(index, location.copy(latitude = value)) }, label = { Text("Latitude (optional)") }, modifier = Modifier.weight(1f))
-                                    OutlinedTextField(location.longitude, { value -> locations = locations.replace(index, location.copy(longitude = value)) }, label = { Text("Longitude (optional)") }, modifier = Modifier.weight(1f))
+                                    OutlinedTextField(location.latitude, { value -> locations = locations.replace(index, location.copy(latitude = value)) }, label = { Text(stringResource(R.string.edit_pass_latitude_optional)) }, modifier = Modifier.weight(1f))
+                                    OutlinedTextField(location.longitude, { value -> locations = locations.replace(index, location.copy(longitude = value)) }, label = { Text(stringResource(R.string.edit_pass_longitude_optional)) }, modifier = Modifier.weight(1f))
                                 }
                             }
                         }
                     }
                     OutlinedButton(onClick = { locations = locations + PassLocationDraft("", "", "") }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Add location")
+                        Text(stringResource(R.string.edit_pass_add_location))
                     }
                 }
             }
             item {
-                EditorSection("Fields") {
+                EditorSection(stringResource(R.string.edit_pass_fields)) {
                     fields.forEachIndexed { index, field ->
                         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -244,7 +246,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                                     OutlinedTextField(
                                         field.label,
                                         { value -> fields = fields.replace(index, field.copy(label = value)) },
-                                        label = { Text("Label") },
+                                        label = { Text(stringResource(R.string.edit_pass_label)) },
                                         modifier = Modifier.weight(1f),
                                     )
                                     IconButton(
@@ -253,40 +255,40 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                             fields = fields.moveItem(index, -1)
                                         },
-                                    ) { Icon(Icons.Default.ArrowUpward, "Move field up") }
+                                    ) { Icon(Icons.Default.ArrowUpward, stringResource(R.string.edit_pass_move_field_up)) }
                                     IconButton(
                                         enabled = index < fields.lastIndex,
                                         onClick = {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                             fields = fields.moveItem(index, 1)
                                         },
-                                    ) { Icon(Icons.Default.ArrowDownward, "Move field down") }
+                                    ) { Icon(Icons.Default.ArrowDownward, stringResource(R.string.edit_pass_move_field_down)) }
                                     IconToggleButton(
                                         checked = field.hidden,
                                         onCheckedChange = { hidden -> fields = fields.replace(index, field.copy(hidden = hidden)) },
                                     ) {
                                         Icon(
                                             if (field.hidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                            if (field.hidden) "Show field" else "Hide field",
+                                            if (field.hidden) stringResource(R.string.edit_pass_show_field) else stringResource(R.string.edit_pass_hide_field),
                                         )
                                     }
                                     IconButton(onClick = { fields = fields.toMutableList().also { it.removeAt(index) } }) {
-                                        Icon(Icons.Default.Delete, "Delete field")
+                                        Icon(Icons.Default.Delete, stringResource(R.string.edit_pass_delete_field))
                                     }
                                 }
-                                OutlinedTextField(field.value, { value -> fields = fields.replace(index, field.copy(value = value)) }, label = { Text("Value") }, modifier = Modifier.fillMaxWidth())
+                                OutlinedTextField(field.value, { value -> fields = fields.replace(index, field.copy(value = value)) }, label = { Text(stringResource(R.string.edit_pass_value)) }, modifier = Modifier.fillMaxWidth())
                             }
                         }
                     }
                     OutlinedButton(
                         onClick = { fields = fields + PassFieldUiModel("local-${fields.size + 1}", "", "", false, null) },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Add field") }
+                    ) { Text(stringResource(R.string.edit_pass_add_field)) }
                 }
             }
             item {
                 Button(onClick = ::saveAndClose, enabled = pass != null, modifier = Modifier.fillMaxWidth()) {
-                    Text("Save and close")
+                    Text(stringResource(R.string.edit_pass_save_and_close))
                 }
             }
         }
