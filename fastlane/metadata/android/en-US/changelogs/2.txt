@@ -1,8 +1,9 @@
-First PassTick beta.
+First PassTick beta (0.1.1).
 
-- Reads and stores .pkpass and .esPass files offline.
+- Reads and stores .pkpass and esPass files offline.
 - Shows barcodes, pass details, locations, and dates.
 - Reminds you before events with notification actions.
 - Protects passes with biometrics. Protected content stays out of widgets and the lock screen.
-- Adds tags, pins, archive, trash with undo, and home screen widgets.
+- Tags, pins, archive with undo, and home screen widgets.
+- Archive or restore from the swipe actions or the pass menu.
 - No account, no ads, no trackers, and no INTERNET permission.
