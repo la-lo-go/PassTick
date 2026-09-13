@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import androidx.core.graphics.toColorInt
 import org.json.JSONException
 import org.json.JSONObject
 import org.ligi.passandroid.R
@@ -162,7 +163,7 @@ object AppleStylePassReader {
     private fun readTextFields(passJSON: JSONObject, pass: PassImpl, translation: AppleStylePassTranslation) {
         readJsonSafe(passJSON, "backgroundColor", object : JsonStringReadCallback {
             override fun onString(string: String) {
-                pass.accentColor = runCatching { Color.parseColor(string) }.getOrDefault(Color.BLACK)
+                pass.accentColor = runCatching { string.toColorInt() }.getOrDefault(Color.BLACK)
             }
         })
 

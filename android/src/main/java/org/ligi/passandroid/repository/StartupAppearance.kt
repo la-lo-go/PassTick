@@ -3,6 +3,7 @@ package org.ligi.passandroid.repository
 import android.content.Context
 import android.content.res.Configuration
 import androidx.annotation.ColorInt
+import androidx.core.content.edit
 
 data class StartupAppearance(
     val themeMode: ThemeMode,
@@ -37,9 +38,9 @@ object StartupAppearanceStore {
     }
 
     fun write(context: Context, themeMode: ThemeMode, amoledBlackBackground: Boolean) {
-        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE).edit()
-            .putString(THEME_MODE, themeMode.name)
-            .putBoolean(AMOLED, amoledBlackBackground)
-            .apply()
+        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE).edit {
+            putString(THEME_MODE, themeMode.name)
+            putBoolean(AMOLED, amoledBlackBackground)
+        }
     }
 }

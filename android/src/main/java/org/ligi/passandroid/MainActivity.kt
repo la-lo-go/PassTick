@@ -1,11 +1,11 @@
 package org.ligi.passandroid
 
 import android.content.Intent
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.graphics.drawable.toDrawable
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.ligi.passandroid.navigation.PassDeepLinkRequest
@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val startupAppearance = StartupAppearanceStore.read(this)
-        window.setBackgroundDrawable(ColorDrawable(startupAppearance.backgroundColor(this)))
+        window.setBackgroundDrawable(startupAppearance.backgroundColor(this).toDrawable())
         enableEdgeToEdge()
         deepLinkRequest.value = intent.data?.passDeepLinkRequestOrNull()
         if (savedInstanceState == null) importFrom(intent)

@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.get
 import org.ligi.passandroid.repository.PassArtworkKind
 
 internal enum class PassArtworkFit { CONTAIN, COVER }
@@ -89,7 +90,7 @@ private fun Bitmap.averageVisibleLuminance(): Double {
     var count = 0
     for (y in 0 until height step yStep) {
         for (x in 0 until width step xStep) {
-            val pixel = getPixel(x, y)
+            val pixel = this[x, y]
             if (android.graphics.Color.alpha(pixel) < 32) continue
             total += android.graphics.Color.red(pixel) / 255.0 * 0.2126 +
                 android.graphics.Color.green(pixel) / 255.0 * 0.7152 +

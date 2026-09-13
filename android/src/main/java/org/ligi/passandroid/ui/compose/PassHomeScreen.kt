@@ -104,6 +104,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
@@ -898,9 +899,9 @@ private fun ReorderableTicketColumn(
     var measuredBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
     var frozenBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
     var draggedId by remember { mutableStateOf<String?>(null) }
-    var draggedFromIndex by remember { mutableStateOf(-1) }
-    var draggedTargetIndex by remember { mutableStateOf(-1) }
-    var draggedOffset by remember { mutableStateOf(0f) }
+    var draggedFromIndex by remember { mutableIntStateOf(-1) }
+    var draggedTargetIndex by remember { mutableIntStateOf(-1) }
+    var draggedOffset by remember { mutableFloatStateOf(0f) }
     var pendingCommitIds by remember { mutableStateOf<List<String>?>(null) }
     var settlingId by remember { mutableStateOf<String?>(null) }
     val settlingOffset = remember { Animatable(0f) }

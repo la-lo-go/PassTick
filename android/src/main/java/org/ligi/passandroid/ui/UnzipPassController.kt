@@ -4,8 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
-import android.os.Build
 import android.os.ParcelFileDescriptor
+import androidx.core.graphics.createBitmap
 import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.exception.ZipException
 import okio.buffer
@@ -130,7 +130,6 @@ object UnzipPassController : KoinComponent {
     }
 
     private fun importPdfPass(spec: FileUnzipControllerSpec): Boolean {
-        if (Build.VERSION.SDK_INT < 21) return false
         return try {
             val file = File(spec.zipFileString)
             val readUtf8 = file.source().buffer().readUtf8(4)
@@ -144,14 +143,14 @@ object UnzipPassController : KoinComponent {
 
             val resources = spec.context.resources
             val widthPixels = resources.displayMetrics.widthPixels
-            val createBitmap = Bitmap.createBitmap(widthPixels, (widthPixels * ratio).toInt(), Bitmap.Config.ARGB_8888)
-            page.render(createBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            val bitmap = createBitmap(widthPixels, (widthPixels * ratio).toInt(), Bitmap.Config.ARGB_8888)
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
 
             val imagePass = createPassForPDFImport(resources)
             val pathForID = spec.passStore.getPathForID(imagePass.id)
             pathForID.mkdirs()
 
-            createBitmap.compress(Bitmap.CompressFormat.PNG, 100, FileOutputStream(File(pathForID, "strip.png")))
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, FileOutputStream(File(pathForID, "strip.png")))
 
             spec.passStore.save(imagePass)
             spec.passStore.classifier.moveToTopic(imagePass, "new")

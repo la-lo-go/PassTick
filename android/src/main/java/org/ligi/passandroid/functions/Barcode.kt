@@ -4,6 +4,9 @@ import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import androidx.annotation.VisibleForTesting
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toDrawable
+import androidx.core.graphics.set
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
@@ -15,7 +18,7 @@ import java.util.*
 fun generateBitmapDrawable(resources: Resources, data: String, type: PassBarCodeFormat): BitmapDrawable? {
     val bitmap = generateBarCodeBitmap(data, type) ?: return null
 
-    return BitmapDrawable(resources, bitmap).apply {
+    return bitmap.toDrawable(resources).apply {
         isFilterBitmap = false
         setAntiAlias(false)
     }
@@ -50,11 +53,11 @@ private fun createBarcodeBitmap(matrix: BitMatrix): Bitmap {
     val height = if (is1D) width / 5 else matrix.height
 
     // RGB_565 keeps barcode pixels opaque on print and screen surfaces.
-    val barcodeImage = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+    val barcodeImage = createBitmap(width, height, Bitmap.Config.RGB_565)
 
     for (y in 0 until height) {
         for (x in 0 until width) {
-            barcodeImage.setPixel(x, y, if (matrix.get(x, if (is1D) 0 else y)) 0 else 0xFFFFFF)
+            barcodeImage[x, y] = if (matrix.get(x, if (is1D) 0 else y)) 0 else 0xFFFFFF
         }
     }
 

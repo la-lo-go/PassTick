@@ -14,6 +14,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import org.json.JSONObject
 import org.ligi.passandroid.MainActivity
 import org.ligi.passandroid.R
@@ -220,17 +221,17 @@ private fun notificationsAllowed(context: Context): Boolean =
 
 private fun store(context: Context, reminders: List<PassReminder>) {
     val encoded = reminders.mapTo(mutableSetOf(), ::encodeReminder)
-    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putStringSet(STORED, encoded).apply()
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(STORED, encoded) }
 }
 
 private fun storePolicySettings(context: Context, settings: NotificationPolicySettings) {
-    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        .putInt(ACCESS_WINDOW, settings.accessWindowMinutes)
-        .putBoolean(EXACT_TIMING, settings.exactTiming)
-        .putBoolean(ACTIONS_ENABLED, settings.actionsEnabled)
-        .putString(LOCK_SCREEN_DETAIL, settings.lockScreenDetail.name)
-        .putBoolean(LOCK_ALL_PASSES, settings.lockAllPasses)
-        .apply()
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+        putInt(ACCESS_WINDOW, settings.accessWindowMinutes)
+        putBoolean(EXACT_TIMING, settings.exactTiming)
+        putBoolean(ACTIONS_ENABLED, settings.actionsEnabled)
+        putString(LOCK_SCREEN_DETAIL, settings.lockScreenDetail.name)
+        putBoolean(LOCK_ALL_PASSES, settings.lockAllPasses)
+    }
 }
 
 private fun readPolicySettings(context: Context): NotificationPolicySettings =

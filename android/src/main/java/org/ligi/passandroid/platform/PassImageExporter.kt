@@ -17,6 +17,8 @@ import android.provider.MediaStore
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.withSave
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassImageAspectRatio
 import org.ligi.passandroid.repository.PassImageContent
@@ -139,7 +141,7 @@ object PassImageExporter {
             cardHeight = canvasHeight - 2 * cardMargin
         }
 
-        val bitmap = Bitmap.createBitmap(width, canvasHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, canvasHeight.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.TRANSPARENT)
         val canvas = Canvas(bitmap)
         drawCard(canvas, cardMargin, cardMargin, cardWidth, cardHeight, base)
@@ -376,7 +378,7 @@ object PassImageExporter {
         gap: Float,
         imagePaint: Paint,
     ) {
-        val contents = Bitmap.createBitmap(contentWidth, contentHeight.toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        val contents = createBitmap(contentWidth, contentHeight.toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         try {
             contents.eraseColor(Color.TRANSPARENT)
             drawBlocks(Canvas(contents), blocks, 0f, 0f, gap)
@@ -412,13 +414,13 @@ object PassImageExporter {
         val bounds = RectF(left, top, left + size, top + size)
         if (thumbnail != null) {
             val clip = Path().apply { addRoundRect(bounds, radius, radius, Path.Direction.CW) }
-            save()
-            clipPath(clip)
-            val edge = minOf(thumbnail.width, thumbnail.height)
-            val sourceLeft = (thumbnail.width - edge) / 2
-            val sourceTop = (thumbnail.height - edge) / 2
-            drawBitmap(thumbnail, Rect(sourceLeft, sourceTop, sourceLeft + edge, sourceTop + edge), bounds, imagePaint)
-            restore()
+            withSave {
+                clipPath(clip)
+                val edge = minOf(thumbnail.width, thumbnail.height)
+                val sourceLeft = (thumbnail.width - edge) / 2
+                val sourceTop = (thumbnail.height - edge) / 2
+                drawBitmap(thumbnail, Rect(sourceLeft, sourceTop, sourceLeft + edge, sourceTop + edge), bounds, imagePaint)
+            }
         } else {
             drawRoundRect(bounds, radius, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TITLE_ICON_BACKGROUND })
             val initial = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -439,10 +441,10 @@ object PassImageExporter {
     }
 
     private fun Canvas.drawLayout(layout: StaticLayout, left: Float, top: Float) {
-        save()
-        translate(left, top)
-        layout.draw(this)
-        restore()
+        withSave {
+            translate(left, top)
+            layout.draw(this)
+        }
     }
 
     private val DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm z", Locale.getDefault())

@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import org.threeten.bp.LocalDate
 import org.threeten.bp.LocalTime
 import org.threeten.bp.ZoneId
@@ -216,4 +217,4 @@ fun DatePickerField(
 
 fun formatPickerColor(color: Int): String = "#%08X".format(java.util.Locale.ROOT, color)
 
-fun parsePickerColor(value: String): Int? = runCatching { android.graphics.Color.parseColor(value) }.getOrNull()
+fun parsePickerColor(value: String): Int? = runCatching { value.toColorInt() }.getOrNull()
