@@ -59,7 +59,7 @@ class PassImageExporterTest {
     @Test
     fun barcodePngRoundTripsThroughDecoder() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val shareDir = File(context.filesDir, "share").apply { mkdirs() }
+        val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
         val output = File(shareDir, "export-test-${System.currentTimeMillis()}.png")
         val uri = FileProvider.getUriForFile(context, "dev.lalogo.passtick.fileprovider", output)
         try {

@@ -80,7 +80,7 @@ class ContentUriExchangeTest {
         }
     }
 
-    private fun sharedFile(name: String) = File(context.filesDir, "share/$name").apply {
+    private fun sharedFile(name: String) = File(context.cacheDir, "share/$name").apply {
         parentFile?.mkdirs()
     }
 
