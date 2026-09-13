@@ -818,6 +818,6 @@ private fun EmptySearch(query: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(stringResource(R.string.home_no_matching_passes), style = MaterialTheme.typography.headlineSmall)
-        Text("Try fewer or different words for “${query.trim()}”.", style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.home_no_matches_for_query, query.trim()), style = MaterialTheme.typography.bodyLarge)
     }
 }

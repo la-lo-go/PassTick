@@ -234,6 +234,55 @@
     <string name="app_allow_pass_reminders_in_settings">Allow pass reminders in Android notification settings</string>
     <string name="app_allow_exact_alarms_then_select_again">Allow exact alarms, then select this option again</string>
     <string name="app_allow_exact_alarms_then_enable_again">Allow exact alarms, then enable this option again</string>
+    <string name="edit_pass_type_value">Type: %1$s</string>
+    <string name="edit_pass_validation_description">Add a description before leaving.</string>
+    <string name="edit_pass_validation_barcode">Add barcode data or remove the barcode.</string>
+    <string name="edit_pass_validation_calendar_start">Select a valid start date or clear it.</string>
+    <string name="edit_pass_validation_calendar_end">Select a valid end date or clear it.</string>
+    <string name="edit_pass_validation_calendar_order">The end date must be after the start date.</string>
+    <string name="edit_pass_validation_location_partial">Enter both coordinates or clear both.</string>
+    <string name="edit_pass_validation_location_invalid">Fix the location coordinates or clear them.</string>
+    <string name="edit_pass_validation_latitude">Latitude must be between -90 and 90.</string>
+    <string name="edit_pass_validation_longitude">Longitude must be between -180 and 180.</string>
+    <string name="edit_pass_validation_location_empty">Add an address or delete the empty location.</string>
+    <string name="edit_pass_validation_field_empty">Complete or delete the empty field.</string>
+    <string name="edit_pass_barcode_value">Barcode: %1$s</string>
+    <string name="edit_pass_collapse_section">Collapse %1$s</string>
+    <string name="edit_pass_expand_section">Expand %1$s</string>
+    <string name="picker_label_value">%1$s  %2$s</string>
+    <string name="export_auto">Auto</string>
+    <string name="home_no_matches_for_query">Try fewer or different words for "%1$s".</string>
+    <string name="reminder_pass_reminder">Pass reminder</string>
+    <string name="reminder_channel_name">Pass reminders</string>
+    <string name="reminder_channel_description">Notifications for dated passes</string>
+    <string name="reminder_open_code">Open code</string>
+    <string name="reminder_directions">Directions</string>
+    <string name="message_pass_imported">Pass imported</string>
+    <string name="message_passes_imported">Passes imported</string>
+    <string name="message_pass_exported">Pass exported</string>
+    <string name="message_pass_ready_to_share">Pass ready to share</string>
+    <string name="message_image_ready_to_share">Image ready to share</string>
+    <string name="message_pass_saved">Pass saved</string>
+    <string name="message_pass_moved">Pass moved</string>
+    <string name="message_category_deleted">Category deleted</string>
+    <string name="message_tags_updated">Tags updated</string>
+    <string name="message_pass_image_updated">Pass image updated</string>
+    <string name="message_pass_protected">Pass protected</string>
+    <string name="message_protection_removed">Protection removed</string>
+    <string name="message_pass_pinned">Pass pinned</string>
+    <string name="message_pass_unpinned">Pass unpinned</string>
+    <string name="message_pass_archived">Pass archived</string>
+    <string name="message_pass_restored">Pass restored</string>
+    <string name="message_operation_failed">Operation failed</string>
+
+    <plurals name="reminder_starts_in_minutes">
+        <item quantity="one">Starts in %1$d minute</item>
+        <item quantity="other">Starts in %1$d minutes</item>
+    </plurals>
+    <plurals name="reminder_starts_in_hours">
+        <item quantity="one">Starts in %1$d hour</item>
+        <item quantity="other">Starts in %1$d hours</item>
+    </plurals>
 
     <plurals name="home_locked_passes">
         <item quantity="one">%1$d pass · Tap to unlock</item>

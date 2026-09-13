@@ -27,6 +27,7 @@ class AndroidReminderScheduler(private val context: Context) : ReminderScheduler
 
     override fun sync(reminders: List<PassReminder>, settings: NotificationPolicySettings) {
         val now = System.currentTimeMillis()
+        val localizedSettings = settings.copy(strings = notificationStrings(context))
         val previous = readStored(context)
         val active = reminders.filter { it.endAtMillis > now }.distinctBy(PassReminder::id)
         val activeIds = active.mapTo(mutableSetOf(), PassReminder::id)
@@ -37,12 +38,12 @@ class AndroidReminderScheduler(private val context: Context) : ReminderScheduler
         }
         (previous.map(PassReminder::passId).toSet() - active.map(PassReminder::passId).toSet())
             .forEach { NotificationManagerCompat.from(context).cancel(notificationId(it)) }
-        active.forEach { scheduleLeadOrShow(context, it, now, settings) }
+        active.forEach { scheduleLeadOrShow(context, it, now, localizedSettings) }
         lifecycleOwners(active).filter { it.triggerAtMillis <= now }.forEach {
-            scheduleLifecycle(context, it, now, settings)
+            scheduleLifecycle(context, it, now, localizedSettings)
         }
         store(context, active)
-        storePolicySettings(context, settings)
+        storePolicySettings(context, localizedSettings)
     }
 
     private fun cancel(reminder: PassReminder) {
@@ -85,8 +86,12 @@ class ReminderBootReceiver : BroadcastReceiver() {
 
 fun ensureReminderNotificationChannel(context: Context) {
     context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-        NotificationChannel(CHANNEL_ID, "Pass reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "Notifications for dated passes"
+        NotificationChannel(
+            CHANNEL_ID,
+            context.getString(R.string.reminder_channel_name),
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            description = context.getString(R.string.reminder_channel_description)
         },
     )
 }
@@ -168,8 +173,8 @@ private fun showReminder(context: Context, reminder: PassReminder, policy: Notif
 
 private fun NotificationCompat.Builder.addReminderAction(context: Context, reminder: PassReminder, action: NotificationAction) {
     when (action) {
-        NotificationAction.OPEN_CODE -> addAction(0, "Open code", openPassIntent(context, reminder.passId, true))
-        NotificationAction.DIRECTIONS -> addAction(0, "Directions", directionsIntent(context, reminder))
+        NotificationAction.OPEN_CODE -> addAction(0, context.getString(R.string.reminder_open_code), openPassIntent(context, reminder.passId, true))
+        NotificationAction.DIRECTIONS -> addAction(0, context.getString(R.string.reminder_directions), directionsIntent(context, reminder))
     }
 }
 
@@ -244,8 +249,22 @@ private fun readPolicySettings(context: Context): NotificationPolicySettings =
                 ?.let { runCatching { NotificationLockScreenDetail.valueOf(it) }.getOrNull() }
                 ?: NotificationLockScreenDetail.HIDE_SENSITIVE,
             lockAllPasses = getBoolean(LOCK_ALL_PASSES, false),
+            strings = notificationStrings(context),
         )
     }
+
+private fun notificationStrings(context: Context) = NotificationStrings(
+    passReminder = context.getString(R.string.reminder_pass_reminder),
+    startsIn = { remaining ->
+        val minutes = durationMinutes(remaining)
+        if (minutes < 60) {
+            context.resources.getQuantityString(R.plurals.reminder_starts_in_minutes, minutes.toInt(), minutes.toInt())
+        } else {
+            val hours = durationHours(minutes)
+            context.resources.getQuantityString(R.plurals.reminder_starts_in_hours, hours.toInt(), hours.toInt())
+        }
+    },
+)
 
 private fun readStored(context: Context): List<PassReminder> =
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(STORED, emptySet()).orEmpty().mapNotNull(::decodeReminder)

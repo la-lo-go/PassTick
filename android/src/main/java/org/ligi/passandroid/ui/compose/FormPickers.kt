@@ -73,7 +73,7 @@ fun ColorPickerField(
     var open by remember { mutableStateOf(false) }
     OutlinedButton(onClick = { open = true }, modifier = modifier) {
         Box(Modifier.size(24.dp).clip(CircleShape).background(Color(color)))
-        Text("$label  ${formatPickerColor(color)}", Modifier.padding(start = 12.dp))
+        Text(stringResource(R.string.picker_label_value, label, formatPickerColor(color)), Modifier.padding(start = 12.dp))
     }
     if (open) {
         ColorPickerDialog(

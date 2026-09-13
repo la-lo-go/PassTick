@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
@@ -69,6 +70,7 @@ import org.ligi.passandroid.ui.state.PassUiModel
 import org.threeten.bp.ZonedDateTime
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
 import org.ligi.passandroid.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,6 +103,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
     var editorMenuOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val resources = LocalResources.current
     val hapticFeedback = LocalHapticFeedback.current
     fun currentDraft() = PassDraft(
         description = description,
@@ -118,8 +121,8 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
 
     fun saveAndClose() {
         val draft = currentDraft()
-        val error = validatePassDraft(draft)
-        if (error == null) {
+        val issue = validatePassDraft(draft)
+        if (issue == null) {
             val initialDraft = pass?.toEditableDraft()
             if (draft == initialDraft) {
                 onAction(EditPassAction.Back)
@@ -129,7 +132,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
         } else {
             scope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar(error, withDismissAction = true)
+                snackbarHostState.showSnackbar(resources.getString(issue.messageRes), withDismissAction = true)
             }
         }
     }
@@ -167,7 +170,9 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                     OutlinedTextField(description, { description = it }, label = { Text(stringResource(R.string.edit_pass_description)) }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(creator, { creator = it }, label = { Text(stringResource(R.string.edit_pass_creator)) }, modifier = Modifier.fillMaxWidth())
                     Box {
-                        OutlinedButton(onClick = { typeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Type: ${passType.displayName()}") }
+                        OutlinedButton(onClick = { typeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.edit_pass_type_value, passType.displayName()))
+                        }
                         DropdownMenu(typeMenuOpen, { typeMenuOpen = false }) {
                             PassType.entries.forEach { type ->
                                 DropdownMenuItem({ Text(type.displayName()) }, onClick = { passType = type; typeMenuOpen = false })
@@ -181,7 +186,12 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                 EditorSection(stringResource(R.string.edit_pass_code), initiallyExpanded = false) {
                     Box {
                         OutlinedButton(onClick = { barcodeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Barcode: ${barcodeFormat?.name?.replace('_', ' ') ?: "None"}")
+                            Text(
+                                stringResource(
+                                    R.string.edit_pass_barcode_value,
+                                    barcodeFormat?.name?.replace('_', ' ') ?: stringResource(R.string.edit_pass_none),
+                                ),
+                            )
                         }
                         DropdownMenu(barcodeMenuOpen, { barcodeMenuOpen = false }) {
                             DropdownMenuItem({ Text(stringResource(R.string.edit_pass_none)) }, onClick = { barcodeFormat = null; barcodeMenuOpen = false })
@@ -316,7 +326,21 @@ private fun PassUiModel.toEditableDraft(): PassDraft = PassDraft(
     },
 )
 
-internal fun validatePassDraft(draft: PassDraft): String? {
+internal enum class PassDraftIssue(@StringRes val messageRes: Int) {
+    DESCRIPTION_MISSING(R.string.edit_pass_validation_description),
+    BARCODE_MISSING(R.string.edit_pass_validation_barcode),
+    CALENDAR_START_INVALID(R.string.edit_pass_validation_calendar_start),
+    CALENDAR_END_INVALID(R.string.edit_pass_validation_calendar_end),
+    CALENDAR_END_BEFORE_START(R.string.edit_pass_validation_calendar_order),
+    LOCATION_COORDINATES_PARTIAL(R.string.edit_pass_validation_location_partial),
+    LOCATION_COORDINATES_INVALID(R.string.edit_pass_validation_location_invalid),
+    LATITUDE_RANGE(R.string.edit_pass_validation_latitude),
+    LONGITUDE_RANGE(R.string.edit_pass_validation_longitude),
+    LOCATION_EMPTY(R.string.edit_pass_validation_location_empty),
+    FIELD_EMPTY(R.string.edit_pass_validation_field_empty),
+}
+
+internal fun validatePassDraft(draft: PassDraft): PassDraftIssue? {
     validateDescription(draft)?.let { return it }
     validateBarcode(draft)?.let { return it }
     validateCalendar(draft)?.let { return it }
@@ -324,46 +348,46 @@ internal fun validatePassDraft(draft: PassDraft): String? {
     return validateFields(draft)
 }
 
-private fun validateDescription(draft: PassDraft): String? =
-    if (draft.description.isBlank()) "Add a description before leaving." else null
+private fun validateDescription(draft: PassDraft): PassDraftIssue? =
+    if (draft.description.isBlank()) PassDraftIssue.DESCRIPTION_MISSING else null
 
-private fun validateBarcode(draft: PassDraft): String? =
-    if (draft.barcodeFormat != null && draft.barcodeMessage.isBlank()) "Add barcode data or remove the barcode." else null
+private fun validateBarcode(draft: PassDraft): PassDraftIssue? =
+    if (draft.barcodeFormat != null && draft.barcodeMessage.isBlank()) PassDraftIssue.BARCODE_MISSING else null
 
-private fun validateCalendar(draft: PassDraft): String? {
+private fun validateCalendar(draft: PassDraft): PassDraftIssue? {
     val start = parseDraftDate(draft.calendarStart)
     val end = parseDraftDate(draft.calendarEnd)
-    if (draft.calendarStart.isNotBlank() && start == null) return "Select a valid start date or clear it."
-    if (draft.calendarEnd.isNotBlank() && end == null) return "Select a valid end date or clear it."
-    if (start != null && end != null && end.isBefore(start)) return "The end date must be after the start date."
+    if (draft.calendarStart.isNotBlank() && start == null) return PassDraftIssue.CALENDAR_START_INVALID
+    if (draft.calendarEnd.isNotBlank() && end == null) return PassDraftIssue.CALENDAR_END_INVALID
+    if (start != null && end != null && end.isBefore(start)) return PassDraftIssue.CALENDAR_END_BEFORE_START
     return null
 }
 
 private fun parseDraftDate(value: String): ZonedDateTime? =
     value.takeIf(String::isNotBlank)?.let { runCatching { ZonedDateTime.parse(it) }.getOrNull() }
 
-private fun validateLocations(locations: List<PassLocationDraft>): String? {
+private fun validateLocations(locations: List<PassLocationDraft>): PassDraftIssue? {
     locations.forEach { location ->
         validateLocation(location)?.let { return it }
     }
     return null
 }
 
-private fun validateLocation(location: PassLocationDraft): String? {
+private fun validateLocation(location: PassLocationDraft): PassDraftIssue? {
     val hasLatitude = location.latitude.isNotBlank()
     val hasLongitude = location.longitude.isNotBlank()
-    if (hasLatitude != hasLongitude) return "Enter both coordinates or clear both."
+    if (hasLatitude != hasLongitude) return PassDraftIssue.LOCATION_COORDINATES_PARTIAL
     val latitude = location.latitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
     val longitude = location.longitude.takeIf(String::isNotBlank)?.toDoubleOrNull()
-    if (hasLatitude && (latitude == null || longitude == null)) return "Fix the location coordinates or clear them."
-    if (latitude != null && latitude !in -90.0..90.0) return "Latitude must be between -90 and 90."
-    if (longitude != null && longitude !in -180.0..180.0) return "Longitude must be between -180 and 180."
-    if (location.name.isBlank() && !hasLatitude) return "Add an address or delete the empty location."
+    if (hasLatitude && (latitude == null || longitude == null)) return PassDraftIssue.LOCATION_COORDINATES_INVALID
+    if (latitude != null && latitude !in -90.0..90.0) return PassDraftIssue.LATITUDE_RANGE
+    if (longitude != null && longitude !in -180.0..180.0) return PassDraftIssue.LONGITUDE_RANGE
+    if (location.name.isBlank() && !hasLatitude) return PassDraftIssue.LOCATION_EMPTY
     return null
 }
 
-private fun validateFields(draft: PassDraft): String? =
-    if (draft.fields.any { it.label.isBlank() && it.value.isBlank() }) "Complete or delete the empty field." else null
+private fun validateFields(draft: PassDraft): PassDraftIssue? =
+    if (draft.fields.any { it.label.isBlank() && it.value.isBlank() }) PassDraftIssue.FIELD_EMPTY else null
 
 @Composable
 private fun EditorSection(
@@ -379,7 +403,13 @@ private fun EditorSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, if (expanded) "Collapse $title" else "Expand $title")
+            Icon(
+                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                stringResource(
+                    if (expanded) R.string.edit_pass_collapse_section else R.string.edit_pass_expand_section,
+                    title,
+                ),
+            )
         }
         if (expanded) {
             Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {

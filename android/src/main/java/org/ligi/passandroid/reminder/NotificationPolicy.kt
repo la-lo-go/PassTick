@@ -10,12 +10,18 @@ enum class NotificationDisposition { SCHEDULE, SHOW, CANCEL }
 
 enum class NotificationLockScreenDetail { FULL, HIDE_SENSITIVE, HIDDEN }
 
+data class NotificationStrings(
+    val passReminder: String = "Pass reminder",
+    val startsIn: (durationMillis: Long) -> String = { "Starts in ${durationLabel(it)}" },
+)
+
 data class NotificationPolicySettings(
     val accessWindowMinutes: Int = 15,
     val exactTiming: Boolean = false,
     val actionsEnabled: Boolean = true,
     val lockScreenDetail: NotificationLockScreenDetail = NotificationLockScreenDetail.HIDE_SENSITIVE,
     val lockAllPasses: Boolean = false,
+    val strings: NotificationStrings = NotificationStrings(),
 )
 
 data class NotificationPolicyResult(
@@ -43,13 +49,13 @@ object NotificationPolicy {
             nowMillis < reminder.triggerAtMillis -> NotificationDisposition.SCHEDULE
             else -> NotificationDisposition.SHOW
         }
-        val body = body(reminder, nowMillis, phase)
+        val body = body(reminder, nowMillis, phase, settings)
         val isProtected = reminder.isProtected || settings.lockAllPasses
         return NotificationPolicyResult(
             title = reminder.title,
             body = body,
-            publicTitle = if (isProtected) "Pass reminder" else reminder.title,
-            publicBody = if (isProtected) publicBody(reminder, nowMillis, phase) else body,
+            publicTitle = if (isProtected) settings.strings.passReminder else reminder.title,
+            publicBody = if (isProtected) publicBody(reminder, nowMillis, phase, settings) else body,
             phase = phase,
             actions = if (disposition == NotificationDisposition.CANCEL) emptySet() else actions(reminder, settings),
             disposition = disposition,
@@ -64,15 +70,31 @@ object NotificationPolicy {
         else -> NotificationPhase.UPCOMING
     }
 
-    private fun body(reminder: PassReminder, nowMillis: Long, phase: NotificationPhase): String =
-        listOfNotNull(phaseText(reminder, nowMillis, phase), reminder.locationLabel?.trim()?.takeIf(String::isNotEmpty))
-            .joinToString(" · ")
+    private fun body(
+        reminder: PassReminder,
+        nowMillis: Long,
+        phase: NotificationPhase,
+        settings: NotificationPolicySettings,
+    ): String = listOfNotNull(
+        phaseText(reminder, nowMillis, phase, settings),
+        reminder.locationLabel?.trim()?.takeIf(String::isNotEmpty),
+    ).joinToString(" · ")
 
-    private fun publicBody(reminder: PassReminder, nowMillis: Long, phase: NotificationPhase): String =
-        phaseText(reminder, nowMillis, phase)
+    private fun publicBody(
+        reminder: PassReminder,
+        nowMillis: Long,
+        phase: NotificationPhase,
+        settings: NotificationPolicySettings,
+    ): String = phaseText(reminder, nowMillis, phase, settings)
 
-    private fun phaseText(reminder: PassReminder, nowMillis: Long, phase: NotificationPhase): String = when (phase) {
-        NotificationPhase.ACCESS, NotificationPhase.UPCOMING -> "Starts in ${durationLabel(reminder.eventAtMillis - nowMillis)}"
+    private fun phaseText(
+        reminder: PassReminder,
+        nowMillis: Long,
+        phase: NotificationPhase,
+        settings: NotificationPolicySettings,
+    ): String = when (phase) {
+        NotificationPhase.ACCESS, NotificationPhase.UPCOMING ->
+            settings.strings.startsIn(reminder.eventAtMillis - nowMillis)
     }
 
     private fun actions(
@@ -103,15 +125,19 @@ object NotificationPolicy {
         else -> reminder.endAtMillis
     }?.takeIf { it > nowMillis }
 
-    private fun durationLabel(durationMillis: Long): String {
-        val minutes = max(1, (durationMillis + MINUTE - 1) / MINUTE)
-        if (minutes < 60) return "$minutes ${if (minutes == 1L) "minute" else "minutes"}"
-        val hours = (minutes + 59) / 60
-        return "$hours ${if (hours == 1L) "hour" else "hours"}"
-    }
-
     private val PassReminder.hasLocation: Boolean
         get() = !locationLabel.isNullOrBlank() || latitude != null && longitude != null
-
-    private const val MINUTE = 60_000L
 }
+
+internal fun durationMinutes(durationMillis: Long): Long = max(1, (durationMillis + MINUTE - 1) / MINUTE)
+
+internal fun durationHours(minutes: Long): Long = (minutes + 59) / 60
+
+internal fun durationLabel(durationMillis: Long): String {
+    val minutes = durationMinutes(durationMillis)
+    if (minutes < 60) return "$minutes ${if (minutes == 1L) "minute" else "minutes"}"
+    val hours = durationHours(minutes)
+    return "$hours ${if (hours == 1L) "hour" else "hours"}"
+}
+
+private const val MINUTE = 60_000L

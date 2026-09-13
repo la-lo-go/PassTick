@@ -19,68 +19,68 @@ class PassDraftValidationTest {
     @Test
     fun `rejects a blank description`() {
         assertThat(validatePassDraft(validDraft().copy(description = " ")))
-            .isEqualTo("Add a description before leaving.")
+            .isEqualTo(PassDraftIssue.DESCRIPTION_MISSING)
     }
 
     @Test
     fun `rejects a barcode format without data`() {
         val draft = validDraft().copy(barcodeFormat = PassBarCodeFormat.QR_CODE, barcodeMessage = "")
 
-        assertThat(validatePassDraft(draft)).isEqualTo("Add barcode data or remove the barcode.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.BARCODE_MISSING)
     }
 
     @Test
     fun `rejects an unparsable start date`() {
         assertThat(validatePassDraft(validDraft().copy(calendarStart = "not-a-date")))
-            .isEqualTo("Select a valid start date or clear it.")
+            .isEqualTo(PassDraftIssue.CALENDAR_START_INVALID)
     }
 
     @Test
     fun `rejects an unparsable end date`() {
         assertThat(validatePassDraft(validDraft().copy(calendarEnd = "not-a-date")))
-            .isEqualTo("Select a valid end date or clear it.")
+            .isEqualTo(PassDraftIssue.CALENDAR_END_INVALID)
     }
 
     @Test
     fun `rejects a partial coordinate pair`() {
         val draft = validDraft().copy(locations = listOf(PassLocationDraft("Station", "40.4", "")))
 
-        assertThat(validatePassDraft(draft)).isEqualTo("Enter both coordinates or clear both.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.LOCATION_COORDINATES_PARTIAL)
     }
 
     @Test
     fun `rejects non numeric coordinates`() {
         val draft = validDraft().copy(locations = listOf(PassLocationDraft("Station", "north", "1.0")))
 
-        assertThat(validatePassDraft(draft)).isEqualTo("Fix the location coordinates or clear them.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.LOCATION_COORDINATES_INVALID)
     }
 
     @Test
     fun `rejects a latitude outside the valid range`() {
         val draft = validDraft().copy(locations = listOf(PassLocationDraft("Station", "91.0", "1.0")))
 
-        assertThat(validatePassDraft(draft)).isEqualTo("Latitude must be between -90 and 90.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.LATITUDE_RANGE)
     }
 
     @Test
     fun `rejects a longitude outside the valid range`() {
         val draft = validDraft().copy(locations = listOf(PassLocationDraft("Station", "1.0", "181.0")))
 
-        assertThat(validatePassDraft(draft)).isEqualTo("Longitude must be between -180 and 180.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.LONGITUDE_RANGE)
     }
 
     @Test
     fun `rejects an unnamed location without coordinates`() {
         val draft = validDraft().copy(locations = listOf(PassLocationDraft("", "", "")))
 
-        assertThat(validatePassDraft(draft)).isEqualTo("Add an address or delete the empty location.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.LOCATION_EMPTY)
     }
 
     @Test
     fun `rejects an incomplete field`() {
         val draft = validDraft().copy(fields = listOf(PassFieldUiModel("key", "", "", false, null)))
 
-        assertThat(validatePassDraft(draft)).isEqualTo("Complete or delete the empty field.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.FIELD_EMPTY)
     }
 
     @Test
@@ -90,7 +90,7 @@ class PassDraftValidationTest {
             calendarEnd = "2026-09-02T10:00:00+02:00[Europe/Madrid]",
         )
 
-        assertThat(validatePassDraft(draft)).isEqualTo("The end date must be after the start date.")
+        assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.CALENDAR_END_BEFORE_START)
     }
 
     private fun validDraft() = PassDraft(

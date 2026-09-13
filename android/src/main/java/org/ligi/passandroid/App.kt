@@ -2,6 +2,7 @@ package org.ligi.passandroid
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
 import android.os.Bundle
 import com.jakewharton.threetenabp.AndroidThreeTen
 import org.koin.android.ext.koin.androidContext
@@ -21,6 +22,7 @@ import org.ligi.passandroid.repository.FilePassRepository
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.SettingsRepository
 import org.ligi.passandroid.ui.state.MainViewModel
+import org.ligi.passandroid.ui.state.StringResolver
 import org.ligi.passandroid.reminder.AndroidReminderScheduler
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
@@ -47,7 +49,13 @@ open class App : Application() {
             single<PlatformActions> { AndroidPlatformActions(this@App, activityProvider = { currentActivity }) }
             single<ReminderScheduler> { AndroidReminderScheduler(this@App) }
             single { PassWidgetSnapshotPublisher(this@App) }
-            viewModel { MainViewModel(get(), get(), get(), get(), get()) }
+            single<StringResolver> {
+                val context = get<Context>()
+                object : StringResolver {
+                    override fun resolve(id: Int, vararg args: Any): String = context.getString(id, *args)
+                }
+            }
+            viewModel { MainViewModel(get(), get(), get(), get(), get(), get()) }
         }
     }
 

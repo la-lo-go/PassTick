@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.withContext
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.platform.PassImageExporter
+import org.ligi.passandroid.R
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.PassRepository
@@ -42,6 +43,7 @@ class MainViewModel(
     private val platformActions: PlatformActions,
     private val reminderScheduler: ReminderScheduler = ReminderScheduler.None,
     private val widgetPublisher: PassWidgetSnapshotPublisher? = null,
+    private val strings: StringResolver = StringResolver { _, _ -> "" },
 ) : ViewModel() {
     private var reminderActionOverrides: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>>? = null
     suspend fun isCalendarEventPresent(pass: PassUiModel): Boolean = withContext(Dispatchers.IO) {
@@ -85,8 +87,8 @@ class MainViewModel(
         viewModelScope.launch {
             for (move in categoryMoves) {
                 runCatching { passRepository.moveToCategory(move.id, move.categoryId) }
-                    .onSuccess { if (move.announce) message.value = "Pass moved" }
-                    .onFailure { message.value = it.message ?: "Operation failed" }
+                    .onSuccess { if (move.announce) message.value = strings.resolve(R.string.message_pass_moved) }
+                    .onFailure { message.value = it.message ?: strings.resolve(R.string.message_operation_failed) }
             }
         }
         viewModelScope.launch {
@@ -149,34 +151,34 @@ class MainViewModel(
 
     private fun handleImportExportAction(action: AppAction): Boolean = when (action) {
         is AppAction.Import -> {
-            launchOperation("Pass imported") {
+            launchOperation(strings.resolve(R.string.message_pass_imported)) {
                 val imported = passRepository.import(action.uri).getOrThrow()
                 addCalendarEventsAfterImport(listOf(imported))
             }
             true
         }
         is AppAction.ImportFiles -> {
-            launchOperation("Passes imported") {
+            launchOperation(strings.resolve(R.string.message_passes_imported)) {
                 val imported = action.uris.map { passRepository.import(it).getOrThrow() }
                 addCalendarEventsAfterImport(imported)
             }
             true
         }
         is AppAction.Export -> {
-            launchOperation("Pass exported") {
+            launchOperation(strings.resolve(R.string.message_pass_exported)) {
                 passRepository.export(action.id, action.destination).getOrThrow()
             }
             true
         }
         is AppAction.SharePass -> {
-            launchOperation("Pass ready to share") {
+            launchOperation(strings.resolve(R.string.message_pass_ready_to_share)) {
                 val uri = passRepository.prepareShare(action.id).getOrThrow()
                 platformActions.share(uri, "application/vnd.espass-espass+zip")
             }
             true
         }
         is AppAction.ShareImage -> {
-            launchOperation("Image ready to share") {
+            launchOperation(strings.resolve(R.string.message_image_ready_to_share)) {
                 val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
                 withContext(Dispatchers.IO) { platformActions.shareImage(pass, action.options) }
             }
@@ -209,7 +211,7 @@ class MainViewModel(
         }
         is AppAction.OpenUrl -> {
             runCatching { platformActions.openUrl(action.url) }
-                .onFailure { message.value = it.message ?: "Operation failed" }
+                .onFailure { message.value = it.message ?: strings.resolve(R.string.message_operation_failed) }
             true
         }
         else -> false
@@ -220,7 +222,7 @@ class MainViewModel(
             viewModelScope.launch {
                 busy.value = true
                 runCatching { check(passRepository.delete(action.id)) }
-                    .onFailure { message.value = it.message ?: "Operation failed" }
+                    .onFailure { message.value = it.message ?: strings.resolve(R.string.message_operation_failed) }
                 pendingDeletionIds.update { it - action.id }
                 busy.value = false
             }
@@ -234,14 +236,15 @@ class MainViewModel(
         }
         is AppAction.SetPassProtected -> {
             launchOperation(
-                if (action.isProtected) "Pass protected" else "Protection removed",
+                if (action.isProtected) strings.resolve(R.string.message_pass_protected)
+                else strings.resolve(R.string.message_protection_removed),
             ) {
                 passRepository.setProtected(action.id, action.isProtected)
             }
             true
         }
         is AppAction.SavePass -> {
-            launchOperation("Pass saved") { save(action) }
+            launchOperation(strings.resolve(R.string.message_pass_saved)) { save(action) }
             true
         }
         else -> false
@@ -262,7 +265,7 @@ class MainViewModel(
             true
         }
         is AppAction.DeleteCategory -> {
-            launchOperation("Category deleted") {
+            launchOperation(strings.resolve(R.string.message_category_deleted)) {
                 val category = uiState.value.categories.firstOrNull { it.id == action.categoryId }
                     ?: error("Category not found")
                 require(category.role == PassCategoryRole.CUSTOM) { "Built-in categories cannot be deleted" }
@@ -522,29 +525,42 @@ class MainViewModel(
 
     private fun handlePassMetadataAction(action: AppAction): Boolean = when (action) {
         is AppAction.SetPassFavorite -> {
-            launchOperation(if (action.isFavorite) "Pass pinned" else "Pass unpinned") {
+            launchOperation(
+                if (action.isFavorite) strings.resolve(R.string.message_pass_pinned)
+                else strings.resolve(R.string.message_pass_unpinned),
+            ) {
                 passRepository.setPinned(action.id, action.isFavorite)
             }
             true
         }
         is AppAction.SetPassPinned -> {
-            launchOperation(if (action.isPinned) "Pass pinned" else "Pass unpinned") {
+            launchOperation(
+                if (action.isPinned) strings.resolve(R.string.message_pass_pinned)
+                else strings.resolve(R.string.message_pass_unpinned),
+            ) {
                 passRepository.setPinned(action.id, action.isPinned)
             }
             true
         }
         is AppAction.SetPassTags -> {
-            launchOperation("Tags updated") { passRepository.setTags(action.id, action.tagIds) }
+            launchOperation(strings.resolve(R.string.message_tags_updated)) { passRepository.setTags(action.id, action.tagIds) }
             true
         }
         is AppAction.SetPassArchived -> {
-            launchOperation(if (action.announce) if (action.isArchived) "Pass archived" else "Pass restored" else null) {
+            launchOperation(
+                if (action.announce) {
+                    if (action.isArchived) strings.resolve(R.string.message_pass_archived)
+                    else strings.resolve(R.string.message_pass_restored)
+                } else {
+                    null
+                },
+            ) {
                 passRepository.setArchived(action.id, action.isArchived)
             }
             true
         }
         is AppAction.SetPreferredArtwork -> {
-            launchOperation("Pass image updated") {
+            launchOperation(strings.resolve(R.string.message_pass_image_updated)) {
                 passRepository.setPreferredArtwork(action.id, action.kind)
             }
             true
@@ -569,7 +585,7 @@ class MainViewModel(
             busy.value = true
             runCatching { block() }
                 .onSuccess { if (successMessage != null) message.value = successMessage }
-                .onFailure { message.value = it.message ?: "Operation failed" }
+                .onFailure { message.value = it.message ?: strings.resolve(R.string.message_operation_failed) }
             busy.value = false
         }
     }
@@ -639,7 +655,7 @@ private fun PassDraft.toTimeSpan(): PassTimeSpanSnapshot? {
 }
 
 private fun PassDraft.toPassUpdate(): PassUpdate {
-    org.ligi.passandroid.ui.compose.validatePassDraft(this)?.let(::error)
+    org.ligi.passandroid.ui.compose.validatePassDraft(this)?.let { error("Invalid pass draft: ${it.name}") }
     return PassUpdate(
     description = description,
     creator = creator,

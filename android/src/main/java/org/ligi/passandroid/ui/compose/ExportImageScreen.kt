@@ -223,9 +223,10 @@ private fun ContentChip(label: String, selected: Boolean, onToggle: () -> Unit) 
     )
 }
 
+@Composable
 private fun aspectRatioLabel(ratio: PassImageAspectRatio, orientation: PassImageOrientation): String {
     if (ratio == PassImageAspectRatio.A4) return "A4"
-    if (ratio.ratioWidth == 0f) return "Auto"
+    if (ratio.ratioWidth == 0f) return stringResource(R.string.export_auto)
     val (width, height) = if (orientation == PassImageOrientation.LANDSCAPE) {
         ratio.ratioHeight to ratio.ratioWidth
     } else {
