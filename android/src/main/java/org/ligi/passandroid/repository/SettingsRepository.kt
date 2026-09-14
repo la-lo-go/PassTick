@@ -18,6 +18,22 @@ import org.ligi.passandroid.reminder.NotificationAction
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+enum class AccentPalette {
+    DYNAMIC,
+    BLUE,
+    INDIGO,
+    PURPLE,
+    PINK,
+    RED,
+    ORANGE,
+    AMBER,
+    YELLOW,
+    GREEN,
+    TEAL,
+    CYAN,
+    BROWN,
+}
+
 enum class PassCategoryRole { INBOX, FAVORITES, ARCHIVE, PAST, TRASH, CUSTOM }
 
 enum class PassDetailSection {
@@ -109,6 +125,7 @@ val defaultPassCategories = builtInPassCategories + recommendedPassTags
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val amoledBlackBackground: Boolean = false,
+    val accentPalette: AccentPalette = AccentPalette.DYNAMIC,
     val automaticBrightness: Boolean = true,
     val sortOrder: PassSortOrder = PassSortOrder.DATE_DESC,
     val passOrder: List<String> = emptyList(),
@@ -150,8 +167,9 @@ data class AppSettings(
 interface SettingsRepository {
     val settings: Flow<AppSettings>
 
-    suspend fun setThemeMode(value: ThemeMode)
+        suspend fun setThemeMode(value: ThemeMode)
     suspend fun setAmoledBlackBackground(value: Boolean)
+    suspend fun setAccentPalette(value: AccentPalette)
     suspend fun setAutomaticBrightness(value: Boolean)
     suspend fun setSortOrder(value: PassSortOrder)
     suspend fun setPassOrder(value: List<String>)
@@ -193,6 +211,9 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 if (value == "AMOLED") ThemeMode.DARK else runCatching { ThemeMode.valueOf(value) }.getOrNull()
             } ?: ThemeMode.SYSTEM,
             amoledBlackBackground = preferences[AMOLED_BLACK_BACKGROUND] ?: (preferences[THEME] == "AMOLED"),
+            accentPalette = preferences[ACCENT]?.let { value ->
+                runCatching { AccentPalette.valueOf(value) }.getOrNull()
+            } ?: AccentPalette.DYNAMIC,
             automaticBrightness = preferences[AUTOMATIC_BRIGHTNESS] ?: true,
             sortOrder = preferences[SORT]?.let { runCatching { PassSortOrder.valueOf(it) }.getOrNull() }
                 ?: PassSortOrder.DATE_DESC,
@@ -249,13 +270,21 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     }
 
     override suspend fun setThemeMode(value: ThemeMode) {
-        StartupAppearanceStore.write(context, value, StartupAppearanceStore.read(context).amoledBlackBackground)
+        val current = StartupAppearanceStore.read(context)
+        StartupAppearanceStore.write(context, value, current.amoledBlackBackground, current.accentPalette)
         update(THEME, value.name)
     }
 
     override suspend fun setAmoledBlackBackground(value: Boolean) {
-        StartupAppearanceStore.write(context, StartupAppearanceStore.read(context).themeMode, value)
+        val current = StartupAppearanceStore.read(context)
+        StartupAppearanceStore.write(context, current.themeMode, value, current.accentPalette)
         update(AMOLED_BLACK_BACKGROUND, value)
+    }
+
+    override suspend fun setAccentPalette(value: AccentPalette) {
+        val current = StartupAppearanceStore.read(context)
+        StartupAppearanceStore.write(context, current.themeMode, current.amoledBlackBackground, value)
+        update(ACCENT, value.name)
     }
     override suspend fun setAutomaticBrightness(value: Boolean) = update(AUTOMATIC_BRIGHTNESS, value)
     override suspend fun setSortOrder(value: PassSortOrder) = update(SORT, value.name)
@@ -359,6 +388,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
 
     private companion object {
         val THEME = stringPreferencesKey("theme")
+        val ACCENT = stringPreferencesKey("accent_palette")
         val AMOLED_BLACK_BACKGROUND = booleanPreferencesKey("amoled_black_background")
         val AUTOMATIC_BRIGHTNESS = booleanPreferencesKey("automatic_brightness")
         val SORT = stringPreferencesKey("sort_order")
