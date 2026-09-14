@@ -275,6 +275,7 @@
     <string name="message_pass_moved">Pass moved</string>
     <string name="message_category_deleted">Category deleted</string>
     <string name="message_tags_updated">Tags updated</string>
+    <string name="message_notes_updated">Note updated</string>
     <string name="message_pass_image_updated">Pass image updated</string>
     <string name="message_pass_protected">Pass protected</string>
     <string name="message_protection_removed">Protection removed</string>

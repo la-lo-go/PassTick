@@ -72,6 +72,7 @@ data class PassSnapshot(
     val isArchived: Boolean = false,
     val preferredArtworkKind: PassArtworkKind? = null,
     val trashedAtEpochMillis: Long? = null,
+    val notes: String = "",
 ) {
     val isPinned: Boolean get() = isFavorite
     val isTrashed: Boolean get() = trashedAtEpochMillis != null
@@ -109,6 +110,8 @@ interface PassRepository {
     suspend fun setPinned(id: String, isPinned: Boolean) = setFavorite(id, isPinned)
 
     suspend fun setTags(id: String, tagIds: Set<String>)
+
+    suspend fun setNotes(id: String, notes: String)
 
     suspend fun setArchived(id: String, isArchived: Boolean)
 
@@ -222,6 +225,12 @@ class FilePassRepository(
     override suspend fun setTags(id: String, tagIds: Set<String>) = withContext(ioDispatcher) {
         checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
         metadataStore.setTags(id, tagIds)
+        passStore.notifyChange()
+    }
+
+    override suspend fun setNotes(id: String, notes: String) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        metadataStore.setNotes(id, notes)
         passStore.notifyChange()
     }
 
@@ -368,6 +377,7 @@ class FilePassRepository(
             metadataStore.isArchived(pass.id),
             metadataStore.preferredArtwork(pass.id),
             trashedAt,
+            metadataStore.notes(pass.id),
         )
     }
 
@@ -383,6 +393,7 @@ private fun Pass.toSnapshot(
     isArchived: Boolean = false,
     preferredArtworkKind: PassArtworkKind? = null,
     trashedAtEpochMillis: Long? = null,
+    notes: String = "",
 ) = PassSnapshot(
     id = id,
     description = description.orEmpty(),
@@ -408,6 +419,7 @@ private fun Pass.toSnapshot(
     isArchived = isArchived,
     preferredArtworkKind = preferredArtworkKind,
     trashedAtEpochMillis = trashedAtEpochMillis,
+    notes = notes,
 )
 
 internal fun bestArtworkFile(path: File, kind: PassArtworkKind): File? {

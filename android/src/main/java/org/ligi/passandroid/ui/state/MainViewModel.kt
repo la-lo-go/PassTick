@@ -601,6 +601,10 @@ class MainViewModel(
             launchOperation(strings.resolve(R.string.message_tags_updated)) { passRepository.setTags(action.id, action.tagIds) }
             true
         }
+        is AppAction.SetPassNotes -> {
+            launchOperation(strings.resolve(R.string.message_notes_updated)) { passRepository.setNotes(action.id, action.text) }
+            true
+        }
         is AppAction.SetPassArchived -> {
             launchOperation(
                 if (action.announce) {

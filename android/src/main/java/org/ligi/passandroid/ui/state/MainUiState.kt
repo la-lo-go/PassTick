@@ -54,6 +54,7 @@ data class PassUiModel(
     val isArchived: Boolean = false,
     val preferredArtworkKind: PassArtworkKind? = null,
     val trashedAtEpochMillis: Long? = null,
+    val notes: String = "",
 ) {
     val isPinned: Boolean get() = isFavorite
 
@@ -89,6 +90,7 @@ data class PassUiModel(
             isArchived = pass.isArchived,
             preferredArtworkKind = pass.preferredArtworkKind,
             trashedAtEpochMillis = pass.trashedAtEpochMillis,
+            notes = pass.notes,
         )
     }
 
@@ -169,6 +171,7 @@ sealed interface AppAction {
     data class SetPassFavorite(val id: String, val isFavorite: Boolean) : AppAction
     data class SetPassPinned(val id: String, val isPinned: Boolean) : AppAction
     data class SetPassTags(val id: String, val tagIds: Set<String>) : AppAction
+    data class SetPassNotes(val id: String, val text: String) : AppAction
     data class SetPassArchived(val id: String, val isArchived: Boolean, val announce: Boolean = true) : AppAction
     data class SetPreferredArtwork(val id: String, val kind: PassArtworkKind?) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction

@@ -214,6 +214,24 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `updates notes in the visible model and trims blank text away`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.SetPassNotes("pass-1", "  Gate opened at 6  "))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.passes.single().notes).isEqualTo("Gate opened at 6")
+
+        viewModel.onAction(AppAction.SetPassNotes("pass-1", "   "))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.passes.single().notes).isEmpty()
+    }
+
+    @Test
     fun `silent archive does not publish a second message`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
@@ -508,6 +526,9 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     }
     override suspend fun setTags(id: String, tagIds: Set<String>) {
         passes.value = passes.value.map { if (it.id == id) it.copy(tagIds = tagIds) else it }
+    }
+    override suspend fun setNotes(id: String, notes: String) {
+        passes.value = passes.value.map { if (it.id == id) it.copy(notes = notes.trim()) else it }
     }
     override suspend fun setArchived(id: String, isArchived: Boolean) {
         passes.value = passes.value.map { if (it.id == id) it.copy(isArchived = isArchived) else it }
