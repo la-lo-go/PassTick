@@ -26,6 +26,7 @@ enum class PassDetailSection {
     FIELDS,
     LOCATIONS,
     CALENDAR,
+    NOTES,
 }
 
 enum class HomeCardSection {

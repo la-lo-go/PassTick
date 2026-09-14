@@ -136,6 +136,7 @@ private fun PassDetailSection.displayName() = when (this) {
     PassDetailSection.FIELDS -> stringResource(R.string.layout_pass_details)
     PassDetailSection.LOCATIONS -> stringResource(R.string.edit_pass_locations)
     PassDetailSection.CALENDAR -> stringResource(R.string.pass_detail_date_and_time)
+    PassDetailSection.NOTES -> stringResource(R.string.layout_notes)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -314,5 +315,6 @@ private fun layoutPreviewPass(): PassUiModel {
         ),
         calendarTimeSpan = PassTimeSpanUiModel(from = start, to = end),
         tagIds = setOf(SAMPLE_PREVIEW_TAG_ID),
+        notes = "Boarding closes 30 minutes before departure",
     )
 }

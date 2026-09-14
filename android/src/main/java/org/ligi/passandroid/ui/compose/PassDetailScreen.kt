@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Share
@@ -519,6 +520,15 @@ internal fun PassDetailSectionList(
                                 ),
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             ) { Text(stringResource(R.string.pass_detail_date_and_time)) }
+                        }
+                    }
+                    PassDetailSection.NOTES -> if (pass.notes.isNotBlank()) {
+                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                            ListItem(
+                                leadingContent = { Icon(Icons.Default.EditNote, null) },
+                                supportingContent = { Text(pass.notes) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            ) { Text(stringResource(R.string.pass_detail_note)) }
                         }
                     }
                 }

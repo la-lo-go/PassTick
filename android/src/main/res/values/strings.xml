@@ -40,6 +40,7 @@
     <string name="pass_detail_protected_pass">Protected pass</string>
     <string name="pass_detail_open_in_maps">Open in Maps</string>
     <string name="pass_detail_date_and_time">Date and time</string>
+    <string name="pass_detail_note">Note</string>
     <string name="pass_detail_no_barcode">No barcode</string>
     <string name="pass_detail_back">Back</string>
     <string name="pass_detail_pass_actions">Pass actions</string>
@@ -222,6 +223,7 @@
     <string name="layout_primary_field">Primary field</string>
     <string name="layout_tag">Tag</string>
     <string name="layout_pass_type">Pass type</string>
+    <string name="layout_notes">Notes</string>
     <string name="layout_move_section_up">Move %1$s up</string>
     <string name="layout_move_section_down">Move %1$s down</string>
     <string name="settings_minutes_15">15 minutes</string>
