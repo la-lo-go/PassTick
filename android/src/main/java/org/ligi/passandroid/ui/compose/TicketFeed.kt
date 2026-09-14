@@ -22,6 +22,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -72,7 +73,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -82,8 +82,10 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
@@ -946,8 +948,6 @@ private fun homeCardLineStyle(lineIndex: Int) = when (lineIndex) {
 
 private fun homeCardLineWeight(lineIndex: Int): FontWeight? = if (lineIndex == 0) FontWeight.SemiBold else null
 
-private enum class CardMetadataSlot { Full, Compact }
-
 @Composable
 private fun CardMetadataRow(
     typeLabel: String?,
@@ -956,36 +956,46 @@ private fun CardMetadataRow(
     typeWeight: FontWeight?,
     modifier: Modifier = Modifier,
 ) {
-    SubcomposeLayout(modifier) { constraints ->
-        val looseConstraints = constraints.copy(minWidth = 0, minHeight = 0)
-        val fullPlaceables = subcompose(CardMetadataSlot.Full) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                typeLabel?.let { Text(it, style = typeStyle, fontWeight = typeWeight) }
+    BoxWithConstraints(modifier) {
+        val measurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val typeLabelStyle = typeStyle.copy(fontWeight = typeWeight ?: typeStyle.fontWeight)
+        val itemGap = 8.dp
+        val compactGap = 6.dp
+        val dotSize = 10.dp
+        val badgePadding = 8.dp
+        val badgeInnerGap = 6.dp
+        val safetyMargin = 4.dp
+        val fullWidth = with(density) {
+            val children = (if (typeLabel != null) 1 else 0) + tags.size
+            var width = itemGap.toPx() * (children - 1).coerceAtLeast(0)
+            if (typeLabel != null) {
+                width += measurer.measure(AnnotatedString(typeLabel), style = typeLabelStyle, maxLines = 1, softWrap = false).size.width
+            }
+            tags.forEach { tag ->
+                val nameWidth = measurer.measure(AnnotatedString(tag.name), style = MaterialTheme.typography.labelSmall, maxLines = 1, softWrap = false).size.width
+                width += badgePadding.toPx() * 2 + dotSize.toPx() + badgeInnerGap.toPx() + nameWidth
+            }
+            width
+        }
+        val compact = with(density) { fullWidth + safetyMargin.toPx() } > with(density) { maxWidth.toPx() }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(if (compact) compactGap else itemGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            typeLabel?.let { Text(it, style = typeStyle, fontWeight = typeWeight) }
+            if (compact) {
+                tags.take(MAX_CARD_TAG_DOTS).forEach { CategoryDot(it.colorArgb) }
+                if (tags.size > MAX_CARD_TAG_DOTS) {
+                    Text(
+                        "+${tags.size - MAX_CARD_TAG_DOTS}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
                 tags.forEach { CategoryBadge(it) }
             }
-        }.map { it.measure(looseConstraints) }
-        val fullWidth = fullPlaceables.maxOfOrNull { it.width } ?: 0
-        val placeables = if (fullWidth <= constraints.maxWidth) {
-            fullPlaceables
-        } else {
-            subcompose(CardMetadataSlot.Compact) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    typeLabel?.let { Text(it, style = typeStyle, fontWeight = typeWeight) }
-                    tags.take(MAX_CARD_TAG_DOTS).forEach { CategoryDot(it.colorArgb) }
-                    if (tags.size > MAX_CARD_TAG_DOTS) {
-                        Text(
-                            "+${tags.size - MAX_CARD_TAG_DOTS}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }.map { it.measure(looseConstraints) }
-        }
-        val width = placeables.maxOfOrNull { it.width }?.coerceAtMost(constraints.maxWidth) ?: 0
-        val height = placeables.maxOfOrNull { it.height } ?: 0
-        layout(width, height) {
-            placeables.forEach { it.placeRelative(0, 0) }
         }
     }
 }
@@ -1068,7 +1078,7 @@ private fun CategoryBadge(category: PassCategory) {
         Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             CategoryDot(category.colorArgb)
             Spacer(Modifier.size(6.dp))
-            Text(category.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(category.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
         }
     }
 }

@@ -18,6 +18,10 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.then
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -33,6 +37,8 @@ import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.defaultPassCategories
 import org.ligi.passandroid.repository.HomeCardSection
+import org.ligi.passandroid.repository.PassCategory
+import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.model.pass.PassType
@@ -573,6 +579,51 @@ class PassScreensTest {
         composeRule.onNodeWithText("Example issuer • Boarding").assertDoesNotExist()
         composeRule.onNodeWithText("Example issuer").assertIsDisplayed()
         composeRule.onNodeWithText("Boarding").assertIsDisplayed()
+    }
+
+    @Test
+    fun homeCardShowsTagNamesWhenTheyFit() {
+        val tags = listOf(
+            PassCategory("alpha", "Alpha", 0xFF1565C0, PassCategoryRole.CUSTOM),
+            PassCategory("beta", "Beta", 0xFF7B1FA2, PassCategoryRole.CUSTOM),
+        )
+        val taggedPass = pass("one", "Boarding pass", PassType.BOARDING).copy(tagIds = setOf("alpha", "beta"))
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassHomeScreen(
+                    MainUiState(passes = listOf(taggedPass), categories = defaultPassCategories + tags, isContentLoading = false),
+                    {},
+                )
+            }
+        }
+
+        composeRule.onNode(hasText("Alpha") and hasAnyAncestor(hasTestTag("pass_card_one"))).assertIsDisplayed()
+        composeRule.onNode(hasText("Beta") and hasAnyAncestor(hasTestTag("pass_card_one"))).assertIsDisplayed()
+    }
+
+    @Test
+    fun homeCardUsesTagDotsWhenNamesOverflow() {
+        val simpleTag = PassCategory("simple", "Simple", 0xFF006C4C, PassCategoryRole.CUSTOM)
+        val manyTags = (1..12).map { index ->
+            PassCategory("tag$index", "Very long tag name number $index", 0xFF1565C0 + index, PassCategoryRole.CUSTOM)
+        }
+        val state = MainUiState(
+            passes = listOf(
+                pass("one", "Simple pass", PassType.BOARDING).copy(tagIds = setOf(simpleTag.id)),
+                pass("two", "Tagged pass", PassType.BOARDING).copy(tagIds = manyTags.mapTo(mutableSetOf(), PassCategory::id)),
+            ),
+            categories = defaultPassCategories + manyTags + simpleTag,
+            isContentLoading = false,
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
+        }
+
+        composeRule.onNode(hasText("Very long tag name number 1") and hasAnyAncestor(hasTestTag("pass_card_two"))).assertDoesNotExist()
+        composeRule.onNode(hasText("+6") and hasAnyAncestor(hasTestTag("pass_card_two"))).assertIsDisplayed()
+        val simpleHeight = composeRule.onNodeWithTag("pass_card_one").fetchSemanticsNode().size.height
+        val overflowHeight = composeRule.onNodeWithTag("pass_card_two").fetchSemanticsNode().size.height
+        assertThat(overflowHeight).isLessThan(simpleHeight * 2)
     }
 
     @Test
