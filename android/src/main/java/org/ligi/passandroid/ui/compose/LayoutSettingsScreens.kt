@@ -162,26 +162,6 @@ fun HomeCardLayoutSettingsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item {
-                Text(
-                    stringResource(R.string.layout_preview),
-                    Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            item {
-                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                    HomeCardBody(
-                        pass = remember { layoutPreviewPass() },
-                        hero = false,
-                        sectionOrder = order,
-                        hiddenSections = hidden,
-                        tagCategories = listOf(samplePreviewTag),
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
             item(key = "artwork") {
                 Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                     ListItem(
@@ -232,6 +212,27 @@ fun HomeCardLayoutSettingsScreen(
                     ) { Text(section.displayName()) }
                 }
             }
+            item {
+                Text(
+                    stringResource(R.string.layout_preview),
+                    Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            item {
+                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                    HomeCardBody(
+                        pass = remember { layoutPreviewPass() },
+                        hero = false,
+                        sectionOrder = order,
+                        hiddenSections = hidden,
+                        tagCategories = listOf(samplePreviewTag),
+                        modifier = Modifier.padding(16.dp),
+                        thumbnailFallback = { thumbModifier -> PreviewThumbnailArtwork(thumbModifier, PreviewAccentColor) },
+                    )
+                }
+            }
         }
     }
 }
@@ -269,6 +270,21 @@ private fun PreviewBannerArtwork(accentColor: Int) {
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(painterResource(R.drawable.ic_notification_pass), null, Modifier.size(56.dp))
+        }
+    }
+}
+
+@Composable
+private fun PreviewThumbnailArtwork(modifier: Modifier, accentColor: Int) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = Color(accentColor),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(painterResource(R.drawable.ic_notification_pass), null, Modifier.fillMaxSize(0.62f))
         }
     }
 }
