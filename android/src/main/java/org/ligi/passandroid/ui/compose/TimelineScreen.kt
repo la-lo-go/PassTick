@@ -18,6 +18,7 @@ import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -58,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import org.ligi.passandroid.domain.timeline.EventTemporalState
 import org.ligi.passandroid.domain.timeline.PassEvent
@@ -96,6 +99,15 @@ fun TimelineScreen(
     var viewMode by rememberSaveable { mutableStateOf(TimelineViewMode.List) }
     var selectedDayEpoch by rememberSaveable { mutableStateOf<Long?>(null) }
     var displayedMonthValue by rememberSaveable { mutableStateOf<Long?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val passCounts = remember(state.timeline) { state.timeline.days.associate { it.date to it.events.size } }
+    val nearestIndex = remember(state.timeline.days, state.timeline.nearestEventId) {
+        timelineItemIndex(state.timeline, state.timeline.nearestEventId)
+    }
+    LaunchedEffect(nearestIndex) {
+        nearestIndex?.let { listState.scrollToItem(it) }
+    }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -134,7 +146,7 @@ fun TimelineScreen(
             }
         } else {
             when (viewMode) {
-                TimelineViewMode.List -> TimelineContent(state, onAction, Modifier.padding(padding))
+                TimelineViewMode.List -> TimelineContent(state, onAction, listState, Modifier.padding(padding))
                 TimelineViewMode.Agenda -> {
                     val currentMonth = remember(state.timeline.zoneId) {
                         YearMonth.from(LocalDate.now(state.timeline.zoneId))
@@ -144,7 +156,15 @@ fun TimelineScreen(
                         selectedDay = selectedDayEpoch?.let(LocalDate::ofEpochDay),
                         displayedMonth = displayedMonthValue?.toYearMonth() ?: currentMonth,
                         onMonthChange = { month -> displayedMonthValue = month.year * 12L + month.monthValue },
-                        onDayClick = { date -> selectedDayEpoch = date.toEpochDay() },
+                        onDayClick = { date ->
+                            selectedDayEpoch = date.toEpochDay()
+                            if (passCounts.containsKey(date)) {
+                                viewMode = TimelineViewMode.List
+                                scope.launch {
+                                    timelineDayIndex(state.timeline, date)?.let { listState.scrollToItem(it) }
+                                }
+                            }
+                        },
                         modifier = Modifier.padding(padding).padding(16.dp),
                     )
                 }
@@ -173,18 +193,12 @@ private fun ToggleIconButton(
 private fun TimelineContent(
     state: TimelineUiState,
     onAction: (TimelineAction) -> Unit,
+    listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
     var openEventId by remember { mutableStateOf<String?>(null) }
     val locale = LocalConfiguration.current.locales[0]
     val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", locale) }
-    val nearestIndex = remember(state.timeline.days, state.timeline.nearestEventId) {
-        timelineItemIndex(state.timeline, state.timeline.nearestEventId)
-    }
-    LaunchedEffect(nearestIndex) {
-        nearestIndex?.let { listState.scrollToItem(it) }
-    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
