@@ -62,6 +62,106 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `trashing moves a pass out of the home list and into trash`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.TrashPass("pass-1"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.passes).isEmpty()
+        assertThat(viewModel.uiState.value.trashedPasses.single().id).isEqualTo("pass-1")
+        assertThat(viewModel.uiState.value.trashedPasses.single().trashedAtEpochMillis).isNotNull()
+        assertThat(repository.deletedIds).isEmpty()
+    }
+
+    @Test
+    fun `restoring from trash returns the pass to the home list`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.TrashPass("pass-1"))
+        viewModel.onAction(AppAction.RestoreFromTrash("pass-1"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.passes.single().id).isEqualTo("pass-1")
+        assertThat(viewModel.uiState.value.trashedPasses).isEmpty()
+    }
+
+    @Test
+    fun `emptying the trash deletes only trashed passes`() = runTest(dispatcher) {
+        val repository = FakePassRepository(
+            listOf(snapshot("pass-1", "Boarding pass"), snapshot("pass-2", "Coupon")),
+        )
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.TrashPass("pass-1"))
+        advanceUntilIdle()
+        viewModel.onAction(AppAction.EmptyTrash)
+        advanceUntilIdle()
+
+        assertThat(repository.deletedIds).containsExactly("pass-1")
+        assertThat(viewModel.uiState.value.passes.single().id).isEqualTo("pass-2")
+        assertThat(viewModel.uiState.value.trashedPasses).isEmpty()
+    }
+
+    @Test
+    fun `delete forever removes a trashed pass permanently`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.TrashPass("pass-1"))
+        advanceUntilIdle()
+        viewModel.onAction(AppAction.DeleteForever("pass-1"))
+        advanceUntilIdle()
+
+        assertThat(repository.deletedIds).containsExactly("pass-1")
+        assertThat(viewModel.uiState.value.trashedPasses).isEmpty()
+    }
+
+    @Test
+    fun `the widget publisher never receives trashed passes`() = runTest(dispatcher) {
+        val repository = FakePassRepository(
+            listOf(snapshot("pass-1", "Boarding pass"), snapshot("pass-2", "Coupon")),
+        )
+        val published = mutableListOf<List<PassSnapshot>>()
+        val viewModel = MainViewModel(
+            repository,
+            FakeSettingsRepository(),
+            FakePlatformActions(),
+            widgetPublisher = { passes, _, _ -> published += passes },
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.TrashPass("pass-1"))
+        advanceUntilIdle()
+
+        assertThat(published).isNotEmpty()
+        published.forEach { passes -> assertThat(passes.none { it.isTrashed }).isTrue() }
+    }
+
+    @Test
+    fun `startup purges expired trash with the configured retention`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        assertThat(repository.purgedRetentions).containsExactly(
+            org.ligi.passandroid.repository.TRASH_RETENTION.toMillis(),
+        )
+    }
+
+    @Test
     fun `pending deletion hides a pass and undo restores it before physical deletion`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())

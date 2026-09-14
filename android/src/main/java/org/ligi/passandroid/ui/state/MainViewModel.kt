@@ -24,6 +24,7 @@ import org.ligi.passandroid.repository.PassArtworkUpdate
 import org.ligi.passandroid.repository.PassLocationSnapshot
 import org.ligi.passandroid.repository.PassTimeSpanSnapshot
 import org.ligi.passandroid.repository.DEFAULT_PASS_CATEGORY_ID
+import org.ligi.passandroid.repository.TRASH_RETENTION
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.SettingsRepository
@@ -35,14 +36,14 @@ import org.ligi.passandroid.domain.timeline.buildPassTimeline
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.reminder.buildPassReminders
 import org.ligi.passandroid.reminder.PassReminderOverride
-import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
+import org.ligi.passandroid.widget.WidgetSnapshotPublisher
 
 class MainViewModel(
     private val passRepository: PassRepository,
     private val settingsRepository: SettingsRepository,
     private val platformActions: PlatformActions,
     private val reminderScheduler: ReminderScheduler = ReminderScheduler.None,
-    private val widgetPublisher: PassWidgetSnapshotPublisher? = null,
+    private val widgetPublisher: WidgetSnapshotPublisher? = null,
     private val strings: StringResolver = StringResolver { _, _ -> "" },
 ) : ViewModel() {
     private var reminderActionOverrides: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>>? = null
@@ -57,16 +58,31 @@ class MainViewModel(
     private val categoryMoves = Channel<AppAction.MovePass>(Channel.UNLIMITED)
     private val passes = passRepository.observePasses()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val trashedPasses = passRepository.observeTrashedPasses()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     private val visiblePasses = combine(passes, pendingDeletionIds) { currentPasses, pendingIds ->
         currentPasses.filterNot { it.id in pendingIds }
     }
+    private val visibleTrashedPasses = combine(trashedPasses, pendingDeletionIds) { currentTrashed, pendingIds ->
+        currentTrashed.filterNot { it.id in pendingIds }
+    }
+    private data class PassCollections(
+        val passes: List<PassSnapshot>,
+        val trashedPasses: List<PassSnapshot>,
+    )
+    private val passCollections = combine(visiblePasses, visibleTrashedPasses) { passes, trashed ->
+        PassCollections(passes, trashed)
+    }
 
-    val uiState = combine(visiblePasses, settingsRepository.settings, busy, message, selectedCategoryId) {
-            passes, settings, isBusy, currentMessage, requestedCategoryId ->
-        val categories = settings.categories.withLegacyCategories(passes)
-        val timeline = buildPassTimeline(passes, Instant.now(), ZoneId.systemDefault())
+    val uiState = combine(passCollections, settingsRepository.settings, busy, message, selectedCategoryId) {
+            collections, settings, isBusy, currentMessage, requestedCategoryId ->
+        val categories = settings.categories.withLegacyCategories(collections.passes)
+        val timeline = buildPassTimeline(collections.passes, Instant.now(), ZoneId.systemDefault())
         MainUiState(
-            passes = passes.sortedForDisplay(settings.sortOrder, settings.passOrder).map(PassUiModel::from),
+            passes = collections.passes.sortedForDisplay(settings.sortOrder, settings.passOrder).map(PassUiModel::from),
+            trashedPasses = collections.trashedPasses
+                .sortedByDescending { it.trashedAtEpochMillis ?: 0L }
+                .map(PassUiModel::from),
             settings = settings,
             isContentLoading = false,
             isBusy = isBusy,
@@ -77,6 +93,7 @@ class MainViewModel(
                     PROTECTED_PASSES_CATEGORY_ID,
                     PINNED_PASSES_CATEGORY_ID,
                     ARCHIVED_PASSES_CATEGORY_ID,
+                    TRASHED_PASSES_CATEGORY_ID,
                 ) || categories.any { it.id == requested }
             },
             timeline = timeline,
@@ -84,6 +101,10 @@ class MainViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     init {
+        // Trash has no background scheduler; expiry is enforced on every app open.
+        viewModelScope.launch {
+            runCatching { passRepository.purgeExpiredTrash(TRASH_RETENTION) }
+        }
         viewModelScope.launch {
             for (move in categoryMoves) {
                 runCatching { passRepository.moveToCategory(move.id, move.categoryId) }
@@ -121,7 +142,11 @@ class MainViewModel(
                         .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
                         .mapTo(mutableSetOf()) { it.id }
                     runCatching {
-                        widgetPublisher?.publish(currentPasses, widgetExcludedIds, settings.lockAllPasses)
+                        widgetPublisher?.publish(
+                            currentPasses.filterNot(PassSnapshot::isTrashed),
+                            widgetExcludedIds,
+                            settings.lockAllPasses,
+                        )
                     }
                 }
         }
@@ -218,13 +243,34 @@ class MainViewModel(
     }
 
     private fun handlePassMutationAction(action: AppAction): Boolean = when (action) {
-        is AppAction.DeletePass -> {
+        is AppAction.DeletePass, is AppAction.DeleteForever -> {
+            val id = when (action) {
+                is AppAction.DeletePass -> action.id
+                is AppAction.DeleteForever -> action.id
+                else -> error("Unreachable")
+            }
+            deletePass(id)
+            true
+        }
+        is AppAction.TrashPass -> {
             viewModelScope.launch {
                 busy.value = true
-                runCatching { check(passRepository.delete(action.id)) }
+                runCatching { passRepository.trashPass(action.id) }
                     .onFailure { message.value = it.message ?: strings.resolve(R.string.message_operation_failed) }
                 pendingDeletionIds.update { it - action.id }
                 busy.value = false
+            }
+            true
+        }
+        is AppAction.RestoreFromTrash -> {
+            launchOperation(strings.resolve(R.string.message_pass_restored)) {
+                passRepository.restoreFromTrash(action.id)
+            }
+            true
+        }
+        is AppAction.EmptyTrash -> {
+            launchOperation(null) {
+                passRepository.emptyTrash()
             }
             true
         }
@@ -248,6 +294,16 @@ class MainViewModel(
             true
         }
         else -> false
+    }
+
+    private fun deletePass(id: String) {
+        viewModelScope.launch {
+            busy.value = true
+            runCatching { check(passRepository.delete(id)) }
+                .onFailure { message.value = it.message ?: strings.resolve(R.string.message_operation_failed) }
+            pendingDeletionIds.update { it - id }
+            busy.value = false
+        }
     }
 
     private fun handleCategoryAction(action: AppAction): Boolean = when (action) {
@@ -368,6 +424,12 @@ class MainViewModel(
         is AppAction.SetBlockScreenshots -> {
             viewModelScope.launch {
                 settingsRepository.setBlockScreenshots(action.value)
+            }
+            true
+        }
+        is AppAction.SetTrashEnabled -> {
+            viewModelScope.launch {
+                settingsRepository.setTrashEnabled(action.value)
             }
             true
         }

@@ -6,15 +6,20 @@ import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.domain.timeline.normalizedTimeSpan
 import java.time.Clock
 
+/** Publishes a widget snapshot so ViewModels can stay independent from the Android widget code. */
+fun interface WidgetSnapshotPublisher {
+    suspend fun publish(passes: List<PassSnapshot>, excludedCategoryIds: Set<String>, lockAllPasses: Boolean)
+}
+
 class PassWidgetSnapshotPublisher(
     private val context: Context,
     private val store: PassWidgetSnapshotStore = PassWidgetSnapshotStore(context),
     private val clock: Clock = Clock.systemUTC(),
-) {
-    suspend fun publish(
+) : WidgetSnapshotPublisher {
+    override suspend fun publish(
         passes: List<PassSnapshot>,
         excludedCategoryIds: Set<String>,
-        lockAllPasses: Boolean = false,
+        lockAllPasses: Boolean,
     ) {
         val snapshot = PassWidgetSnapshot(
             passes = widgetPasses(passes, excludedCategoryIds, lockAllPasses),

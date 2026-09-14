@@ -53,6 +53,7 @@ data class PassUiModel(
     val tagIds: Set<String> = emptySet(),
     val isArchived: Boolean = false,
     val preferredArtworkKind: PassArtworkKind? = null,
+    val trashedAtEpochMillis: Long? = null,
 ) {
     val isPinned: Boolean get() = isFavorite
 
@@ -87,6 +88,7 @@ data class PassUiModel(
             tagIds = pass.tagIds,
             isArchived = pass.isArchived,
             preferredArtworkKind = pass.preferredArtworkKind,
+            trashedAtEpochMillis = pass.trashedAtEpochMillis,
         )
     }
 
@@ -133,9 +135,11 @@ data class PassDraft(
 const val PROTECTED_PASSES_CATEGORY_ID = "protected"
 const val PINNED_PASSES_CATEGORY_ID = "pinned"
 const val ARCHIVED_PASSES_CATEGORY_ID = "archived"
+const val TRASHED_PASSES_CATEGORY_ID = "trashed"
 
 data class MainUiState(
     val passes: List<PassUiModel> = emptyList(),
+    val trashedPasses: List<PassUiModel> = emptyList(),
     val settings: AppSettings = AppSettings(),
     val isContentLoading: Boolean = true,
     val isBusy: Boolean = false,
@@ -156,6 +160,10 @@ sealed interface AppAction {
     data class OpenLocation(val id: String, val locationIndex: Int) : AppAction
     data class OpenUrl(val url: String) : AppAction
     data class DeletePass(val id: String) : AppAction
+    data class TrashPass(val id: String) : AppAction
+    data class RestoreFromTrash(val id: String) : AppAction
+    data class DeleteForever(val id: String) : AppAction
+    data object EmptyTrash : AppAction
     data class SetPassPendingDeletion(val id: String, val pending: Boolean) : AppAction
     data class SetPassProtected(val id: String, val isProtected: Boolean) : AppAction
     data class SetPassFavorite(val id: String, val isFavorite: Boolean) : AppAction
@@ -187,6 +195,7 @@ sealed interface AppAction {
     data class SetBlurProtectedPassCards(val value: Boolean) : AppAction
     data class SetSeparateProtectedPasses(val value: Boolean) : AppAction
     data class SetBlockScreenshots(val value: Boolean) : AppAction
+    data class SetTrashEnabled(val value: Boolean) : AppAction
     data class SetImageExportOptions(val value: PassImageExportOptions) : AppAction
     data class MovePassDetailSection(val section: PassDetailSection, val offset: Int) : AppAction
     data class SetPassDetailSectionVisible(val section: PassDetailSection, val visible: Boolean) : AppAction
