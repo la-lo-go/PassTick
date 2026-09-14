@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
@@ -103,6 +104,14 @@ fun PassDetailLayoutSettingsScreen(
                 }
             }
             item {
+                Text(
+                    stringResource(R.string.layout_preview),
+                    Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            item {
                 PassDetailSectionList(
                     pass = remember { layoutPreviewPass() },
                     sectionOrder = order,
@@ -153,6 +162,14 @@ fun HomeCardLayoutSettingsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item {
+                Text(
+                    stringResource(R.string.layout_preview),
+                    Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
             item {
                 Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                     HomeCardBody(
