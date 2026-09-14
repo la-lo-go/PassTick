@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -71,7 +72,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -97,6 +100,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
@@ -104,11 +109,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import org.ligi.passandroid.model.comparator.PassSortOrder
+import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
+import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.displayArtwork
 import org.ligi.passandroid.ui.state.searchDocument
 import org.ligi.passandroid.ui.state.searchTerms
 import org.ligi.passandroid.ui.state.AppAction
@@ -124,6 +132,10 @@ sealed interface HomeAction {
     data class Archive(val id: String) : HomeAction
     data class Restore(val id: String) : HomeAction
     data class Delete(val id: String) : HomeAction
+    data class RestoreFromTrash(val id: String) : HomeAction
+    data class DeleteForever(val id: String) : HomeAction
+    data class SetTrashEnabled(val value: Boolean) : HomeAction
+    data object EmptyTrash : HomeAction
     data class ToggleFavorite(val id: String) : HomeAction
     data class ToggleProtected(val id: String) : HomeAction
     data class Undo(val operation: UndoOperation) : HomeAction
@@ -174,8 +186,13 @@ fun PassHomeScreen(
     var todayExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var pinnedExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var otherExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
-    val protectedPassIds = remember(state.passes, state.settings.lockAllPasses) {
-        state.passes.filter { state.settings.lockAllPasses || it.isProtected }.mapTo(mutableSetOf(), PassUiModel::id)
+    val protectedPassIds = remember(state.passes, state.trashedPasses, state.selectedCategoryId, state.settings.lockAllPasses) {
+        val source = if (state.selectedCategoryId == TRASHED_PASSES_CATEGORY_ID) {
+            state.passes + state.trashedPasses
+        } else {
+            state.passes
+        }
+        source.filter { state.settings.lockAllPasses || it.isProtected }.mapTo(mutableSetOf(), PassUiModel::id)
     }
     val previewPass = state.passes.firstOrNull { it.id == previewPassId }?.let { pass ->
         pass.copy(isProtected = pass.id in protectedPassIds && !protectedPassesUnlocked)
@@ -250,6 +267,9 @@ fun PassHomeScreen(
     val todayPasses = homeSections.today
     val pinnedPasses = homeSections.pinned
     val remainingPasses = homeSections.other
+    val trashSelected = state.selectedCategoryId == TRASHED_PASSES_CATEGORY_ID
+    var deleteForeverPassId by remember { mutableStateOf<String?>(null) }
+    var showEmptyTrashConfirm by remember { mutableStateOf(false) }
 
     BackHandler(enabled = searchExpanded) {
         if (searchHasFocus || !searchFocusClearedByBack) {
@@ -367,6 +387,18 @@ fun PassHomeScreen(
                             onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
                             modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
                         )
+                        if (state.trashedPasses.isNotEmpty()) {
+                            NavigationDrawerItem(
+                                label = { Text(stringResource(R.string.home_trash)) },
+                                selected = state.selectedCategoryId == TRASHED_PASSES_CATEGORY_ID,
+                                icon = { Icon(Icons.Default.Delete, null) },
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    onAction(HomeAction.SelectCategory(TRASHED_PASSES_CATEGORY_ID))
+                                },
+                                modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_trashed"),
+                            )
+                        }
                         if (visibleCategories.isNotEmpty()) {
                             Text(
                                 stringResource(R.string.category_tags),
@@ -431,7 +463,7 @@ fun PassHomeScreen(
                 contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (!state.isContentLoading && !searchExpanded) {
+                if (!state.isContentLoading && !searchExpanded && !trashSelected) {
                     item(key = "sort") {
                         HomeSortSelector(
                             selectedSort = state.settings.sortOrder,
@@ -446,6 +478,22 @@ fun PassHomeScreen(
                         }
                     }
                 }
+                if (trashSelected) {
+                    item(key = "trash") {
+                        TrashSection(
+                            passes = state.trashedPasses,
+                            trashEnabled = state.settings.trashEnabled,
+                            unlocked = protectedPassesUnlocked,
+                            protectedPassIds = protectedPassIds,
+                            blurProtectedPassCards = state.settings.blurProtectedPassCards,
+                            showLockIcon = state.settings.showProtectedPassLockIcon,
+                            onRestore = { onAction(HomeAction.RestoreFromTrash(it)) },
+                            onDeleteForever = { deleteForeverPassId = it },
+                            onEmptyTrash = { showEmptyTrashConfirm = true },
+                            onTrashEnabledChange = { onAction(HomeAction.SetTrashEnabled(it)) },
+                        )
+                    }
+                } else {
                 val hasNoVisiblePasses = visiblePasses.isEmpty() && !showLockedSection
                 val hiddenProtectedPassesExist = state.settings.separateProtectedPasses &&
                     state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID &&
@@ -570,6 +618,40 @@ fun PassHomeScreen(
                         )
                     }
                 }
+                }
+            }
+            if (deleteForeverPassId != null) {
+                AlertDialog(
+                    onDismissRequest = { deleteForeverPassId = null },
+                    title = { Text(stringResource(R.string.home_delete_forever_title)) },
+                    text = { Text(stringResource(R.string.home_delete_forever_message)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val passId = deleteForeverPassId
+                            deleteForeverPassId = null
+                            if (passId != null) onAction(HomeAction.DeleteForever(passId))
+                        }) { Text(stringResource(R.string.home_delete_forever)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deleteForeverPassId = null }) { Text(stringResource(R.string.pass_detail_cancel)) }
+                    },
+                )
+            }
+            if (showEmptyTrashConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showEmptyTrashConfirm = false },
+                    title = { Text(stringResource(R.string.home_empty_trash_title)) },
+                    text = { Text(stringResource(R.string.home_empty_trash_message)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showEmptyTrashConfirm = false
+                            onAction(HomeAction.EmptyTrash)
+                        }) { Text(stringResource(R.string.home_empty_trash)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showEmptyTrashConfirm = false }) { Text(stringResource(R.string.pass_detail_cancel)) }
+                    },
+                )
             }
             LargeFloatingActionButton(
                 onClick = { onAction(HomeAction.ImportPass) },
@@ -791,5 +873,156 @@ private fun EmptySearch(query: String) {
     ) {
         Text(stringResource(R.string.home_no_matching_passes), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.home_no_matches_for_query, query.trim()), style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun TrashSection(
+    passes: List<PassUiModel>,
+    trashEnabled: Boolean,
+    unlocked: Boolean,
+    protectedPassIds: Set<String>,
+    blurProtectedPassCards: Boolean,
+    showLockIcon: Boolean,
+    onRestore: (String) -> Unit,
+    onDeleteForever: (String) -> Unit,
+    onEmptyTrash: () -> Unit,
+    onTrashEnabledChange: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.home_trash), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    pluralStringResource(R.plurals.home_trash_pass_count, passes.size, passes.size),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (passes.isNotEmpty()) {
+                TextButton(onClick = onEmptyTrash) { Text(stringResource(R.string.home_empty_trash)) }
+            }
+        }
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(stringResource(R.string.settings_keep_deleted_passes_in_trash), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.settings_deleted_passes_wait_in_trash),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = trashEnabled, onCheckedChange = onTrashEnabledChange)
+            }
+        }
+        if (passes.isEmpty()) {
+            Text(
+                stringResource(R.string.home_trash_is_empty),
+                Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            passes.forEach { pass ->
+                TrashPassCard(
+                    pass = pass,
+                    locked = pass.id in protectedPassIds && !unlocked,
+                    blurProtectedPassCards = blurProtectedPassCards,
+                    showLockIcon = showLockIcon,
+                    onRestore = { onRestore(pass.id) },
+                    onDeleteForever = { onDeleteForever(pass.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrashPassCard(
+    pass: PassUiModel,
+    locked: Boolean,
+    blurProtectedPassCards: Boolean,
+    showLockIcon: Boolean,
+    onRestore: () -> Unit,
+    onDeleteForever: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val artwork = pass.displayArtwork(listOf(PassArtworkKind.ICON, PassArtworkKind.THUMBNAIL, PassArtworkKind.LOGO))
+            Row(
+                Modifier.weight(1f).softProtectedBlur(locked && blurProtectedPassCards),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                artwork?.let {
+                    AdaptivePassArtwork(
+                        bytes = it.bytes,
+                        kind = it.kind,
+                        accentColor = pass.accentColor,
+                        contentDescription = stringResource(R.string.pass_detail_pass_artwork),
+                        modifier = Modifier.size(32.dp),
+                        context = PassArtworkContext.HOME_THUMBNAIL,
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            pass.description,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (locked && showLockIcon) {
+                            Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Text(
+                        trashDeletedLabel(pass.trashedAtEpochMillis),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            IconButton(onClick = onRestore) {
+                Icon(Icons.Default.Restore, stringResource(R.string.home_restore), tint = MaterialTheme.colorScheme.primary)
+            }
+            IconButton(onClick = onDeleteForever) {
+                Icon(Icons.Default.Delete, stringResource(R.string.home_delete_forever), tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun trashDeletedLabel(trashedAtEpochMillis: Long?): String {
+    val days = trashedAtEpochMillis?.let { millis ->
+        java.util.concurrent.TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - millis)
+    } ?: 0L
+    return if (days <= 0L) {
+        stringResource(R.string.home_trash_deleted_today)
+    } else {
+        pluralStringResource(R.plurals.home_trash_deleted_days, days.toInt(), days.toInt())
     }
 }

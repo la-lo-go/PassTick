@@ -247,7 +247,6 @@ class MainViewModel(
             val id = when (action) {
                 is AppAction.DeletePass -> action.id
                 is AppAction.DeleteForever -> action.id
-                else -> error("Unreachable")
             }
             deletePass(id)
             true

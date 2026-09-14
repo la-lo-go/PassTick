@@ -90,6 +90,17 @@
     <string name="home_protected">Protected</string>
     <string name="home_pinned">Pinned</string>
     <string name="home_archived">Archived</string>
+    <string name="home_trash">Trash</string>
+    <string name="home_empty_trash">Empty trash</string>
+    <string name="home_trash_is_empty">Trash is empty</string>
+    <string name="home_trash_deleted_today">Deleted today</string>
+    <string name="home_delete_forever">Delete forever</string>
+    <string name="home_delete_forever_title">Delete this pass forever?</string>
+    <string name="home_delete_forever_message">The pass will be deleted permanently.</string>
+    <string name="home_empty_trash_title">Empty the trash?</string>
+    <string name="home_empty_trash_message">All passes in the trash will be deleted permanently.</string>
+    <string name="settings_keep_deleted_passes_in_trash">Keep deleted passes in the Trash</string>
+    <string name="settings_deleted_passes_wait_in_trash">Deleted passes wait in the Trash for at least 7 days</string>
     <string name="home_github_repo">Github Repo</string>
     <string name="home_protected_passes">Protected passes</string>
     <string name="home_unlock_protected_passes">Unlock protected passes</string>
@@ -228,6 +239,7 @@
     <string name="app_calendar_permission_required">Calendar permission is required for automatic events</string>
     <string name="app_calendar_auto_add_message">Dated passes will be added directly to your primary writable calendar after import. You can turn this off at any time.</string>
     <string name="app_pass_deleted">Pass deleted</string>
+    <string name="app_pass_moved_to_trash">Pass moved to Trash</string>
     <string name="app_allow_pass_reminders_in_settings">Allow pass reminders in Android notification settings</string>
     <string name="app_allow_exact_alarms_then_select_again">Allow exact alarms, then select this option again</string>
     <string name="app_allow_exact_alarms_then_enable_again">Allow exact alarms, then enable this option again</string>
@@ -284,5 +296,15 @@
     <plurals name="home_locked_passes">
         <item quantity="one">%1$d pass · Tap to unlock</item>
         <item quantity="other">%1$d passes · Tap to unlock</item>
+    </plurals>
+
+    <plurals name="home_trash_deleted_days">
+        <item quantity="one">Deleted %1$d day ago</item>
+        <item quantity="other">Deleted %1$d days ago</item>
+    </plurals>
+
+    <plurals name="home_trash_pass_count">
+        <item quantity="one">%1$d pass</item>
+        <item quantity="other">%1$d passes</item>
     </plurals>
 </resources>

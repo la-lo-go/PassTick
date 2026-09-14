@@ -118,6 +118,9 @@ fun PassTickApp(
         if (state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID) protectedSectionUnlocked = false
     }
     fun requiresProtection(pass: PassUiModel): Boolean = state.settings.lockAllPasses || pass.isProtected
+    val protectionSourcePasses = state.passes + state.trashedPasses.takeIf {
+        state.selectedCategoryId == org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
+    }.orEmpty()
     val protectedContentVisible = when (val destination = backStack.lastOrNull()) {
         is AppDestination.PassDetail -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
         is AppDestination.EditPass -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
@@ -243,6 +246,7 @@ fun PassTickApp(
     }
 
     fun requestDelete(passId: String) {
+        val trashEnabled = state.settings.trashEnabled
         viewModel.onAction(AppAction.SetPassPendingDeletion(passId, true))
         coroutineScope.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
@@ -251,7 +255,9 @@ fun PassTickApp(
                 snackbarHostState.currentSnackbarData?.dismiss()
             }
             val result = snackbarHostState.showSnackbar(
-                            message = activity.getString(R.string.app_pass_deleted),
+                            message = activity.getString(
+                                if (trashEnabled) R.string.app_pass_moved_to_trash else R.string.app_pass_deleted,
+                            ),
                             actionLabel = activity.getString(R.string.home_undo),
                 withDismissAction = false,
                 duration = SnackbarDuration.Indefinite,
@@ -260,7 +266,7 @@ fun PassTickApp(
             if (result == SnackbarResult.ActionPerformed) {
                 viewModel.onAction(AppAction.SetPassPendingDeletion(passId, false))
             } else {
-                viewModel.onAction(AppAction.DeletePass(passId))
+                viewModel.onAction(if (trashEnabled) AppAction.TrashPass(passId) else AppAction.DeletePass(passId))
             }
         }
     }
@@ -347,6 +353,10 @@ fun PassTickApp(
             is HomeAction.Delete -> {
                 requestDelete(action.id)
             }
+            is HomeAction.RestoreFromTrash -> viewModel.onAction(AppAction.RestoreFromTrash(action.id))
+            is HomeAction.DeleteForever -> viewModel.onAction(AppAction.DeleteForever(action.id))
+            is HomeAction.SetTrashEnabled -> viewModel.onAction(AppAction.SetTrashEnabled(action.value))
+            HomeAction.EmptyTrash -> viewModel.onAction(AppAction.EmptyTrash)
             is HomeAction.Undo -> viewModel.onAction(action.operation.toAppAction().copy(announce = false))
             HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
             HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
@@ -528,7 +538,7 @@ fun PassTickApp(
                     onOpenPass = { passId, replaceCurrent -> openPass(passId, replaceCurrent = replaceCurrent) },
                     onHomeAction = ::handleHomeAction,
                     onPassDetailAction = ::handlePassDetailAction,
-                    protectedPassIds = state.passes.filter(::requiresProtection).mapTo(mutableSetOf(), PassUiModel::id),
+                    protectedPassIds = protectionSourcePasses.filter(::requiresProtection).mapTo(mutableSetOf(), PassUiModel::id),
                     protectedPassesUnlocked = protectedPassesRevealed,
                     authenticatedPassIds = authenticatedPassIds,
                     passAuthenticator = passAuthenticator,
