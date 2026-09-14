@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import org.junit.Rule
 import org.junit.Test
 import org.ligi.passandroid.repository.AppSettings
@@ -189,6 +190,19 @@ class PassScreensTest {
         openDrawer()
         composeRule.onNodeWithText("Settings").assertIsDisplayed()
         pressBack()
+        composeRule.onNodeWithText("Settings").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun drawerClosesOnScrimTapAfterScrollingTheList() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
+        }
+
+        composeRule.onNodeWithTag("pass_card_one").performTouchInput { swipeUp() }
+        composeRule.onNodeWithContentDescription("Navigation menu").performClick()
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        composeRule.onRoot().performTouchInput { click(Offset(width - 24f, height / 2f)) }
         composeRule.onNodeWithText("Settings").assertIsNotDisplayed()
     }
 

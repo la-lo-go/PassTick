@@ -605,6 +605,9 @@ private fun TicketSwipeContainer(
                     do {
                         pressed = awaitPointerEvent().changes.any { it.pressed }
                     } while (pressed)
+                    if (revealState.currentValue == SwipeRevealAnchor.Closed && openSwipePassId.value == pass.id) {
+                        openSwipePassId.value = null
+                    }
                 }
             }.anchoredDraggable(
                 state = revealState,
@@ -863,7 +866,7 @@ internal fun HomeCardBody(
         if (HomeCardSection.ARTWORK !in hiddenSections) {
             PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             val typeLabel = pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase)
             var typeRendered = false
             var tagsRendered = false
@@ -913,13 +916,20 @@ internal fun HomeCardBody(
                             if (showType) typeRendered = true
                             if (visibleTags.isNotEmpty()) tagsRendered = true
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (showType) {
                                     Text(typeLabel, style = MaterialTheme.typography.labelMedium)
                                 }
-                                visibleTags.forEach { CategoryBadge(it) }
+                                visibleTags.take(MAX_CARD_TAG_DOTS).forEach { CategoryDot(it.colorArgb) }
+                                if (visibleTags.size > MAX_CARD_TAG_DOTS) {
+                                    Text(
+                                        "+${visibleTags.size - MAX_CARD_TAG_DOTS}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
@@ -998,19 +1008,10 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
 }
 
 @Composable
-private fun CategoryBadge(category: PassCategory) {
-    Surface(color = Color(category.colorArgb.toInt()).copy(alpha = 0.18f), shape = RoundedCornerShape(50)) {
-        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CategoryDot(category.colorArgb)
-            Spacer(Modifier.size(6.dp))
-            Text(category.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
-        }
-    }
-}
-
-@Composable
 private fun CategoryDot(colorArgb: Long) {
     Box(Modifier.size(10.dp).background(Color(colorArgb.toInt()), RoundedCornerShape(50)))
 }
+
+private const val MAX_CARD_TAG_DOTS = 6
 
 private const val FULL_SWIPE_COMMIT_FRACTION = 0.62f
