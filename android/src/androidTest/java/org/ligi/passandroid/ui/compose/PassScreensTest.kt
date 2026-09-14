@@ -1,10 +1,14 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.DarkMode
@@ -38,8 +42,10 @@ import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassArtworkUiModel
 import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.MainUiState
+import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.EditPassAction
+import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.theme.PassTheme
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -87,7 +93,7 @@ class PassScreensTest {
         composeRule.onNodeWithText("Protect the app").assertIsDisplayed()
         composeRule.onNodeWithText("Show a lock icon on protected passes").assertIsDisplayed()
         composeRule.onNodeWithText("Blur protected pass information").assertIsDisplayed()
-        composeRule.onNodeWithText("Keep protected passes in a locked section").assertIsDisplayed()
+        composeRule.onNodeWithText("Keep all protected passes in a locked section").assertIsDisplayed()
     }
 
     @Test
@@ -97,9 +103,106 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithTag("settings_list").performScrollToIndex(5)
-        composeRule.onNodeWithText("Exact reminders").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Exact reminder timing").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Notification actions").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Hide protected details").assertExists()
+        composeRule.onNodeWithText("Lock screen").assertDoesNotExist()
+    }
+
+    @Test
+    fun settingsAboutShowsBugReportAction() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = {}) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(6)
+        composeRule.onNodeWithText("Report a bug").assertIsDisplayed()
+    }
+
+    @Test
+    fun bugReportDialogOffersGitHubAndEmail() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(6)
+        composeRule.onNodeWithText("Report a bug").performClick()
+        composeRule.onNodeWithText("GitHub issue").assertIsDisplayed().performClick()
+
+        assertThat(actions).containsExactly(SettingsAction.OpenBugReportGitHub)
+    }
+
+    @Test
+    fun settingsScrollsToRemindersWhenRequested() {
+        var consumed = false
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                SettingsScreen(
+                    AppSettings(),
+                    scrollToNotifications = true,
+                    onNotificationScrollConsumed = { consumed = true },
+                    onAction = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Reminders").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 2_000) { consumed }
+    }
+
+    @Test
+    fun drawerClosesOnScrimTapAfterReopening() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
+        }
+
+        fun openDrawer() = composeRule.onNodeWithContentDescription("Navigation menu").performClick()
+        fun tapScrim() = composeRule.onRoot().performTouchInput {
+            click(Offset(width - 24f, height / 2f))
+        }
+
+        openDrawer()
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        tapScrim()
+        composeRule.onNodeWithText("Settings").assertIsNotDisplayed()
+
+        openDrawer()
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        tapScrim()
+        composeRule.onNodeWithText("Settings").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun drawerClosesOnBackAfterReopening() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
+        }
+
+        fun openDrawer() = composeRule.onNodeWithContentDescription("Navigation menu").performClick()
+        fun pressBack() = composeRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+
+        openDrawer()
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        pressBack()
+        composeRule.onNodeWithText("Settings").assertIsNotDisplayed()
+
+        openDrawer()
+        composeRule.onNodeWithText("Settings").assertIsDisplayed()
+        pressBack()
+        composeRule.onNodeWithText("Settings").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun eventAccessIsDisabledUntilRemindersAreEnabled() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(remindersEnabled = false), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(5)
+        composeRule.onNodeWithText("30 minutes").performScrollTo().assertIsNotEnabled().performClick()
+
+        assertThat(actions).isEmpty()
     }
 
     @Test
@@ -318,6 +421,7 @@ class PassScreensTest {
                     MainUiState(
                         passes = listOf(pass("one", "Boarding pass", PassType.BOARDING)),
                         settings = settings,
+                        selectedCategoryId = PROTECTED_PASSES_CATEGORY_ID,
                         isContentLoading = false,
                     ),
                     {},
@@ -326,9 +430,29 @@ class PassScreensTest {
             }
         }
 
-        composeRule.onNodeWithText("Protected passes").assertIsDisplayed()
         composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Protected pass information blurred").assertDoesNotExist()
+    }
+
+    @Test
+    fun separatedProtectedPassesStayOutOfAllAfterUnlock() {
+        val settings = AppSettings(lockAllPasses = true, separateProtectedPasses = true)
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassHomeScreen(
+                    MainUiState(
+                        passes = listOf(pass("one", "Boarding pass", PassType.BOARDING)),
+                        settings = settings,
+                        isContentLoading = false,
+                    ),
+                    {},
+                    protectedPassesUnlocked = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Boarding pass").assertDoesNotExist()
+        composeRule.onNodeWithText("Protected passes").assertDoesNotExist()
     }
 
     @Test
@@ -386,6 +510,55 @@ class PassScreensTest {
         }
 
         composeRule.onAllNodesWithContentDescription("Pass artwork").assertCountEquals(2)
+    }
+
+    @Test
+    fun creatorAndPassTypeShareALineWhenAdjacent() {
+        val state = sampleState().copy(
+            settings = AppSettings(
+                homeCardSectionOrder = listOf(
+                    HomeCardSection.ARTWORK,
+                    HomeCardSection.TITLE,
+                    HomeCardSection.CREATOR,
+                    HomeCardSection.PASS_TYPE,
+                    HomeCardSection.DATE,
+                    HomeCardSection.PRIMARY_FIELD,
+                    HomeCardSection.CATEGORY,
+                ),
+                hiddenHomeCardSections = emptySet(),
+            ),
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
+        }
+
+        composeRule.onNodeWithText("Example issuer • Boarding").assertIsDisplayed()
+    }
+
+    @Test
+    fun creatorAndPassTypeStaySeparateWhenAnotherSectionIsBetween() {
+        val state = sampleState().copy(
+            passes = listOf(pass("one", "Boarding pass", PassType.BOARDING)),
+            settings = AppSettings(
+                homeCardSectionOrder = listOf(
+                    HomeCardSection.ARTWORK,
+                    HomeCardSection.TITLE,
+                    HomeCardSection.CREATOR,
+                    HomeCardSection.DATE,
+                    HomeCardSection.PASS_TYPE,
+                    HomeCardSection.PRIMARY_FIELD,
+                    HomeCardSection.CATEGORY,
+                ),
+                hiddenHomeCardSections = emptySet(),
+            ),
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
+        }
+
+        composeRule.onNodeWithText("Example issuer • Boarding").assertDoesNotExist()
+        composeRule.onNodeWithText("Example issuer").assertIsDisplayed()
+        composeRule.onNodeWithText("Boarding").assertIsDisplayed()
     }
 
     @Test

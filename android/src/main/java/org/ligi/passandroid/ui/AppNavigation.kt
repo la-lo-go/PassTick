@@ -46,6 +46,8 @@ import org.ligi.passandroid.ui.compose.PassCustomizationScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
 import org.ligi.passandroid.ui.compose.PassHomeScreen
+import org.ligi.passandroid.ui.compose.BUG_REPORT_MAIL_URL
+import org.ligi.passandroid.ui.compose.BUG_REPORT_URL
 import org.ligi.passandroid.ui.compose.PRIVACY_POLICY_URL
 import org.ligi.passandroid.ui.compose.PROJECT_REPOSITORY_URL
 import org.ligi.passandroid.ui.compose.SettingsScreen
@@ -132,9 +134,10 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     detailPane = { selected ->
                         val pass = state.passes.firstOrNull { it.id == selected.passId }
                         val requiresUnlock = selected.passId in dependencies.protectedPassIds &&
-                            selected.passId !in dependencies.authenticatedPassIds
+                            selected.passId !in dependencies.authenticatedPassIds &&
+                            !dependencies.protectedPassesUnlocked
                         if (requiresUnlock) {
-                            LaunchedEffect(selected.passId) {
+                            LaunchedEffect(selected.passId, requiresUnlock) {
                                 if (!dependencies.passAuthenticator.canAuthenticate()) {
                                     dependencies.onBack()
                                     dependencies.snackbarHostState.showSnackbar(
@@ -248,7 +251,8 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
             entry<AppDestination.EditPass> { destination ->
                 val pass = state.passes.firstOrNull { it.id == destination.passId }
                 if (destination.passId in dependencies.protectedPassIds &&
-                    destination.passId !in dependencies.authenticatedPassIds
+                    destination.passId !in dependencies.authenticatedPassIds &&
+                    !dependencies.protectedPassesUnlocked
                 ) {
                     LaunchedEffect(destination.passId) {
                         dependencies.onBack()
@@ -413,6 +417,14 @@ private fun handleNavigationSettingsAction(
         dependencies.viewModel.onAction(AppAction.OpenUrl(PROJECT_REPOSITORY_URL))
         true
     }
+    SettingsAction.OpenBugReportGitHub -> {
+        dependencies.viewModel.onAction(AppAction.OpenUrl(BUG_REPORT_URL))
+        true
+    }
+    SettingsAction.OpenBugReportEmail -> {
+        dependencies.viewModel.onAction(AppAction.OpenUrl(BUG_REPORT_MAIL_URL))
+        true
+    }
     else -> false
 }
 
@@ -461,10 +473,6 @@ private fun handleDetailSettingsAction(
     }
     is SettingsAction.SetNotificationActionsEnabled -> {
         dependencies.viewModel.onAction(AppAction.SetNotificationActionsEnabled(action.value))
-        true
-    }
-    is SettingsAction.SetNotificationLockScreenDetail -> {
-        dependencies.viewModel.onAction(AppAction.SetNotificationLockScreenDetail(action.value))
         true
     }
     is SettingsAction.SetShowProtectedPassLockIcon -> {

@@ -4,7 +4,6 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
-import org.ligi.passandroid.reminder.NotificationLockScreenDetail
 import org.ligi.passandroid.navigation.PassDateField
 import org.ligi.passandroid.repository.PassImageExportOptions
 
@@ -72,7 +71,6 @@ sealed interface SettingsAction {
     data class SetNotificationAccessWindow(val minutes: Int) : SettingsAction
     data class SetNotificationExactTiming(val value: Boolean) : SettingsAction
     data class SetNotificationActionsEnabled(val value: Boolean) : SettingsAction
-    data class SetNotificationLockScreenDetail(val value: NotificationLockScreenDetail) : SettingsAction
     data class SetLockAllPasses(val value: Boolean) : SettingsAction
     data class SetShowProtectedPassLockIcon(val value: Boolean) : SettingsAction
     data class SetBlurProtectedPassCards(val value: Boolean) : SettingsAction
@@ -80,6 +78,8 @@ sealed interface SettingsAction {
     data class SetBlockScreenshots(val value: Boolean) : SettingsAction
     data object OpenPrivacyPolicy : SettingsAction
     data object OpenSourceCode : SettingsAction
+    data object OpenBugReportGitHub : SettingsAction
+    data object OpenBugReportEmail : SettingsAction
 }
 
 sealed interface PassDetailLayoutSettingsAction {

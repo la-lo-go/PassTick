@@ -395,12 +395,6 @@ fun PassDetailScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 136.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.STRIP }
-                    ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
-                    ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
-                val visibleFields = pass.fields.filterNot { field ->
-                    field.hidden || (pass.calendarEvent != null && field.value.containsDateAndTime())
-                }
                 if (pass.isProtected || allPassesProtected) item {
                     Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                         ListItem(
@@ -414,88 +408,121 @@ fun PassDetailScreen(
                         ) { Text(stringResource(R.string.pass_detail_protected_pass)) }
                     }
                 }
-                passDetailSectionOrder
-                    .filterNot(hiddenPassDetailSections::contains)
-                    .forEach { section ->
-                        when (section) {
-                            PassDetailSection.ARTWORK -> if (artwork != null) item {
-                                Box(Modifier.fillMaxWidth().height(160.dp)) {
-                                    PassArtwork(pass, listOf(artwork.kind), Modifier.fillMaxSize())
-                                }
-                            }
-                            PassDetailSection.BARCODE -> item {
-                                BarcodeCard(
-                                    pass = pass,
-                                    emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenPassDetailSections,
-                                    onHoldChanged = { codeHeld = it },
-                                    onPin = { codePinned = true },
-                                )
-                            }
-                            PassDetailSection.FIELDS -> if (visibleFields.isNotEmpty()) item {
-                                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                                    Column(Modifier.padding(vertical = 8.dp)) {
-                                        visibleFields.forEach { field ->
-                                            ListItem(
-                                                supportingContent = { Text(field.label) },
-                                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                            ) { Text(field.value) }
-                                        }
-                                    }
-                                }
-                            }
-                            PassDetailSection.LOCATIONS -> if (pass.locations.isNotEmpty()) item {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        pass.locations.forEachIndexed { index, location ->
-                                            val label = location.name?.takeIf(String::isNotBlank)
-                                                ?: "${location.latitude}, ${location.longitude}"
-                                            val locationShape = RoundedCornerShape(28.dp)
-                                            Surface(
-                                                modifier = Modifier.fillMaxWidth().clip(locationShape).clickable {
-                                                    onAction(PassDetailAction.OpenLocation(index))
-                                                },
-                                                shape = locationShape,
-                                                color = MaterialTheme.colorScheme.surfaceContainer,
-                                            ) {
-                                                ListItem(
-                                                    leadingContent = { Icon(Icons.Default.LocationOn, null) },
-                                                    supportingContent = { Text(stringResource(R.string.pass_detail_open_in_maps)) },
-                                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                                ) { Text(label) }
-                                            }
-                                        }
-                                }
-                            }
-                            PassDetailSection.CALENDAR -> pass.calendarEvent?.let {
-                                item {
-                                    Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                                        ListItem(
-                                            leadingContent = { Icon(Icons.Default.CalendarMonth, null) },
-                                            supportingContent = {
-                                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                    pass.calendarDateTimeLines().forEach { Text(it) }
-                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                        Text(if (calendarEventPresent) stringResource(R.string.pass_detail_already_in_calendar) else stringResource(R.string.pass_detail_add_to_calendar))
-                                                        if (calendarEventPresent) Icon(Icons.Default.Check, stringResource(R.string.pass_detail_in_calendar), Modifier.size(18.dp))
-                                                    }
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxWidth().combinedClickable(
-                                                enabled = true,
-                                                onClick = {
-                                                    if (!calendarEventPresent) onAction(PassDetailAction.AddToCalendar)
-                                                },
-                                                onLongClick = { editDateDialog = true },
-                                            ),
-                                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                        ) { Text(stringResource(R.string.pass_detail_date_and_time)) }
-                                    }
+                item {
+                    PassDetailSectionList(
+                        pass = pass,
+                        sectionOrder = passDetailSectionOrder,
+                        hiddenSections = hiddenPassDetailSections,
+                        calendarEventPresent = calendarEventPresent,
+                        onAction = onAction,
+                        onBarcodeHoldChanged = { codeHeld = it },
+                        onBarcodePin = { codePinned = true },
+                        onEditDateRequested = { editDateDialog = true },
+                    )
+                }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PassDetailSectionList(
+    pass: PassUiModel,
+    sectionOrder: List<PassDetailSection>,
+    hiddenSections: Set<PassDetailSection>,
+    calendarEventPresent: Boolean,
+    onAction: (PassDetailAction) -> Unit,
+    onBarcodeHoldChanged: (Boolean) -> Unit,
+    onBarcodePin: () -> Unit,
+    onEditDateRequested: () -> Unit,
+    modifier: Modifier = Modifier,
+    artworkFallback: (@Composable () -> Unit)? = null,
+) {
+    val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.STRIP }
+        ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
+        ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
+    val visibleFields = pass.fields.filterNot { field ->
+        field.hidden || (pass.calendarEvent != null && field.value.containsDateAndTime())
+    }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        sectionOrder
+            .filterNot(hiddenSections::contains)
+            .forEach { section ->
+                when (section) {
+                    PassDetailSection.ARTWORK -> if (artwork != null) {
+                        Box(Modifier.fillMaxWidth().height(160.dp)) {
+                            PassArtwork(pass, listOf(artwork.kind), Modifier.fillMaxSize())
+                        }
+                    } else artworkFallback?.let { fallback ->
+                        Box(Modifier.fillMaxWidth().height(160.dp)) { fallback() }
+                    }
+                    PassDetailSection.BARCODE -> BarcodeCard(
+                        pass = pass,
+                        emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenSections,
+                        onHoldChanged = onBarcodeHoldChanged,
+                        onPin = onBarcodePin,
+                    )
+                    PassDetailSection.FIELDS -> if (visibleFields.isNotEmpty()) {
+                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                            Column(Modifier.padding(vertical = 8.dp)) {
+                                visibleFields.forEach { field ->
+                                    ListItem(
+                                        supportingContent = { Text(field.label) },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    ) { Text(field.value) }
                                 }
                             }
                         }
                     }
+                    PassDetailSection.LOCATIONS -> if (pass.locations.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            pass.locations.forEachIndexed { index, location ->
+                                val label = location.name?.takeIf(String::isNotBlank)
+                                    ?: "${location.latitude}, ${location.longitude}"
+                                val locationShape = RoundedCornerShape(28.dp)
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().clip(locationShape).clickable {
+                                        onAction(PassDetailAction.OpenLocation(index))
+                                    },
+                                    shape = locationShape,
+                                    color = MaterialTheme.colorScheme.surfaceContainer,
+                                ) {
+                                    ListItem(
+                                        leadingContent = { Icon(Icons.Default.LocationOn, null) },
+                                        supportingContent = { Text(stringResource(R.string.pass_detail_open_in_maps)) },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    ) { Text(label) }
+                                }
+                            }
+                        }
+                    }
+                    PassDetailSection.CALENDAR -> pass.calendarEvent?.let {
+                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                            ListItem(
+                                leadingContent = { Icon(Icons.Default.CalendarMonth, null) },
+                                supportingContent = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        pass.calendarDateTimeLines().forEach { Text(it) }
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text(if (calendarEventPresent) stringResource(R.string.pass_detail_already_in_calendar) else stringResource(R.string.pass_detail_add_to_calendar))
+                                            if (calendarEventPresent) Icon(Icons.Default.Check, stringResource(R.string.pass_detail_in_calendar), Modifier.size(18.dp))
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().combinedClickable(
+                                    enabled = true,
+                                    onClick = {
+                                        if (!calendarEventPresent) onAction(PassDetailAction.AddToCalendar)
+                                    },
+                                    onLongClick = { onEditDateRequested() },
+                                ),
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            ) { Text(stringResource(R.string.pass_detail_date_and_time)) }
+                        }
+                    }
                 }
             }
-        }
     }
 }
 

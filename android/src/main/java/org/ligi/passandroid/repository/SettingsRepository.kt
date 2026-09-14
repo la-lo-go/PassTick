@@ -92,7 +92,15 @@ val recommendedPassTags = listOf(
     PassCategory("travel", "Travel", 0xFF1565C0, icon = "flight"),
     PassCategory("events", "Events", 0xFF7B1FA2, icon = "event"),
     PassCategory("loyalty", "Loyalty", 0xFFF57C00, icon = "star"),
-    PassCategory("work", "Work", 0xFF00796B, icon = "label"),
+    PassCategory("work", "Work", 0xFF00796B, icon = "work"),
+    PassCategory("food", "Food and drink", 0xFFD84315, icon = "food"),
+    PassCategory("shopping", "Shopping", 0xFFAD1457, icon = "shopping"),
+    PassCategory("sports", "Sports", 0xFF2E7D32, icon = "sports"),
+    PassCategory("entertainment", "Entertainment", 0xFF6A1B9A, icon = "movie"),
+    PassCategory("music", "Music", 0xFF4527A0, icon = "music"),
+    PassCategory("health", "Health", 0xFF00838F, icon = "health"),
+    PassCategory("education", "Education", 0xFF283593, icon = "school"),
+    PassCategory("transport", "Transport", 0xFF37474F, icon = "train"),
 )
 
 val defaultPassCategories = builtInPassCategories + recommendedPassTags

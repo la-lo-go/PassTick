@@ -459,12 +459,6 @@ class MainViewModel(
             }
             true
         }
-        is AppAction.SetNotificationLockScreenDetail -> {
-            viewModelScope.launch {
-                settingsRepository.setNotificationLockScreenDetail(action.value)
-            }
-            true
-        }
         else -> false
     }
 

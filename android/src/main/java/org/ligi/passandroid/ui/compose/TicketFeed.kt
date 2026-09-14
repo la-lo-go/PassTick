@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -105,6 +106,7 @@ import org.ligi.passandroid.ui.theme.PassActionButton
 import org.ligi.passandroid.ui.theme.PassActionButtonGap
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import org.ligi.passandroid.R
 
 @Composable
@@ -722,8 +724,13 @@ private fun TicketRow(
                 stringResource(R.string.home_open_pass_description, pass.description)
             }
             Box(Modifier.weight(1f)) {
-            Row(
-                Modifier.fillMaxWidth()
+            HomeCardBody(
+                pass = pass,
+                hero = hero,
+                sectionOrder = sectionOrder,
+                hiddenSections = hiddenSections,
+                tagCategories = tagCategories,
+                modifier = Modifier.fillMaxWidth()
                     .softProtectedBlur(contentBlurred)
                     .semantics(mergeDescendants = true) {
                         role = Role.Button
@@ -801,66 +808,7 @@ private fun TicketRow(
                             }
                         }
                 },
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-            if (HomeCardSection.ARTWORK !in hiddenSections) {
-                PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                var metadataShown = false
-                sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }.forEach { section ->
-                    when (section) {
-                        HomeCardSection.ARTWORK -> Unit
-                        HomeCardSection.TITLE -> {
-                            Text(
-                                pass.description,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()
-                            ?.takeUnless { hero && it == pass.todayStartTimeLabel() }
-                            ?.let {
-                            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let {
-                            Text(it, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        HomeCardSection.CATEGORY,
-                        HomeCardSection.PASS_TYPE,
-                        -> if (!metadataShown) {
-                            val showType = HomeCardSection.PASS_TYPE !in hiddenSections
-                            val visibleTags = if (HomeCardSection.CATEGORY !in hiddenSections) {
-                                tagCategories.filter { it.role == PassCategoryRole.CUSTOM && it.id in pass.tagIds }
-                            } else {
-                                emptyList()
-                            }
-                            if (showType || visibleTags.isNotEmpty()) {
-                                metadataShown = true
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    if (showType) {
-                                        Text(
-                                            pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase),
-                                            style = MaterialTheme.typography.labelMedium,
-                                        )
-                                    }
-                                    visibleTags.forEach { CategoryBadge(it) }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            }
+            )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
@@ -890,6 +838,93 @@ private fun TicketRow(
                 Icon(Icons.Default.Lock, stringResource(R.string.pass_detail_protected_pass), Modifier.padding(8.dp).size(18.dp))
             }
         }
+        }
+    }
+}
+
+@Composable
+internal fun HomeCardBody(
+    pass: PassUiModel,
+    hero: Boolean,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
+    tagCategories: List<PassCategory>,
+    modifier: Modifier = Modifier,
+) {
+    val visibleSections = sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }
+    val creatorTypeCombined = visibleSections.indexOf(HomeCardSection.CREATOR).let { creatorIndex ->
+        creatorIndex >= 0 && visibleSections.getOrNull(creatorIndex + 1) == HomeCardSection.PASS_TYPE && !pass.creator.isNullOrBlank()
+    }
+    Row(
+        modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        if (HomeCardSection.ARTWORK !in hiddenSections) {
+            PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val typeLabel = pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase)
+            var typeRendered = false
+            var tagsRendered = false
+            visibleSections.forEach { section ->
+                when (section) {
+                    HomeCardSection.ARTWORK -> Unit
+                    HomeCardSection.TITLE -> {
+                        Text(
+                            pass.description,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()
+                        ?.takeUnless { hero && it == pass.todayStartTimeLabel() }
+                        ?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let { creator ->
+                        if (creatorTypeCombined) {
+                            typeRendered = true
+                            Text(
+                                "$creator • $typeLabel",
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        } else {
+                            Text(creator, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    HomeCardSection.CATEGORY,
+                    HomeCardSection.PASS_TYPE,
+                    -> {
+                        val showType = HomeCardSection.PASS_TYPE in visibleSections && !typeRendered && !creatorTypeCombined
+                        val visibleTags = if (HomeCardSection.CATEGORY in visibleSections && !tagsRendered) {
+                            tagCategories.filter { it.role == PassCategoryRole.CUSTOM && it.id in pass.tagIds }
+                        } else {
+                            emptyList()
+                        }
+                        if (showType || visibleTags.isNotEmpty()) {
+                            if (showType) typeRendered = true
+                            if (visibleTags.isNotEmpty()) tagsRendered = true
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (showType) {
+                                    Text(typeLabel, style = MaterialTheme.typography.labelMedium)
+                                }
+                                visibleTags.forEach { CategoryBadge(it) }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -947,18 +982,16 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
             context = PassArtworkContext.HOME_THUMBNAIL,
         )
     } else {
+        val accent = Color(pass.accentColor)
         Surface(
             modifier = modifier.semantics { contentDescription = artworkDescription },
             shape = RoundedCornerShape(16),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.primary,
+            color = accent,
+            contentColor = if (accent.luminance() > 0.5f) Color.Black else Color.White,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = pass.homeCardInitial(),
-                    style = MaterialTheme.typography.titleLarge,
-                )
+                Icon(painterResource(R.drawable.ic_notification_pass), null, Modifier.fillMaxSize(0.62f))
             }
         }
     }

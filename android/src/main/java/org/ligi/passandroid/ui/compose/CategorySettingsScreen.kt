@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,11 +21,25 @@ import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FlightTakeoff
+import androidx.compose.material.icons.filled.Hotel
+import androidx.compose.material.icons.filled.LocalCafe
+import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Train
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -46,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -158,6 +175,7 @@ fun CategorySettingsScreen(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun CategoryEditorDialog(
     category: PassCategory,
     onDismiss: () -> Unit,
@@ -179,8 +197,12 @@ private fun CategoryEditorDialog(
                 OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.category_name)) }, singleLine = true)
                 ColorPickerField(stringResource(R.string.category_tag_color), color, { color = it }, Modifier.fillMaxWidth())
                 Text(stringResource(R.string.category_tag_icon), style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("label", "star", "event", "flight").forEach { option ->
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    maxItemsInEachRow = 6,
+                ) {
+                    categoryIconOptions.forEach { option ->
                         IconButton(onClick = { icon = option }) {
                             Icon(categoryIcon(option), option, tint = if (icon == option) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -200,9 +222,27 @@ private fun CategoryEditorDialog(
     )
 }
 
-internal fun categoryIcon(name: String) = when (name) {
-    "star" -> Icons.Default.Star
-    "event" -> Icons.Default.Event
-    "flight" -> Icons.Default.FlightTakeoff
-    else -> Icons.AutoMirrored.Filled.Label
-}
+private val categoryIcons = mapOf(
+    "label" to Icons.AutoMirrored.Filled.Label,
+    "star" to Icons.Default.Star,
+    "event" to Icons.Default.Event,
+    "flight" to Icons.Default.FlightTakeoff,
+    "food" to Icons.Default.Restaurant,
+    "shopping" to Icons.Default.ShoppingBag,
+    "sports" to Icons.Default.SportsSoccer,
+    "movie" to Icons.Default.Movie,
+    "music" to Icons.Default.MusicNote,
+    "hotel" to Icons.Default.Hotel,
+    "train" to Icons.Default.Train,
+    "car" to Icons.Default.DirectionsCar,
+    "parking" to Icons.Default.LocalParking,
+    "school" to Icons.Default.School,
+    "work" to Icons.Default.Work,
+    "coffee" to Icons.Default.LocalCafe,
+    "gift" to Icons.Default.CardGiftcard,
+    "health" to Icons.Default.MedicalServices,
+)
+
+internal val categoryIconOptions: List<String> = categoryIcons.keys.toList()
+
+internal fun categoryIcon(name: String): ImageVector = categoryIcons[name] ?: Icons.AutoMirrored.Filled.Label

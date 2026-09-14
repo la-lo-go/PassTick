@@ -8,15 +8,12 @@ class PassCategoryTest {
     fun `inbox and trash remain internal workflow states`() {
         val visible = defaultPassCategories.filter(PassCategory::isUserOrganized)
 
-        assertThat(visible.map(PassCategory::role)).containsExactly(
+        assertThat(visible.map(PassCategory::role).take(3)).containsExactly(
             PassCategoryRole.FAVORITES,
             PassCategoryRole.ARCHIVE,
             PassCategoryRole.PAST,
-            PassCategoryRole.CUSTOM,
-            PassCategoryRole.CUSTOM,
-            PassCategoryRole.CUSTOM,
-            PassCategoryRole.CUSTOM,
         )
+        assertThat(visible.drop(3).map(PassCategory::role)).allMatch { it == PassCategoryRole.CUSTOM }
         assertThat(defaultPassCategories.map(PassCategory::role)).contains(
             PassCategoryRole.INBOX,
             PassCategoryRole.TRASH,
@@ -39,7 +36,7 @@ class PassCategoryTest {
         )
 
         assertThat(firstRun.filter { it.role == PassCategoryRole.CUSTOM }.map(PassCategory::name))
-            .containsExactly("Travel", "Events", "Loyalty", "Work")
+            .containsExactlyElementsOf(recommendedPassTags.map(PassCategory::name))
         assertThat(afterDeletion).noneMatch { it.role == PassCategoryRole.CUSTOM }
     }
 }

@@ -174,7 +174,6 @@ fun PassHomeScreen(
     var todayExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var pinnedExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var otherExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
-    var protectedExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     val protectedPassIds = remember(state.passes, state.settings.lockAllPasses) {
         state.passes.filter { state.settings.lockAllPasses || it.isProtected }.mapTo(mutableSetOf(), PassUiModel::id)
     }
@@ -239,15 +238,6 @@ fun PassHomeScreen(
             val document = searchDocuments[pass.id].orEmpty()
             searchTerms.all(document::contains)
         }
-    }
-    val separatedProtectedPassesShown = state.settings.separateProtectedPasses &&
-        protectedPassesUnlocked && !searchExpanded
-    val separatedProtectedPasses = if (
-        separatedProtectedPassesShown && state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID
-    ) {
-        categoryPasses.filter { it.id in protectedPassIds }
-    } else {
-        emptyList()
     }
     val showLockedSection = state.settings.separateProtectedPasses &&
         !protectedPassesUnlocked && protectedPassIds.isNotEmpty() && !searchExpanded
@@ -320,11 +310,12 @@ fun PassHomeScreen(
             category.role == PassCategoryRole.CUSTOM && state.passes.any { category.id in it.tagIds }
         }
     }
+    BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = openSwipePassId.value == null && previewPass == null,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(modifier = Modifier.widthIn(max = 300.dp)) {
                 Column(Modifier.fillMaxSize()) {
                     NavigationDrawerItem(
                         label = { Text(stringResource(R.string.home_timeline)) },
@@ -453,9 +444,13 @@ fun PassHomeScreen(
                         }
                     }
                 }
-                val hasNoVisiblePasses = visiblePasses.isEmpty() && separatedProtectedPasses.isEmpty() &&
-                    !showLockedSection
-                if (hasNoVisiblePasses && !state.isContentLoading && !state.isBusy) {
+                val hasNoVisiblePasses = visiblePasses.isEmpty() && !showLockedSection
+                val hiddenProtectedPassesExist = state.settings.separateProtectedPasses &&
+                    state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID &&
+                    protectedPassIds.isNotEmpty()
+                val emptyStateAllowed = !hiddenProtectedPassesExist || searchExpanded
+                val emptyStateVisible = hasNoVisiblePasses && emptyStateAllowed
+                if (emptyStateVisible && !state.isContentLoading && !state.isBusy) {
                     item(key = "empty") {
                         if (searchTerms.isEmpty()) EmptyHome() else EmptySearch(searchQuery)
                     }
@@ -534,7 +529,7 @@ fun PassHomeScreen(
                 if (remainingPasses.isNotEmpty()) {
                     // The heading only labels the leftover group; without other sections it has no contrast.
                     val showOtherPassesHeading = todayPasses.isNotEmpty() || pinnedPasses.isNotEmpty() ||
-                        separatedProtectedPasses.isNotEmpty() || showLockedSection
+                        showLockedSection
                     if (showOtherPassesHeading) {
                         item(key = "passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
                     }
@@ -568,43 +563,6 @@ fun PassHomeScreen(
                             onProtectedPreviewRequested = {
                                 scope.launch { snackbarHostState.showSnackbar(unlockPreviewMessage) }
                             },
-                            openSwipePassId = openSwipePassId,
-                            tagCategories = state.categories,
-                        )
-                    }
-                }
-                if (separatedProtectedPasses.isNotEmpty()) {
-                    item(key = "protected-heading") {
-                        SectionHeading(stringResource(R.string.home_protected_passes), protectedExpanded) { protectedExpanded = !protectedExpanded }
-                    }
-                    if (protectedExpanded) item(key = "protected-feed") {
-                        TicketFeed(
-                            passes = separatedProtectedPasses,
-                            categories = state.categories,
-                            columns = if (expanded) 2 else 1,
-                            hero = false,
-                            sectionOrder = state.settings.homeCardSectionOrder,
-                            hiddenSections = state.settings.hiddenHomeCardSections,
-                            showProtectedPassLockIcon = state.settings.showProtectedPassLockIcon,
-                            blurProtectedPassCards = false,
-                            onOpen = { onAction(HomeAction.OpenPass(it)) },
-                            onArchive = { id, restoring, originalCategoryId ->
-                                if (restoring) {
-                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), passRestoredMessage)
-                                } else {
-                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), passArchivedMessage)
-                                }
-                            },
-                            onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
-                            onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
-                            onToggleProtected = { onAction(HomeAction.ToggleProtected(it)) },
-                            onReorder = { onAction(HomeAction.ReorderPass(it)) },
-                            onPreviewChanged = {
-                                previewPassId = it
-                                if (it == null) previewOpeningPassId = null
-                            },
-                            onPreviewOpeningChanged = { previewOpeningPassId = it },
-                            onProtectedPreviewRequested = {},
                             openSwipePassId = openSwipePassId,
                             tagCategories = state.categories,
                         )

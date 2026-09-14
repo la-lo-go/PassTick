@@ -11,7 +11,6 @@ import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassSnapshot
 import org.ligi.passandroid.repository.PassArtworkKind
-import org.ligi.passandroid.reminder.NotificationLockScreenDetail
 import org.ligi.passandroid.repository.DEFAULT_PASS_CATEGORY_ID
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.functions.CalendarEvent
@@ -183,7 +182,6 @@ sealed interface AppAction {
     data class SetNotificationAccessWindow(val minutes: Int) : AppAction
     data class SetNotificationExactTiming(val value: Boolean) : AppAction
     data class SetNotificationActionsEnabled(val value: Boolean) : AppAction
-    data class SetNotificationLockScreenDetail(val value: NotificationLockScreenDetail) : AppAction
     data class SetLockAllPasses(val value: Boolean) : AppAction
     data class SetShowProtectedPassLockIcon(val value: Boolean) : AppAction
     data class SetBlurProtectedPassCards(val value: Boolean) : AppAction

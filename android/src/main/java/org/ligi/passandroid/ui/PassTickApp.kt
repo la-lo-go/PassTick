@@ -109,14 +109,21 @@ fun PassTickApp(
     fun popBackStack() {
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
-    var protectedPassesUnlocked by remember { mutableStateOf(false) }
+    var appUnlocked by remember { mutableStateOf(false) }
+    var protectedSectionUnlocked by remember { mutableStateOf(false) }
+    val inProtectedSection = state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID
+    val protectedPassesRevealed = (state.settings.lockAllPasses && appUnlocked) ||
+        (inProtectedSection && protectedSectionUnlocked)
+    LaunchedEffect(state.selectedCategoryId) {
+        if (state.selectedCategoryId != PROTECTED_PASSES_CATEGORY_ID) protectedSectionUnlocked = false
+    }
     fun requiresProtection(pass: PassUiModel): Boolean = state.settings.lockAllPasses || pass.isProtected
     val protectedContentVisible = when (val destination = backStack.lastOrNull()) {
         is AppDestination.PassDetail -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
         is AppDestination.EditPass -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
         is AppDestination.PassCustomization -> state.passes.any { it.id == destination.passId && requiresProtection(it) }
         AppDestination.PassList, AppDestination.Timeline -> state.passes.any(::requiresProtection) &&
-            (!state.settings.separateProtectedPasses || protectedPassesUnlocked)
+            (!state.settings.separateProtectedPasses || protectedPassesRevealed)
         else -> false
     }
     val secureContentVisible = protectedContentVisible && state.settings.blockScreenshots
@@ -137,7 +144,7 @@ fun PassTickApp(
     var expandedCodePassId by remember { mutableStateOf<String?>(null) }
     var scrollSettingsToNotifications by rememberSaveable { mutableStateOf(false) }
     var authenticatedPassIds by remember { mutableStateOf(emptySet<String>()) }
-    val appLocked = state.settings.lockAllPasses && !protectedPassesUnlocked
+    val appLocked = state.settings.lockAllPasses && !appUnlocked
     var startupUnlockRequested by remember { mutableStateOf(false) }
     fun requestAppUnlock() {
         if (!passAuthenticator.canAuthenticate()) {
@@ -148,9 +155,7 @@ fun PassTickApp(
         } else {
             passAuthenticator.authenticate { authenticated ->
                 if (authenticated) {
-                    protectedPassesUnlocked = true
-                    authenticatedPassIds = authenticatedPassIds +
-                        state.passes.filter(::requiresProtection).map(PassUiModel::id)
+                    appUnlocked = true
                 }
             }
         }
@@ -267,7 +272,7 @@ fun PassTickApp(
             if (replaceCurrent) popBackStack()
             backStack.add(AppDestination.PassDetail(passId))
         }
-        if (!requiresProtection(pass) || protectedPassesUnlocked) {
+        if (!requiresProtection(pass) || protectedPassesRevealed) {
             navigate()
         } else if (!passAuthenticator.canAuthenticate()) {
             coroutineScope.launch {
@@ -316,9 +321,7 @@ fun PassTickApp(
                 } else {
                     passAuthenticator.authenticate { authenticated ->
                         if (authenticated) {
-                            protectedPassesUnlocked = true
-                            authenticatedPassIds = authenticatedPassIds +
-                                state.passes.filter(::requiresProtection).map(PassUiModel::id)
+                            protectedSectionUnlocked = true
                             viewModel.onAction(AppAction.SelectCategory(PROTECTED_PASSES_CATEGORY_ID))
                         }
                     }
@@ -526,12 +529,13 @@ fun PassTickApp(
                     onHomeAction = ::handleHomeAction,
                     onPassDetailAction = ::handlePassDetailAction,
                     protectedPassIds = state.passes.filter(::requiresProtection).mapTo(mutableSetOf(), PassUiModel::id),
-                    protectedPassesUnlocked = protectedPassesUnlocked,
+                    protectedPassesUnlocked = protectedPassesRevealed,
                     authenticatedPassIds = authenticatedPassIds,
                     passAuthenticator = passAuthenticator,
                     onPassAuthenticated = { passId -> authenticatedPassIds = authenticatedPassIds + passId },
                     onResetProtectedState = {
-                        protectedPassesUnlocked = false
+                        appUnlocked = false
+                        protectedSectionUnlocked = false
                         authenticatedPassIds = emptySet()
                     },
                     onExportImage = ::exportImageToGallery,

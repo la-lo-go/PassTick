@@ -1,9 +1,12 @@
 package org.ligi.passandroid.ui.compose
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,13 +28,26 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.runtime.remember
 import org.ligi.passandroid.R
+import org.ligi.passandroid.functions.CalendarEvent
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.repository.PassCategory
+import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.ui.state.PassFieldUiModel
+import org.ligi.passandroid.ui.state.PassLocationUiModel
+import org.ligi.passandroid.ui.state.PassTimeSpanUiModel
+import org.ligi.passandroid.ui.state.PassUiModel
+import org.threeten.bp.ZonedDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,13 +73,6 @@ fun PassDetailLayoutSettingsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item {
-                Text(
-                    stringResource(R.string.layout_show_or_hide_sections_then_arrange_their_order),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-            }
             itemsIndexed(order, key = { _, section -> section.name }) { index, section ->
                 Surface(
                     modifier = Modifier.animateItem(),
@@ -92,6 +101,20 @@ fun PassDetailLayoutSettingsScreen(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     ) { Text(section.displayName()) }
                 }
+            }
+            item {
+                PassDetailSectionList(
+                    pass = remember { layoutPreviewPass() },
+                    sectionOrder = order,
+                    hiddenSections = hidden,
+                    calendarEventPresent = false,
+                    onAction = {},
+                    onBarcodeHoldChanged = {},
+                    onBarcodePin = {},
+                    onEditDateRequested = {},
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    artworkFallback = { PreviewBannerArtwork(PreviewAccentColor) },
+                )
             }
         }
     }
@@ -131,16 +154,20 @@ fun HomeCardLayoutSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                Text(
-                    stringResource(R.string.layout_choose_the_card_image_and_arrange_the_text_lines),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
+                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                    HomeCardBody(
+                        pass = remember { layoutPreviewPass() },
+                        hero = false,
+                        sectionOrder = order,
+                        hiddenSections = hidden,
+                        tagCategories = listOf(samplePreviewTag),
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
             }
             item(key = "artwork") {
                 Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                     ListItem(
-                        supportingContent = { Text(stringResource(R.string.layout_the_image_stays_beside_the_text)) },
                         trailingContent = {
                             Switch(
                                 checked = HomeCardSection.ARTWORK !in hidden,
@@ -201,4 +228,58 @@ private fun HomeCardSection.displayName() = when (this) {
     HomeCardSection.CREATOR -> stringResource(R.string.edit_pass_creator)
     HomeCardSection.CATEGORY -> stringResource(R.string.layout_tag)
     HomeCardSection.PASS_TYPE -> stringResource(R.string.layout_pass_type)
+}
+
+private const val SAMPLE_PREVIEW_TAG_ID = "layout-preview-tag"
+
+private val PreviewAccentColor = 0xFF006C4C.toInt()
+
+private val samplePreviewTag = PassCategory(
+    id = SAMPLE_PREVIEW_TAG_ID,
+    name = "Travel",
+    colorArgb = 0xFF1565C0,
+    role = PassCategoryRole.CUSTOM,
+)
+
+@Composable
+private fun PreviewBannerArtwork(accentColor: Int) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color(accentColor),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(painterResource(R.drawable.ic_notification_pass), null, Modifier.size(56.dp))
+        }
+    }
+}
+
+private fun layoutPreviewPass(): PassUiModel {
+    val start = ZonedDateTime.now().plusDays(1).withHour(9).withMinute(30).withSecond(0).withNano(0)
+    val end = start.plusHours(2)
+    return PassUiModel(
+        id = "layout-preview",
+        description = "Boarding pass",
+        creator = "Sample Air",
+        type = PassType.BOARDING,
+        accentColor = PreviewAccentColor,
+        barcodeFormat = PassBarCodeFormat.QR_CODE,
+        barcodeMessage = "PASSTICK-PREVIEW",
+        barcodeAlternativeText = null,
+        fields = listOf(
+            PassFieldUiModel(key = null, label = "Gate", value = "A12", hidden = false, hint = "primaryFields"),
+            PassFieldUiModel(key = null, label = "Seat", value = "12A", hidden = false, hint = null),
+        ),
+        locations = listOf(PassLocationUiModel(name = "Sample Station", latitude = 52.52, longitude = 13.405)),
+        calendarEvent = CalendarEvent(
+            title = "Boarding pass",
+            beginTimeMillis = start.toEpochSecond() * 1000,
+            endTimeMillis = end.toEpochSecond() * 1000,
+            location = "Sample Station",
+        ),
+        calendarTimeSpan = PassTimeSpanUiModel(from = start, to = end),
+        tagIds = setOf(SAMPLE_PREVIEW_TAG_ID),
+    )
 }

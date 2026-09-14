@@ -5,20 +5,22 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Visibility
@@ -28,7 +30,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -37,32 +38,42 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
-import org.ligi.passandroid.reminder.NotificationLockScreenDetail
 import org.ligi.passandroid.ui.state.SettingsAction
+import org.ligi.passandroid.ui.theme.PassIcons
 import androidx.compose.ui.res.stringResource
 import org.ligi.passandroid.R
 
 @Composable
-internal fun ReminderChoice(label: String, selected: Boolean, onClick: () -> Unit) {
+internal fun ReminderChoice(label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     ListItem(
-        trailingContent = { RadioButton(selected, onClick) },
-        modifier = Modifier.clickable(onClick = onClick),
+        trailingContent = { RadioButton(selected, enabled = enabled, onClick = onClick) },
+        modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    ) { Text(label) }
+    ) {
+        Text(
+            label,
+            color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,16 +84,17 @@ fun SettingsScreen(
     onNotificationScrollConsumed: () -> Unit = {},
     onAction: (SettingsAction) -> Unit,
 ) {
-    val notificationRequester = remember { BringIntoViewRequester() }
+    val listState = rememberLazyListState()
     LaunchedEffect(scrollToNotifications) {
         if (scrollToNotifications) {
-            notificationRequester.bringIntoView()
+            listState.animateScrollToItem(RemindersSectionIndex)
             onNotificationScrollConsumed()
         }
     }
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.settings_settings)) }, navigationIcon = { IconButton(onClick = { onAction(SettingsAction.Back) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back)) } }) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxHeight().widthIn(max = 760.dp).align(Alignment.TopCenter).testTag("settings_list"),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -92,28 +104,42 @@ fun SettingsScreen(
                 item { PassListSettings(onAction) }
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
-                item { NotificationSettings(settings, onAction, Modifier.bringIntoViewRequester(notificationRequester)) }
+                item { ReminderSettings(settings, onAction) }
                 item { AboutSettings(onAction) }
             }
         }
     }
 }
 
+// Must match the order of the settings sections above.
+private const val RemindersSectionIndex = 5
+
 @Composable
 private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup(stringResource(R.string.settings_appearance)) {
-        Text(stringResource(R.string.settings_theme), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-        ThemeMode.entries.forEach { mode -> ThemeSetting(mode, settings.themeMode, onAction) }
-        if (settings.themeMode == ThemeMode.DARK) {
-            SettingSwitch(stringResource(R.string.settings_use_amoled_black_background), settings.amoledBlackBackground) {
-                onAction(SettingsAction.SetAmoledBlackBackground(it))
+    SettingsGroup(
+        title = stringResource(R.string.settings_theme),
+        entries = buildList {
+            ThemeMode.entries.forEach { mode ->
+                add(settingsItem { ThemeSetting(mode, settings.themeMode, onAction) })
             }
-        }
-        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-        SettingSwitch(stringResource(R.string.settings_use_hdr_and_maximum_code_brightness), settings.automaticBrightness) {
-            onAction(SettingsAction.SetAutomaticBrightness(it))
-        }
-    }
+            if (settings.themeMode == ThemeMode.DARK) {
+                add(
+                    settingsItem {
+                        SettingSwitch(stringResource(R.string.settings_use_amoled_black_background), settings.amoledBlackBackground) {
+                            onAction(SettingsAction.SetAmoledBlackBackground(it))
+                        }
+                    },
+                )
+            }
+            add(
+                settingsItem {
+                    SettingSwitch(stringResource(R.string.settings_use_hdr_and_maximum_code_brightness), settings.automaticBrightness) {
+                        onAction(SettingsAction.SetAutomaticBrightness(it))
+                    }
+                },
+            )
+        },
+    )
 }
 
 @Composable
@@ -127,28 +153,42 @@ private fun ThemeSetting(mode: ThemeMode, selectedMode: ThemeMode, onAction: (Se
 
 @Composable
 private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup(stringResource(R.string.settings_home)) {
-        SettingSwitch(
-            stringResource(R.string.settings_highlight_todays_passes),
-            settings.highlightTodayPasses,
-            supportingText = stringResource(R.string.settings_show_todays_passes_before_other_passes),
-        ) { onAction(SettingsAction.SetHighlightTodayPasses(it)) }
-    }
+    SettingsGroup(
+        title = stringResource(R.string.settings_home),
+        entries = listOf(
+            settingsItem {
+                SettingSwitch(
+                    stringResource(R.string.settings_highlight_todays_passes),
+                    settings.highlightTodayPasses,
+                    supportingText = stringResource(R.string.settings_show_todays_passes_before_other_passes),
+                ) { onAction(SettingsAction.SetHighlightTodayPasses(it)) }
+            },
+        ),
+    )
 }
 
 @Composable
 private fun PassListSettings(onAction: (SettingsAction) -> Unit) {
-    SettingsGroup(stringResource(R.string.settings_customize_pass_list)) {
-        PassListSetting(Icons.Default.ViewAgenda, "Home cards") {
-            onAction(SettingsAction.OpenHomeCardSettings)
-        }
-        PassListSetting(Icons.Default.Visibility, "Pass view") {
-            onAction(SettingsAction.OpenPassViewSettings)
-        }
-        PassListSetting(Icons.AutoMirrored.Filled.Label, "Tags") {
-            onAction(SettingsAction.OpenCategories)
-        }
-    }
+    SettingsGroup(
+        title = stringResource(R.string.settings_customize_pass_list),
+        entries = listOf(
+            settingsItem {
+                PassListSetting(Icons.Default.ViewAgenda, "Home cards") {
+                    onAction(SettingsAction.OpenHomeCardSettings)
+                }
+            },
+            settingsItem {
+                PassListSetting(Icons.Default.Visibility, "Pass view") {
+                    onAction(SettingsAction.OpenPassViewSettings)
+                }
+            },
+            settingsItem {
+                PassListSetting(Icons.AutoMirrored.Filled.Label, "Tags") {
+                    onAction(SettingsAction.OpenCategories)
+                }
+            },
+        ),
+    )
 }
 
 @Composable
@@ -166,89 +206,221 @@ private fun PassListSetting(
 
 @Composable
 private fun PrivacySettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup(stringResource(R.string.settings_privacy)) {
-        SettingSwitch(
-            stringResource(R.string.settings_protect_the_app),
-            settings.lockAllPasses,
-            supportingText = stringResource(R.string.settings_require_fingerprint_or_screen_lock_to_open_the_a),
-        ) { onAction(SettingsAction.SetLockAllPasses(it)) }
-        SettingSwitch(stringResource(R.string.settings_show_a_lock_icon_on_protected_passes), settings.showProtectedPassLockIcon) {
-            onAction(SettingsAction.SetShowProtectedPassLockIcon(it))
-        }
-        SettingSwitch(stringResource(R.string.settings_blur_protected_pass_information), settings.blurProtectedPassCards) {
-            onAction(SettingsAction.SetBlurProtectedPassCards(it))
-        }
-        SettingSwitch(stringResource(R.string.settings_keep_protected_passes_in_a_locked_section), settings.separateProtectedPasses) {
-            onAction(SettingsAction.SetSeparateProtectedPasses(it))
-        }
-        SettingSwitch(
-            stringResource(R.string.settings_block_screenshots),
-            settings.blockScreenshots,
-            supportingText = stringResource(R.string.settings_prevent_screenshots_on_protected_content),
-        ) { onAction(SettingsAction.SetBlockScreenshots(it)) }
-    }
+    SettingsGroup(
+        title = stringResource(R.string.settings_privacy),
+        entries = listOf(
+            settingsItem {
+                SettingSwitch(
+                    stringResource(R.string.settings_protect_the_app),
+                    settings.lockAllPasses,
+                    supportingText = stringResource(R.string.settings_require_fingerprint_or_screen_lock_to_open_the_a),
+                ) { onAction(SettingsAction.SetLockAllPasses(it)) }
+            },
+            settingsItem {
+                SettingSwitch(stringResource(R.string.settings_show_a_lock_icon_on_protected_passes), settings.showProtectedPassLockIcon) {
+                    onAction(SettingsAction.SetShowProtectedPassLockIcon(it))
+                }
+            },
+            settingsItem {
+                SettingSwitch(stringResource(R.string.settings_blur_protected_pass_information), settings.blurProtectedPassCards) {
+                    onAction(SettingsAction.SetBlurProtectedPassCards(it))
+                }
+            },
+            settingsItem {
+                SettingSwitch(stringResource(R.string.settings_keep_protected_passes_in_a_locked_section), settings.separateProtectedPasses) {
+                    onAction(SettingsAction.SetSeparateProtectedPasses(it))
+                }
+            },
+            settingsItem {
+                SettingSwitch(
+                    stringResource(R.string.settings_block_screenshots),
+                    settings.blockScreenshots,
+                    supportingText = stringResource(R.string.settings_prevent_screenshots_on_protected_content),
+                ) { onAction(SettingsAction.SetBlockScreenshots(it)) }
+            },
+        ),
+    )
 }
 
 @Composable
 private fun CalendarSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
-    SettingsGroup(stringResource(R.string.edit_pass_calendar)) {
-        SettingSwitch(stringResource(R.string.settings_automatically_add_imported_passes), settings.offerCalendarAfterImport) {
-            onAction(SettingsAction.SetOfferCalendarAfterImport(it))
-        }
-    }
+    SettingsGroup(
+        title = stringResource(R.string.edit_pass_calendar),
+        entries = listOf(
+            settingsItem {
+                SettingSwitch(stringResource(R.string.settings_automatically_add_imported_passes), settings.offerCalendarAfterImport) {
+                    onAction(SettingsAction.SetOfferCalendarAfterImport(it))
+                }
+            },
+        ),
+    )
 }
 
 @Composable
 private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
-    SettingsGroup(stringResource(R.string.settings_about)) {
-        PassListSetting(Icons.Default.PrivacyTip, "Privacy policy") {
-            onAction(SettingsAction.OpenPrivacyPolicy)
-        }
-        PassListSetting(Icons.Default.Code, "Source code and license") {
-            onAction(SettingsAction.OpenSourceCode)
+    var showBugReportDialog by remember { mutableStateOf(false) }
+    SettingsGroup(
+        title = stringResource(R.string.settings_about),
+        entries = listOf(
+            settingsItem {
+                PassListSetting(Icons.Default.PrivacyTip, "Privacy policy") {
+                    onAction(SettingsAction.OpenPrivacyPolicy)
+                }
+            },
+            settingsItem {
+                PassListSetting(PassIcons.GitHub, "Source code and license") {
+                    onAction(SettingsAction.OpenSourceCode)
+                }
+            },
+            settingsItem {
+                PassListSetting(Icons.Default.BugReport, stringResource(R.string.settings_report_a_bug)) {
+                    showBugReportDialog = true
+                }
+            },
+        ),
+    )
+    if (showBugReportDialog) {
+        BugReportDialog(
+            onDismiss = { showBugReportDialog = false },
+            onGitHub = {
+                onAction(SettingsAction.OpenBugReportGitHub)
+                showBugReportDialog = false
+            },
+            onEmail = {
+                onAction(SettingsAction.OpenBugReportEmail)
+                showBugReportDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun BugReportDialog(
+    onDismiss: () -> Unit,
+    onGitHub: () -> Unit,
+    onEmail: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+        ) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Icon(Icons.Default.BugReport, null, Modifier.padding(10.dp))
+                    }
+                    Text(
+                        stringResource(R.string.settings_report_a_bug),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Text(
+                    stringResource(R.string.settings_bug_report_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                BugReportOption(
+                    icon = PassIcons.GitHub,
+                    title = stringResource(R.string.settings_bug_report_github),
+                    supporting = stringResource(R.string.settings_bug_report_github_supporting),
+                    onClick = onGitHub,
+                )
+                BugReportOption(
+                    icon = Icons.Default.Email,
+                    title = stringResource(R.string.settings_bug_report_email),
+                    supporting = stringResource(R.string.settings_bug_report_email_supporting),
+                    onClick = onEmail,
+                )
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                    Text(stringResource(R.string.pass_detail_cancel))
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun NotificationSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit, modifier: Modifier = Modifier) {
-    SettingsGroup(stringResource(R.string.settings_notifications), modifier) {
-        SettingSwitch(stringResource(R.string.settings_pass_reminders), settings.remindersEnabled) {
-            onAction(SettingsAction.SetRemindersEnabled(it))
-        }
-        Text(stringResource(R.string.settings_reminder_times), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-        reminderOptions.forEach { (minutes, label) ->
-            ReminderSetting(minutes, stringResource(label), settings, onAction)
-        }
-        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-        Text(stringResource(R.string.settings_event_access), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-        listOf(15 to R.string.settings_minutes_15, 30 to R.string.settings_minutes_30, 60 to R.string.settings_hour_1).forEach { (minutes, label) ->
-            ReminderChoice(stringResource(label), settings.notificationAccessWindowMinutes == minutes) {
-                onAction(SettingsAction.SetNotificationAccessWindow(minutes))
-            }
-        }
-        SettingSwitch(
-            stringResource(R.string.settings_exact_reminders),
-            settings.notificationExactTiming,
-            supportingText = stringResource(R.string.settings_use_exact_alarms_when_android_allows_them),
-        ) { onAction(SettingsAction.SetNotificationExactTiming(it)) }
-        SettingSwitch(stringResource(R.string.settings_notification_actions), settings.notificationActionsEnabled) {
-            onAction(SettingsAction.SetNotificationActionsEnabled(it))
-        }
-        Text(stringResource(R.string.settings_lock_screen), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-        NotificationLockScreenDetail.entries.forEach { detail ->
-            ReminderChoice(detail.displayName(), settings.notificationLockScreenDetail == detail) {
-                onAction(SettingsAction.SetNotificationLockScreenDetail(detail))
+private fun BugReportOption(
+    icon: ImageVector,
+    title: String,
+    supporting: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, null)
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(supporting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
 @Composable
-private fun NotificationLockScreenDetail.displayName() = when (this) {
-    NotificationLockScreenDetail.FULL -> stringResource(R.string.settings_show_all)
-    NotificationLockScreenDetail.HIDE_SENSITIVE -> stringResource(R.string.settings_hide_protected_details)
-    NotificationLockScreenDetail.HIDDEN -> stringResource(R.string.settings_hide_on_lock_screen)
+private fun ReminderSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    SettingsGroup(
+        title = stringResource(R.string.settings_reminders),
+        entries = buildList {
+            add(
+                settingsItem {
+                    SettingSwitch(stringResource(R.string.settings_pass_reminders), settings.remindersEnabled) {
+                        onAction(SettingsAction.SetRemindersEnabled(it))
+                    }
+                },
+            )
+            add(settingsHeader(stringResource(R.string.settings_reminder_times)))
+            reminderOptions.forEach { (minutes, label) ->
+                add(settingsItem { ReminderSetting(minutes, stringResource(label), settings, onAction) })
+            }
+            add(settingsHeader(stringResource(R.string.settings_event_access)))
+            listOf(15 to R.string.settings_minutes_15, 30 to R.string.settings_minutes_30, 60 to R.string.settings_hour_1).forEach { (minutes, label) ->
+                add(
+                    settingsItem {
+                        ReminderChoice(
+                            stringResource(label),
+                            settings.notificationAccessWindowMinutes == minutes,
+                            enabled = settings.remindersEnabled,
+                        ) {
+                            onAction(SettingsAction.SetNotificationAccessWindow(minutes))
+                        }
+                    },
+                )
+            }
+            add(
+                settingsItem {
+                    SettingSwitch(
+                        stringResource(R.string.settings_exact_reminders),
+                        settings.notificationExactTiming,
+                        supportingText = stringResource(R.string.settings_use_exact_alarms_when_android_allows_them),
+                    ) { onAction(SettingsAction.SetNotificationExactTiming(it)) }
+                },
+            )
+            add(
+                settingsItem {
+                    SettingSwitch(stringResource(R.string.settings_notification_actions), settings.notificationActionsEnabled) {
+                        onAction(SettingsAction.SetNotificationActionsEnabled(it))
+                    }
+                },
+            )
+        },
+    )
 }
 
 private val reminderOptions = listOf(
@@ -289,15 +461,44 @@ private fun Set<Int>.toggle(value: Int) = toMutableSet().apply {
     if (!add(value)) remove(value)
 }
 
+private sealed interface SettingsEntry {
+    data class Header(val text: String) : SettingsEntry
+    data class Item(val content: @Composable () -> Unit) : SettingsEntry
+}
+
+private fun settingsItem(content: @Composable () -> Unit) = SettingsEntry.Item(content)
+
+private fun settingsHeader(text: String) = SettingsEntry.Header(text)
+
 @Composable
-private fun SettingsGroup(title: String, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsGroup(title: String, modifier: Modifier = Modifier, entries: List<SettingsEntry>) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-        ) {
-            Column(Modifier.padding(vertical = 8.dp), content = content)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            entries.forEachIndexed { index, entry ->
+                when (entry) {
+                    is SettingsEntry.Header -> Text(
+                        entry.text,
+                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    is SettingsEntry.Item -> {
+                        val roundTop = index == 0 || entries[index - 1] is SettingsEntry.Header
+                        val roundBottom = index == entries.lastIndex || entries[index + 1] is SettingsEntry.Header
+                        val shape = RoundedCornerShape(
+                            topStart = if (roundTop) 28.dp else 0.dp,
+                            topEnd = if (roundTop) 28.dp else 0.dp,
+                            bottomStart = if (roundBottom) 28.dp else 0.dp,
+                            bottomEnd = if (roundBottom) 28.dp else 0.dp,
+                        )
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clip(shape),
+                            shape = shape,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                        ) { entry.content() }
+                    }
+                }
+            }
         }
     }
 }
