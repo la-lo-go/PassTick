@@ -329,13 +329,11 @@ private fun BugReportDialog(
                 BugReportOption(
                     icon = PassIcons.GitHub,
                     title = stringResource(R.string.settings_bug_report_github),
-                    supporting = stringResource(R.string.settings_bug_report_github_supporting),
                     onClick = onGitHub,
                 )
                 BugReportOption(
                     icon = Icons.Default.Email,
                     title = stringResource(R.string.settings_bug_report_email),
-                    supporting = stringResource(R.string.settings_bug_report_email_supporting),
                     onClick = onEmail,
                 )
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
@@ -350,7 +348,6 @@ private fun BugReportDialog(
 private fun BugReportOption(
     icon: ImageVector,
     title: String,
-    supporting: String,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -360,15 +357,12 @@ private fun BugReportOption(
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(icon, null)
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(supporting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Text(title, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
