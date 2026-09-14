@@ -1,5 +1,6 @@
 package org.ligi.passandroid.ui.compose
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -55,10 +57,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import org.ligi.passandroid.repository.AccentPalette
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.theme.PassIcons
+import org.ligi.passandroid.ui.theme.accentSwatchColor
 import androidx.compose.ui.res.stringResource
 import org.ligi.passandroid.R
 
@@ -122,6 +126,14 @@ private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction)
             ThemeMode.entries.forEach { mode ->
                 add(settingsItem { ThemeSetting(mode, settings.themeMode, onAction) })
             }
+            add(settingsHeader(stringResource(R.string.settings_accent_color)))
+            // Dynamic color exists only from API 31; on API 29/30 BLUE is the default fallback.
+            val dynamicAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            val visiblePalettes = (if (dynamicAvailable) listOf(AccentPalette.DYNAMIC) else emptyList()) +
+                AccentPalette.entries.filterNot { it == AccentPalette.DYNAMIC }
+            visiblePalettes.forEach { palette ->
+                add(settingsItem { AccentSetting(palette, settings.accentPalette, onAction) })
+            }
             if (settings.themeMode == ThemeMode.DARK) {
                 add(
                     settingsItem {
@@ -149,6 +161,29 @@ private fun ThemeSetting(mode: ThemeMode, selectedMode: ThemeMode, onAction: (Se
         modifier = Modifier.clickable { onAction(SettingsAction.SetTheme(mode)) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     ) { Text(mode.name.lowercase().replaceFirstChar(Char::uppercase)) }
+}
+
+@Composable
+private fun AccentSetting(
+    palette: AccentPalette,
+    selectedPalette: AccentPalette,
+    onAction: (SettingsAction) -> Unit,
+) {
+    val label = if (palette == AccentPalette.DYNAMIC) {
+        stringResource(R.string.settings_dynamic_color)
+    } else {
+        palette.name.lowercase().replaceFirstChar(Char::uppercase)
+    }
+    ListItem(
+        leadingContent = {
+            Box(Modifier.size(24.dp).clip(CircleShape).background(accentSwatchColor(palette) ?: Color.Transparent))
+        },
+        trailingContent = {
+            RadioButton(palette == selectedPalette, { onAction(SettingsAction.SetAccentPalette(palette)) })
+        },
+        modifier = Modifier.clickable { onAction(SettingsAction.SetAccentPalette(palette)) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    ) { Text(label) }
 }
 
 @Composable

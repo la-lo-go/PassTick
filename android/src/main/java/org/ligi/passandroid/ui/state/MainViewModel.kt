@@ -414,6 +414,12 @@ class MainViewModel(
             }
             true
         }
+        is AppAction.SetAccentPalette -> {
+            viewModelScope.launch {
+                settingsRepository.setAccentPalette(action.value)
+            }
+            true
+        }
         is AppAction.SetAutomaticBrightness -> {
             viewModelScope.launch {
                 settingsRepository.setAutomaticBrightness(action.value)

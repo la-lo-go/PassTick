@@ -19,6 +19,7 @@ class DataStoreSettingsRepositoryTest {
             )
             repository.setThemeMode(ThemeMode.DARK)
             repository.setAmoledBlackBackground(true)
+            repository.setAccentPalette(AccentPalette.GREEN)
             repository.setAutomaticBrightness(false)
             repository.setSortOrder(PassSortOrder.TYPE)
             repository.setPassOrder(listOf("pass-3", "pass-1"))
@@ -60,6 +61,7 @@ class DataStoreSettingsRepositoryTest {
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
+                    it.accentPalette == AccentPalette.GREEN &&
                     it.sortOrder == PassSortOrder.TYPE && it.passOrder == listOf("pass-3", "pass-1") &&
                     it.categories == categories &&
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
@@ -88,6 +90,7 @@ class DataStoreSettingsRepositoryTest {
                 AppSettings(
                     ThemeMode.DARK,
                     amoledBlackBackground = true,
+                    accentPalette = AccentPalette.GREEN,
                     automaticBrightness = false,
                     sortOrder = PassSortOrder.TYPE,
                     passOrder = listOf("pass-3", "pass-1"),
@@ -134,6 +137,7 @@ class DataStoreSettingsRepositoryTest {
             )
             repository.setThemeMode(ThemeMode.SYSTEM)
             repository.setAmoledBlackBackground(false)
+            repository.setAccentPalette(AccentPalette.DYNAMIC)
             repository.setAutomaticBrightness(true)
             repository.setSortOrder(PassSortOrder.DATE_DESC)
             repository.setPassOrder(emptyList())

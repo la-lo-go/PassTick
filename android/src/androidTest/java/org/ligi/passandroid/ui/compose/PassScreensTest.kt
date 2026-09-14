@@ -87,8 +87,33 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
+        composeRule.onNodeWithText("Accent color").assertIsDisplayed()
         composeRule.onNodeWithText("Use AMOLED black background").assertIsDisplayed()
         composeRule.onNodeWithText("Use HDR and maximum code brightness").assertIsDisplayed()
+    }
+
+    @Test
+    fun accentColorRowCapturesSelectionAction() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithText("Green").performScrollTo().performClick()
+
+        assertThat(actions).containsExactly(SettingsAction.SetAccentPalette(org.ligi.passandroid.repository.AccentPalette.GREEN))
+    }
+
+    @Test
+    fun accentPaletteRendersWithoutDynamicColors() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT, accentPalette = org.ligi.passandroid.repository.AccentPalette.GREEN) {
+                SettingsScreen(AppSettings(), onAction = {})
+            }
+        }
+
+        composeRule.onNodeWithText("Theme").assertIsDisplayed()
+        composeRule.onNodeWithText("Accent color").assertIsDisplayed()
     }
 
     @Test
