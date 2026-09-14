@@ -94,6 +94,62 @@ class FilePassMetadataStoreTest {
     }
 
     @Test
+    fun `persists exactly the current metadata key set`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).apply {
+                setTags("pass-1", setOf("travel"))
+                setArchived("pass-1", true)
+                setPreferredArtwork("pass-1", PassArtworkKind.LOGO)
+                setTrashedAt("pass-1", 1_700_000_000_000)
+            }
+
+            val keys = org.json.JSONObject(file.readText()).let { json ->
+                buildList { json.keys().forEach { key -> add(key) } }
+            }
+
+            assertThat(keys).containsExactlyInAnyOrder("tags", "archived", "preferredArtwork", "trashedAt")
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `a corrupt metadata file loads as empty defaults`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile()
+        try {
+            file.writeText("{ not valid json")
+
+            FilePassMetadataStore(file).apply {
+                assertThat(tags("pass-1")).isEmpty()
+                assertThat(isArchived("pass-1")).isFalse()
+                assertThat(preferredArtwork("pass-1")).isNull()
+                assertThat(trashedAt("pass-1")).isNull()
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `remove clears every metadata map for the pass`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).setPreferredArtwork("pass-1", PassArtworkKind.THUMBNAIL)
+
+            FilePassMetadataStore(file).apply {
+                remove("pass-1")
+                assertThat(tags("pass-1")).isEmpty()
+                assertThat(isArchived("pass-1")).isFalse()
+                assertThat(preferredArtwork("pass-1")).isNull()
+                assertThat(trashedAt("pass-1")).isNull()
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun `stores preferred artwork independently from pass contents`() {
         val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
         try {
