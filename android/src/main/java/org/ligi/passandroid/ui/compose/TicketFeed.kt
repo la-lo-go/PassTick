@@ -68,11 +68,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -82,6 +82,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -106,7 +107,6 @@ import org.ligi.passandroid.ui.theme.PassActionButton
 import org.ligi.passandroid.ui.theme.PassActionButtonGap
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.painterResource
 import org.ligi.passandroid.R
 
 @Composable
@@ -853,6 +853,7 @@ internal fun HomeCardBody(
     hiddenSections: Set<HomeCardSection>,
     tagCategories: List<PassCategory>,
     modifier: Modifier = Modifier,
+    thumbnailFallback: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val visibleSections = sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }
     val creatorTypeCombined = visibleSections.indexOf(HomeCardSection.CREATOR).let { creatorIndex ->
@@ -864,20 +865,22 @@ internal fun HomeCardBody(
         verticalAlignment = Alignment.Top,
     ) {
         if (HomeCardSection.ARTWORK !in hiddenSections) {
-            PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp))
+            PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp), thumbnailFallback)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             val typeLabel = pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase)
+            var lineIndex = 0
             var typeRendered = false
             var tagsRendered = false
             visibleSections.forEach { section ->
                 when (section) {
                     HomeCardSection.ARTWORK -> Unit
                     HomeCardSection.TITLE -> {
+                        val index = lineIndex++
                         Text(
                             pass.description,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            style = homeCardLineStyle(index),
+                            fontWeight = homeCardLineWeight(index),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -885,22 +888,26 @@ internal fun HomeCardBody(
                     HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()
                         ?.takeUnless { hero && it == pass.todayStartTimeLabel() }
                         ?.let {
-                            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val index = lineIndex++
+                            Text(it, style = homeCardLineStyle(index), fontWeight = homeCardLineWeight(index), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                        val index = lineIndex++
+                        Text(it, style = homeCardLineStyle(index), fontWeight = homeCardLineWeight(index))
                     }
                     HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let { creator ->
+                        val index = lineIndex++
                         if (creatorTypeCombined) {
                             typeRendered = true
                             Text(
                                 "$creator • $typeLabel",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = homeCardLineStyle(index),
+                                fontWeight = homeCardLineWeight(index),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         } else {
-                            Text(creator, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(creator, style = homeCardLineStyle(index), fontWeight = homeCardLineWeight(index), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     HomeCardSection.CATEGORY,
@@ -915,26 +922,70 @@ internal fun HomeCardBody(
                         if (showType || visibleTags.isNotEmpty()) {
                             if (showType) typeRendered = true
                             if (visibleTags.isNotEmpty()) tagsRendered = true
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                if (showType) {
-                                    Text(typeLabel, style = MaterialTheme.typography.labelMedium)
-                                }
-                                visibleTags.take(MAX_CARD_TAG_DOTS).forEach { CategoryDot(it.colorArgb) }
-                                if (visibleTags.size > MAX_CARD_TAG_DOTS) {
-                                    Text(
-                                        "+${visibleTags.size - MAX_CARD_TAG_DOTS}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
+                            val index = lineIndex++
+                            CardMetadataRow(
+                                typeLabel = typeLabel.takeIf { showType },
+                                tags = visibleTags,
+                                typeStyle = homeCardLineStyle(index),
+                                typeWeight = homeCardLineWeight(index),
+                            )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun homeCardLineStyle(lineIndex: Int) = when (lineIndex) {
+    0 -> MaterialTheme.typography.titleMedium
+    1 -> MaterialTheme.typography.bodyMedium
+    else -> MaterialTheme.typography.bodySmall
+}
+
+private fun homeCardLineWeight(lineIndex: Int): FontWeight? = if (lineIndex == 0) FontWeight.SemiBold else null
+
+private enum class CardMetadataSlot { Full, Compact }
+
+@Composable
+private fun CardMetadataRow(
+    typeLabel: String?,
+    tags: List<PassCategory>,
+    typeStyle: TextStyle,
+    typeWeight: FontWeight?,
+    modifier: Modifier = Modifier,
+) {
+    SubcomposeLayout(modifier) { constraints ->
+        val looseConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val fullPlaceables = subcompose(CardMetadataSlot.Full) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                typeLabel?.let { Text(it, style = typeStyle, fontWeight = typeWeight) }
+                tags.forEach { CategoryBadge(it) }
+            }
+        }.map { it.measure(looseConstraints) }
+        val fullWidth = fullPlaceables.maxOfOrNull { it.width } ?: 0
+        val placeables = if (fullWidth <= constraints.maxWidth) {
+            fullPlaceables
+        } else {
+            subcompose(CardMetadataSlot.Compact) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    typeLabel?.let { Text(it, style = typeStyle, fontWeight = typeWeight) }
+                    tags.take(MAX_CARD_TAG_DOTS).forEach { CategoryDot(it.colorArgb) }
+                    if (tags.size > MAX_CARD_TAG_DOTS) {
+                        Text(
+                            "+${tags.size - MAX_CARD_TAG_DOTS}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }.map { it.measure(looseConstraints) }
+        }
+        val width = placeables.maxOfOrNull { it.width }?.coerceAtMost(constraints.maxWidth) ?: 0
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        layout(width, height) {
+            placeables.forEach { it.placeRelative(0, 0) }
         }
     }
 }
@@ -979,7 +1030,7 @@ internal fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modi
 }
 
 @Composable
-private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
+private fun PassThumbnail(pass: PassUiModel, modifier: Modifier, fallback: (@Composable (Modifier) -> Unit)? = null) {
     val artworkDescription = stringResource(R.string.pass_detail_pass_artwork)
     val artwork = pass.displayArtwork(listOf(PassArtworkKind.ICON, PassArtworkKind.THUMBNAIL, PassArtworkKind.LOGO))
     if (artwork != null) {
@@ -991,18 +1042,33 @@ private fun PassThumbnail(pass: PassUiModel, modifier: Modifier) {
             modifier = modifier,
             context = PassArtworkContext.HOME_THUMBNAIL,
         )
+    } else if (fallback != null) {
+        fallback(modifier)
     } else {
-        val accent = Color(pass.accentColor)
         Surface(
             modifier = modifier.semantics { contentDescription = artworkDescription },
             shape = RoundedCornerShape(16),
-            color = accent,
-            contentColor = if (accent.luminance() > 0.5f) Color.Black else Color.White,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.primary,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(painterResource(R.drawable.ic_notification_pass), null, Modifier.fillMaxSize(0.62f))
+                Text(
+                    text = pass.homeCardInitial(),
+                    style = MaterialTheme.typography.titleLarge,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun CategoryBadge(category: PassCategory) {
+    Surface(color = Color(category.colorArgb.toInt()).copy(alpha = 0.18f), shape = RoundedCornerShape(50)) {
+        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            CategoryDot(category.colorArgb)
+            Spacer(Modifier.size(6.dp))
+            Text(category.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
