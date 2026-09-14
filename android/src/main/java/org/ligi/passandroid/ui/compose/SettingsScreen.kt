@@ -163,6 +163,13 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
                     supportingText = stringResource(R.string.settings_show_todays_passes_before_other_passes),
                 ) { onAction(SettingsAction.SetHighlightTodayPasses(it)) }
             },
+            settingsItem {
+                SettingSwitch(
+                    stringResource(R.string.settings_keep_deleted_passes_in_trash),
+                    settings.trashEnabled,
+                    supportingText = stringResource(R.string.settings_deleted_passes_wait_in_trash),
+                ) { onAction(SettingsAction.SetTrashEnabled(it)) }
+            },
         ),
     )
 }

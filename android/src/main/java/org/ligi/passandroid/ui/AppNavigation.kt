@@ -456,6 +456,10 @@ private fun handleAppearanceSettingsAction(
         dependencies.viewModel.onAction(AppAction.SetAutomaticallyMarkPast(action.value))
         true
     }
+    is SettingsAction.SetTrashEnabled -> {
+        dependencies.viewModel.onAction(AppAction.SetTrashEnabled(action.value))
+        true
+    }
     else -> false
 }
 

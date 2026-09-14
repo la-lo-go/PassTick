@@ -65,6 +65,7 @@ sealed interface SettingsAction {
     data object OpenHomeCardSettings : SettingsAction
     data class SetHighlightTodayPasses(val value: Boolean) : SettingsAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : SettingsAction
+    data class SetTrashEnabled(val value: Boolean) : SettingsAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : SettingsAction
     data class SetRemindersEnabled(val value: Boolean) : SettingsAction
     data class SetReminderMinutes(val value: Set<Int>) : SettingsAction
