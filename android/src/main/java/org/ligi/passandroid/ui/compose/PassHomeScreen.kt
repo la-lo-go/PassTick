@@ -325,54 +325,56 @@ fun PassHomeScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.home_all)) },
-                        selected = state.selectedCategoryId == null,
-                        icon = { Icon(Icons.Default.ViewAgenda, null) },
-                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(null)) },
-                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_all"),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.home_protected)) },
-                        selected = state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID,
-                        icon = { Icon(Icons.Default.Lock, null) },
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onAction(
-                                if (protectedPassesUnlocked) HomeAction.SelectCategory(PROTECTED_PASSES_CATEGORY_ID)
-                                else HomeAction.UnlockProtectedPasses,
-                            )
-                        },
-                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_protected"),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.home_pinned)) },
-                        selected = state.selectedCategoryId == "pinned",
-                        icon = { Icon(Icons.Default.PushPin, null) },
-                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("pinned")) },
-                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_pinned"),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.home_archived)) },
-                        selected = state.selectedCategoryId == "archived",
-                        icon = { Icon(Icons.Default.Archive, null) },
-                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
-                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
-                    )
-                    if (visibleCategories.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.category_tags),
-                            modifier = Modifier.padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 4.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState()),
                     ) {
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.home_all)) },
+                            selected = state.selectedCategoryId == null,
+                            icon = { Icon(Icons.Default.ViewAgenda, null) },
+                            onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(null)) },
+                            modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_all"),
+                        )
+                        if (protectedPassIds.isNotEmpty()) {
+                            NavigationDrawerItem(
+                                label = { Text(stringResource(R.string.home_protected)) },
+                                selected = state.selectedCategoryId == PROTECTED_PASSES_CATEGORY_ID,
+                                icon = { Icon(Icons.Default.Lock, null) },
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    onAction(
+                                        if (protectedPassesUnlocked) HomeAction.SelectCategory(PROTECTED_PASSES_CATEGORY_ID)
+                                        else HomeAction.UnlockProtectedPasses,
+                                    )
+                                },
+                                modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_protected"),
+                            )
+                        }
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.home_pinned)) },
+                            selected = state.selectedCategoryId == "pinned",
+                            icon = { Icon(Icons.Default.PushPin, null) },
+                            onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("pinned")) },
+                            modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_pinned"),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.home_archived)) },
+                            selected = state.selectedCategoryId == "archived",
+                            icon = { Icon(Icons.Default.Archive, null) },
+                            onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
+                            modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
+                        )
+                        if (visibleCategories.isNotEmpty()) {
+                            Text(
+                                stringResource(R.string.category_tags),
+                                modifier = Modifier.padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 4.dp),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         visibleCategories.forEach { category ->
                             NavigationDrawerItem(
                                 label = { Text(category.name) },
@@ -385,18 +387,18 @@ fun PassHomeScreen(
                     }
                     HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.home_github_repo)) },
-                        selected = false,
-                        icon = { Icon(PassIcons.GitHub, null) },
-                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenUrl(PROJECT_REPOSITORY_URL)) },
-                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_open_repository"),
-                    )
-                    NavigationDrawerItem(
                         label = { Text(stringResource(R.string.settings_settings)) },
                         selected = false,
                         icon = { Icon(Icons.Default.Settings, null) },
                         onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenSettings) },
                         modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.home_github_repo)) },
+                        selected = false,
+                        icon = { Icon(PassIcons.GitHub, null) },
+                        onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.OpenUrl(PROJECT_REPOSITORY_URL)) },
+                        modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_open_repository"),
                     )
                 }
             }
