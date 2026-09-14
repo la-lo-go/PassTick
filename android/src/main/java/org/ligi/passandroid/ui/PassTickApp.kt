@@ -89,17 +89,28 @@ fun PassTickApp(
     } else {
         state.settings.amoledBlackBackground
     }
+    val displayedAccent = if (state.isContentLoading) {
+        startupAppearance.accentPalette
+    } else {
+        state.settings.accentPalette
+    }
     val darkSystemBars = displayedThemeMode == org.ligi.passandroid.repository.ThemeMode.DARK ||
         displayedThemeMode == org.ligi.passandroid.repository.ThemeMode.SYSTEM && isSystemInDarkTheme()
     SideEffect {
         WindowCompat.getInsetsController(activity.window, activity.window.decorView).isAppearanceLightStatusBars = !darkSystemBars
     }
-    LaunchedEffect(state.isContentLoading, state.settings.themeMode, state.settings.amoledBlackBackground) {
+    LaunchedEffect(
+        state.isContentLoading,
+        state.settings.themeMode,
+        state.settings.amoledBlackBackground,
+        state.settings.accentPalette,
+    ) {
         if (!state.isContentLoading) {
             StartupAppearanceStore.write(
                 activity,
                 state.settings.themeMode,
                 state.settings.amoledBlackBackground,
+                state.settings.accentPalette,
             )
         }
     }
@@ -481,7 +492,7 @@ fun PassTickApp(
         }
     }
 
-    PassTheme(displayedThemeMode, displayedAmoled) {
+    PassTheme(displayedThemeMode, displayedAmoled, displayedAccent) {
         if (showCalendarPermissionWarning) {
             AlertDialog(
                 onDismissRequest = { showCalendarPermissionWarning = false },
