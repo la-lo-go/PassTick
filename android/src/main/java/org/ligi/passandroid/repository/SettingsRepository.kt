@@ -134,6 +134,7 @@ data class AppSettings(
     val blurProtectedPassCards: Boolean = false,
     val separateProtectedPasses: Boolean = false,
     val blockScreenshots: Boolean = false,
+    val trashEnabled: Boolean = true,
     val imageExportOptions: PassImageExportOptions = PassImageExportOptions(),
 ) {
     val notificationPolicySettings: NotificationPolicySettings get() = NotificationPolicySettings(
@@ -178,6 +179,7 @@ interface SettingsRepository {
     suspend fun setBlurProtectedPassCards(value: Boolean)
     suspend fun setSeparateProtectedPasses(value: Boolean)
     suspend fun setBlockScreenshots(value: Boolean)
+    suspend fun setTrashEnabled(value: Boolean)
     suspend fun setImageExportOptions(value: PassImageExportOptions)
 }
 
@@ -232,6 +234,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             blurProtectedPassCards = preferences[BLUR_PROTECTED_PASS_CARDS] ?: false,
             separateProtectedPasses = preferences[SEPARATE_PROTECTED_PASSES] ?: false,
             blockScreenshots = preferences[BLOCK_SCREENSHOTS] ?: false,
+            trashEnabled = preferences[TRASH_ENABLED] ?: true,
             imageExportOptions = PassImageExportOptions(
                 aspectRatio = preferences[IMAGE_EXPORT_ASPECT_RATIO]?.let {
                     runCatching { PassImageAspectRatio.valueOf(it) }.getOrNull()
@@ -339,6 +342,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setBlurProtectedPassCards(value: Boolean) = update(BLUR_PROTECTED_PASS_CARDS, value)
     override suspend fun setSeparateProtectedPasses(value: Boolean) = update(SEPARATE_PROTECTED_PASSES, value)
     override suspend fun setBlockScreenshots(value: Boolean) = update(BLOCK_SCREENSHOTS, value)
+    override suspend fun setTrashEnabled(value: Boolean) = update(TRASH_ENABLED, value)
 
     override suspend fun setImageExportOptions(value: PassImageExportOptions) {
         context.settingsDataStore.edit {
@@ -383,6 +387,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val BLUR_PROTECTED_PASS_CARDS = booleanPreferencesKey("blur_protected_pass_cards")
         val SEPARATE_PROTECTED_PASSES = booleanPreferencesKey("separate_protected_passes")
         val BLOCK_SCREENSHOTS = booleanPreferencesKey("block_screenshots")
+        val TRASH_ENABLED = booleanPreferencesKey("trash_enabled")
         val IMAGE_EXPORT_ASPECT_RATIO = stringPreferencesKey("image_export_aspect_ratio")
         val IMAGE_EXPORT_ORIENTATION = stringPreferencesKey("image_export_orientation")
         val IMAGE_EXPORT_CONTENT = stringSetPreferencesKey("image_export_content")

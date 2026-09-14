@@ -50,6 +50,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setBlurProtectedPassCards(true)
             repository.setSeparateProtectedPasses(true)
             repository.setBlockScreenshots(true)
+            repository.setTrashEnabled(false)
             val imageExportOptions = PassImageExportOptions(
                 aspectRatio = PassImageAspectRatio.RATIO_4_5,
                 orientation = PassImageOrientation.LANDSCAPE,
@@ -72,6 +73,7 @@ class DataStoreSettingsRepositoryTest {
                     it.notificationLockScreenDetail == NotificationLockScreenDetail.HIDDEN &&
                     it.lockAllPasses && it.showProtectedPassLockIcon &&
                     it.blurProtectedPassCards && it.separateProtectedPasses && it.blockScreenshots &&
+                    !it.trashEnabled &&
                     it.imageExportOptions == imageExportOptions &&
                     it.passDetailSectionOrder == listOf(
                         PassDetailSection.BARCODE,
@@ -117,6 +119,7 @@ class DataStoreSettingsRepositoryTest {
                     blurProtectedPassCards = true,
                     separateProtectedPasses = true,
                     blockScreenshots = true,
+                    trashEnabled = false,
                     imageExportOptions = imageExportOptions,
                 ),
             )
@@ -155,6 +158,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setBlurProtectedPassCards(false)
             repository.setSeparateProtectedPasses(false)
             repository.setBlockScreenshots(false)
+            repository.setTrashEnabled(true)
             repository.setImageExportOptions(PassImageExportOptions())
         }
     }

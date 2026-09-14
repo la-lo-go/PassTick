@@ -559,6 +559,9 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setBlockScreenshots(value: Boolean) {
         settings.value = settings.value.copy(blockScreenshots = value)
     }
+    override suspend fun setTrashEnabled(value: Boolean) {
+        settings.value = settings.value.copy(trashEnabled = value)
+    }
     override suspend fun setImageExportOptions(value: PassImageExportOptions) {
         settings.value = settings.value.copy(imageExportOptions = value)
     }
