@@ -72,9 +72,13 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updatedArchived = archivedPassIds.toMutableSet().apply { remove(passId) }
         val updatedArtwork = preferredArtworkByPass.toMutableMap().apply { remove(passId) }
         val updatedTrashedAt = trashedAtByPass.toMutableMap().apply { remove(passId) }
-        if (updatedTags == tagsByPass && updatedArchived == archivedPassIds &&
-            updatedArtwork == preferredArtworkByPass && updatedTrashedAt == trashedAtByPass
-        ) return
+        val changed = listOf(
+            updatedTags != tagsByPass,
+            updatedArchived != archivedPassIds,
+            updatedArtwork != preferredArtworkByPass,
+            updatedTrashedAt != trashedAtByPass,
+        ).any()
+        if (!changed) return
         persist(updatedTags, updatedArchived, updatedArtwork, updatedTrashedAt)
         tagsByPass.clear()
         tagsByPass.putAll(updatedTags)
