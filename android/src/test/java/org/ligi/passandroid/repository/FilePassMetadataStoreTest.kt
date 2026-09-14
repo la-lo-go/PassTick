@@ -94,6 +94,66 @@ class FilePassMetadataStoreTest {
     }
 
     @Test
+    fun `stores notes across reopen with escaping intact`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            val note = "Gate A12\nSeat \"12A\" \\ row 1"
+
+            FilePassMetadataStore(file).setNotes("pass-1", note)
+
+            assertThat(FilePassMetadataStore(file).notes("pass-1")).isEqualTo(note)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `blank notes remove the stored key and trim the ends`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).apply {
+                setNotes("pass-1", "  padded note  ")
+                setNotes("pass-2", "   ")
+            }
+
+            FilePassMetadataStore(file).apply {
+                assertThat(notes("pass-1")).isEqualTo("padded note")
+                assertThat(notes("pass-2")).isEmpty()
+                assertThat(org.json.JSONObject(file.readText()).optJSONObject("notes")?.has("pass-2")).isFalse()
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `a legacy file without notes loads empty and remove clears notes`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile()
+        try {
+            file.writeText("{\"tags\":{\"pass-1\":[\"travel\"]}}")
+
+            FilePassMetadataStore(file).apply {
+                assertThat(notes("pass-1")).isEmpty()
+                setNotes("pass-1", "kept note")
+                setNotes("pass-2", "dropped note")
+            }
+
+            FilePassMetadataStore(file).apply {
+                assertThat(notes("pass-1")).isEqualTo("kept note")
+                assertThat(notes("pass-2")).isEqualTo("dropped note")
+                remove("pass-1")
+
+                assertThat(notes("pass-1")).isEmpty()
+                assertThat(notes("pass-2")).isEqualTo("dropped note")
+                assertThat(tags("pass-1")).isEmpty()
+                assertThat(tags("pass-2")).isEmpty()
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun `persists exactly the current metadata key set`() {
         val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
         try {
@@ -108,7 +168,7 @@ class FilePassMetadataStoreTest {
                 buildList { json.keys().forEach { key -> add(key) } }
             }
 
-            assertThat(keys).containsExactlyInAnyOrder("tags", "archived", "preferredArtwork", "trashedAt")
+            assertThat(keys).containsExactlyInAnyOrder("tags", "archived", "preferredArtwork", "trashedAt", "notes")
         } finally {
             file.delete()
         }
