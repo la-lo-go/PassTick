@@ -204,6 +204,15 @@
     <string name="timeline_today">Today</string>
     <string name="timeline_upcoming">Upcoming</string>
     <string name="timeline_past">Past</string>
+    <string name="timeline_view_list">List view</string>
+    <string name="timeline_view_agenda">Agenda view</string>
+    <string name="calendar_previous_month">Previous month</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_selected_day">Selected day</string>
+    <plurals name="calendar_day_passes">
+        <item quantity="one">%1$d pass</item>
+        <item quantity="other">%1$d passes</item>
+    </plurals>
     <string name="home_protected_pass_information_blurred">Protected pass information blurred</string>
     <string name="home_preview_pass_code">Preview pass code</string>
     <string name="home_open_protected_pass">Open protected pass</string>
