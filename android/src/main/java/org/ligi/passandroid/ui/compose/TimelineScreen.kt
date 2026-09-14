@@ -23,8 +23,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AddAlarm
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -43,9 +45,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
@@ -60,6 +65,8 @@ import org.ligi.passandroid.domain.timeline.PassTimeline
 import org.ligi.passandroid.ui.theme.PassActionButton
 import org.ligi.passandroid.ui.theme.PassActionButtonGroup
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
+import org.threeten.bp.LocalDate
+import org.threeten.bp.YearMonth
 import org.threeten.bp.format.DateTimeFormatter
 import androidx.compose.ui.res.stringResource
 import org.ligi.passandroid.R
@@ -77,6 +84,8 @@ sealed interface TimelineAction {
     data class ConfigureReminder(val eventId: String) : TimelineAction
 }
 
+enum class TimelineViewMode { List, Agenda }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineScreen(
@@ -84,6 +93,9 @@ fun TimelineScreen(
     onAction: (TimelineAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var viewMode by rememberSaveable { mutableStateOf(TimelineViewMode.List) }
+    var selectedDayEpoch by rememberSaveable { mutableStateOf<Long?>(null) }
+    var displayedMonthValue by rememberSaveable { mutableStateOf<Long?>(null) }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -93,6 +105,20 @@ fun TimelineScreen(
                     IconButton(onClick = { onAction(TimelineAction.Back) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.pass_detail_back))
                     }
+                },
+                actions = {
+                    ToggleIconButton(
+                        icon = Icons.AutoMirrored.Filled.List,
+                        contentDescription = stringResource(R.string.timeline_view_list),
+                        selected = viewMode == TimelineViewMode.List,
+                        onClick = { viewMode = TimelineViewMode.List },
+                    )
+                    ToggleIconButton(
+                        icon = Icons.Default.CalendarMonth,
+                        contentDescription = stringResource(R.string.timeline_view_agenda),
+                        selected = viewMode == TimelineViewMode.Agenda,
+                        onClick = { viewMode = TimelineViewMode.Agenda },
+                    )
                 },
             )
         },
@@ -107,8 +133,39 @@ fun TimelineScreen(
                 Text(stringResource(R.string.timeline_dates_from_your_passes_will_appear_here))
             }
         } else {
-            TimelineContent(state, onAction, Modifier.padding(padding))
+            when (viewMode) {
+                TimelineViewMode.List -> TimelineContent(state, onAction, Modifier.padding(padding))
+                TimelineViewMode.Agenda -> {
+                    val currentMonth = remember(state.timeline.zoneId) {
+                        YearMonth.from(LocalDate.now(state.timeline.zoneId))
+                    }
+                    AgendaCalendar(
+                        timeline = state.timeline,
+                        selectedDay = selectedDayEpoch?.let(LocalDate::ofEpochDay),
+                        displayedMonth = displayedMonthValue?.toYearMonth() ?: currentMonth,
+                        onMonthChange = { month -> displayedMonthValue = month.year * 12L + month.monthValue },
+                        onDayClick = { date -> selectedDayEpoch = date.toEpochDay() },
+                        modifier = Modifier.padding(padding).padding(16.dp),
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun ToggleIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = if (selected) MaterialTheme.colorScheme.primary else Color.Unspecified,
+        )
     }
 }
 
@@ -348,6 +405,14 @@ internal fun timelineItemIndex(timeline: PassTimeline, eventId: String?): Int? {
         itemIndex += day.events.size
     }
     return null
+}
+
+// A month is encoded as year * 12 + monthValue (1..12); decode without losing December.
+private fun Long.toYearMonth(): YearMonth {
+    val remainder = ((this % 12) + 12) % 12
+    val monthValue = if (remainder == 0L) 12 else remainder.toInt()
+    val year = (this - monthValue) / 12
+    return YearMonth.of(year.toInt(), monthValue)
 }
 
 @Composable
