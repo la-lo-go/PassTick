@@ -24,6 +24,34 @@ class FilePassMetadataStoreTest {
     }
 
     @Test
+    fun `remove clears tags archive and artwork for one pass without touching others`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).apply {
+                setTags("pass-1", setOf("travel"))
+                setArchived("pass-1", true)
+                setPreferredArtwork("pass-1", PassArtworkKind.LOGO)
+                setTags("pass-2", setOf("work"))
+                setArchived("pass-2", true)
+                setPreferredArtwork("pass-2", PassArtworkKind.ICON)
+            }
+
+            FilePassMetadataStore(file).apply {
+                remove("pass-1")
+
+                assertThat(tags("pass-1")).isEmpty()
+                assertThat(isArchived("pass-1")).isFalse()
+                assertThat(preferredArtwork("pass-1")).isNull()
+                assertThat(tags("pass-2")).containsExactly("work")
+                assertThat(isArchived("pass-2")).isTrue()
+                assertThat(preferredArtwork("pass-2")).isEqualTo(PassArtworkKind.ICON)
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun `stores preferred artwork independently from pass contents`() {
         val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
         try {
