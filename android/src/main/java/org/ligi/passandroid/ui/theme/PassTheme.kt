@@ -5,28 +5,19 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import org.ligi.passandroid.repository.AccentPalette
 import org.ligi.passandroid.repository.ThemeMode
 
-private val LightColors = lightColorScheme(
-    primary = Color(0xFF2859C5),
-    secondary = Color(0xFF4C5F8A),
-    tertiary = Color(0xFF79536F),
-)
-
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFFB2C5FF),
-    secondary = Color(0xFFB7C4EA),
-    tertiary = Color(0xFFE7B9D9),
-)
+// Blue baseline fallback for API 29/30; shares its stops with AccentPalette.BLUE.
+private val LightColors = accentColorSchemes(AccentPalette.BLUE)!!.first
+private val DarkColors = accentColorSchemes(AccentPalette.BLUE)!!.second
 
 private val PassShapes = Shapes(
     small = RoundedCornerShape(12.dp),
@@ -39,6 +30,7 @@ private val PassShapes = Shapes(
 fun PassTheme(
     themeMode: ThemeMode,
     amoledBlackBackground: Boolean = false,
+    accentPalette: AccentPalette = AccentPalette.DYNAMIC,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode) {
@@ -47,7 +39,12 @@ fun PassTheme(
         ThemeMode.DARK -> true
     }
     val context = LocalContext.current
-    val baseColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    // A curated accent palette wins on every API level; DYNAMIC falls back to wallpaper colors
+    // from API 31 and to the blue baseline below.
+    val baseColors = if (accentPalette != AccentPalette.DYNAMIC) {
+        val (light, darkScheme) = accentColorSchemes(accentPalette)!!
+        if (dark) darkScheme else light
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     } else if (dark) {
         DarkColors
