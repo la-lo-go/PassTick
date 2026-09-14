@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
@@ -55,6 +56,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -71,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.navigation.PassDateField
@@ -114,6 +117,7 @@ fun PassDetailScreen(
     var tagMenuOpen by remember { mutableStateOf(false) }
     var configureReminder by remember { mutableStateOf(false) }
     var editDateDialog by remember { mutableStateOf(false) }
+    var editNotesDialog by remember { mutableStateOf(false) }
     var advancedReminderActions by remember(pass?.id) { mutableStateOf(false) }
     var codeHeld by remember(pass?.id) { mutableStateOf(false) }
     var codePinned by remember(pass?.id) { mutableStateOf(initialCodeExpanded) }
@@ -213,6 +217,30 @@ fun PassDetailScreen(
             },
         )
     }
+    if (editNotesDialog) {
+        var noteDraft by remember(pass?.id) { mutableStateOf(pass?.notes.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { editNotesDialog = false },
+            title = { Text(stringResource(R.string.pass_detail_note)) },
+            text = {
+                OutlinedTextField(
+                    noteDraft,
+                    { noteDraft = it },
+                    label = { Text(stringResource(R.string.layout_notes)) },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth().testTag("note_draft"),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { editNotesDialog = false; onAction(PassDetailAction.SetNotes(noteDraft)) }) {
+                    Text(stringResource(R.string.pass_detail_save_note))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editNotesDialog = false }) { Text(stringResource(R.string.pass_detail_cancel)) }
+            },
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -271,6 +299,30 @@ fun PassDetailScreen(
                                 onClick = {
                                     overflowOpen = false
                                     tagMenuOpen = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            if (pass?.notes.isNullOrBlank()) R.string.pass_detail_add_note
+                                            else R.string.pass_detail_edit_note,
+                                        ),
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.EditNote, null) },
+                                onClick = {
+                                    overflowOpen = false
+                                    editNotesDialog = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_remove_note)) },
+                                leadingIcon = { Icon(Icons.Default.DeleteOutline, null) },
+                                enabled = !pass?.notes.isNullOrBlank(),
+                                onClick = {
+                                    overflowOpen = false
+                                    onAction(PassDetailAction.SetNotes(""))
                                 },
                             )
                             DropdownMenuItem(
@@ -419,6 +471,7 @@ fun PassDetailScreen(
                         onBarcodeHoldChanged = { codeHeld = it },
                         onBarcodePin = { codePinned = true },
                         onEditDateRequested = { editDateDialog = true },
+                        onEditNotesRequested = { editNotesDialog = true },
                     )
                 }
                 }
@@ -437,6 +490,7 @@ internal fun PassDetailSectionList(
     onBarcodeHoldChanged: (Boolean) -> Unit,
     onBarcodePin: () -> Unit,
     onEditDateRequested: () -> Unit,
+    onEditNotesRequested: () -> Unit = {},
     modifier: Modifier = Modifier,
     artworkFallback: (@Composable () -> Unit)? = null,
 ) {
@@ -523,7 +577,12 @@ internal fun PassDetailSectionList(
                         }
                     }
                     PassDetailSection.NOTES -> if (pass.notes.isNotBlank()) {
-                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                        val noteShape = RoundedCornerShape(28.dp)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clip(noteShape).clickable { onEditNotesRequested() },
+                            shape = noteShape,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                        ) {
                             ListItem(
                                 leadingContent = { Icon(Icons.Default.EditNote, null) },
                                 supportingContent = { Text(pass.notes) },

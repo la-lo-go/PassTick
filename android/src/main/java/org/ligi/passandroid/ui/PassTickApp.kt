@@ -428,6 +428,7 @@ fun PassTickApp(
                 AppAction.MovePass(passId, action.categoryId),
             )
             is PassDetailAction.SetTags -> viewModel.onAction(AppAction.SetPassTags(passId, action.tagIds))
+            is PassDetailAction.SetNotes -> viewModel.onAction(AppAction.SetPassNotes(passId, action.text))
             is PassDetailAction.SetProtected -> setProtectedWithAuthentication(passId, action.isProtected)
             is PassDetailAction.SetArchived -> viewModel.onAction(
                 AppAction.SetPassArchived(passId, action.isArchived, announce = false),

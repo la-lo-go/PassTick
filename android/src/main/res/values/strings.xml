@@ -41,6 +41,10 @@
     <string name="pass_detail_open_in_maps">Open in Maps</string>
     <string name="pass_detail_date_and_time">Date and time</string>
     <string name="pass_detail_note">Note</string>
+    <string name="pass_detail_add_note">Add note</string>
+    <string name="pass_detail_edit_note">Edit note</string>
+    <string name="pass_detail_remove_note">Remove note</string>
+    <string name="pass_detail_save_note">Save note</string>
     <string name="pass_detail_no_barcode">No barcode</string>
     <string name="pass_detail_back">Back</string>
     <string name="pass_detail_pass_actions">Pass actions</string>

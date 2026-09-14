@@ -24,6 +24,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
@@ -52,6 +53,7 @@ import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.EditPassAction
+import org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.theme.PassTheme
 import androidx.compose.ui.unit.DpSize
@@ -772,6 +774,66 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithContentDescription("Expanded pass code").assertIsDisplayed()
+    }
+
+    @Test
+    fun notesSectionStaysHiddenWhenThePassHasNoNote() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = {})
+            }
+        }
+
+        composeRule.onNodeWithText("Note").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Edit note").assertDoesNotExist()
+        composeRule.onNodeWithText("Remove note").assertDoesNotExist()
+        composeRule.onNodeWithText("Add note").assertIsDisplayed()
+    }
+
+    @Test
+    fun notesSectionShowsTheNoteAndEditsItThroughTheDialog() {
+        val actions = mutableListOf<PassDetailAction>()
+        val notedPass = pass("one", "Boarding pass", PassType.BOARDING).copy(notes = "Gate opens at 6")
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassDetailScreen(notedPass, onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithText("Note").assertIsDisplayed()
+        composeRule.onNodeWithText("Gate opens at 6").performClick()
+        composeRule.onNodeWithTag("note_draft").performTextInput(", row 1")
+        composeRule.onNodeWithText("Save note").performClick()
+
+        assertThat(actions).containsExactly(PassDetailAction.SetNotes("Gate opens at 6, row 1"))
+    }
+
+    @Test
+    fun notesOverflowCanRemoveTheNote() {
+        val actions = mutableListOf<PassDetailAction>()
+        val notedPass = pass("one", "Boarding pass", PassType.BOARDING).copy(notes = "Gate opens at 6")
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassDetailScreen(notedPass, onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Remove note").performClick()
+
+        assertThat(actions).containsExactly(PassDetailAction.SetNotes(""))
+    }
+
+    @Test
+    fun passDetailLayoutListsNotesWithAWorkingSwitch() {
+        val actions = mutableListOf<PassDetailLayoutSettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailLayoutSettingsScreen(PassDetailSection.entries, emptySet(), actions::add)
+            }
+        }
+
+        composeRule.onNodeWithText("Notes").assertIsDisplayed()
+        composeRule.onAllNodes(isToggleable())[PassDetailSection.entries.indexOf(PassDetailSection.NOTES)].performClick()
+
+        assertThat(actions).containsExactly(PassDetailLayoutSettingsAction.SetVisible(PassDetailSection.NOTES, false))
     }
 
     private fun assertVisualContent(image: androidx.compose.ui.graphics.ImageBitmap) {
