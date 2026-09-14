@@ -30,6 +30,28 @@ class PassSearchTest {
     }
 
     @Test
+    fun `search matches notes alongside the pass fields`() {
+        val pass = PassUiModel(
+            id = "id",
+            description = "Boarding pass",
+            creator = null,
+            type = PassType.BOARDING,
+            accentColor = 0,
+            barcodeFormat = null,
+            barcodeMessage = null,
+            barcodeAlternativeText = null,
+            fields = emptyList(),
+            locations = emptyList(),
+            calendarEvent = null,
+            notes = "Seat change at gate B7",
+        )
+
+        val document = pass.searchDocument()
+
+        assertThat("gate b7".searchTerms().all(document::contains)).isTrue()
+    }
+
+    @Test
     fun `blank query has no terms`() {
         assertThat("   ".searchTerms()).isEmpty()
     }

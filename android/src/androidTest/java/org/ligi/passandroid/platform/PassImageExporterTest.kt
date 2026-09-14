@@ -165,6 +165,19 @@ class PassImageExporterTest {
     }
 
     @Test
+    fun notesRenderIntoTheDetailsWhenEnabled() {
+        val options = PassImageExportOptions(
+            content = PassImageContent(artwork = false, details = true, barcode = false, dateTime = false, location = false),
+        )
+        val withoutNotes = PassImageExporter.renderBitmap(pass, options)
+        val withNotes = PassImageExporter.renderBitmap(pass.copy(notes = "Gate opens at six\nRow 1, seat 12A"), options)
+
+        assertThat(withNotes.height).isGreaterThan(withoutNotes.height)
+        withoutNotes.recycle()
+        withNotes.recycle()
+    }
+
+    @Test
     fun emptyContentStillRendersACard() {
         val bitmap = PassImageExporter.renderBitmap(
             pass,

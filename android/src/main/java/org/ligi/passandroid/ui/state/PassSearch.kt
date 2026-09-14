@@ -9,6 +9,7 @@ internal fun PassUiModel.searchDocument(categoryName: String? = null): String = 
     append(type.name).append(' ')
     append(barcodeAlternativeText.orEmpty()).append(' ')
     append(barcodeMessage.orEmpty()).append(' ')
+    append(notes).append(' ')
     append(categoryName.orEmpty()).append(' ')
     append(calendarTimeSpan?.from?.toString().orEmpty()).append(' ')
     append(calendarTimeSpan?.to?.toString().orEmpty()).append(' ')

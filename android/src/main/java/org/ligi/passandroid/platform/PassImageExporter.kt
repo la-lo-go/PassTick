@@ -279,6 +279,7 @@ object PassImageExporter {
     private fun detailLines(pass: PassUiModel, content: PassImageContent): List<String> = buildList {
         if (content.details) {
             pass.creator?.takeIf { it.isNotBlank() }?.let { add("Created by: $it") }
+            pass.notes.takeIf(String::isNotBlank)?.let { add("Note: $it") }
             pass.fields.filter { !it.hidden || content.hiddenFields }.forEach { add("${it.label}: ${it.value}") }
         }
         if (content.dateTime) {
