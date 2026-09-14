@@ -377,6 +377,7 @@ private fun snapshot(id: String, description: String, categoryId: String = "new"
 
 private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     private val passes = MutableStateFlow(initial)
+    private val trashed = MutableStateFlow<List<PassSnapshot>>(emptyList())
     val deletedIds = mutableListOf<String>()
     val updates = mutableListOf<Pair<String, PassUpdate>>()
     val exports = mutableListOf<Pair<String, Uri>>()
@@ -384,6 +385,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val moved = mutableListOf<Pair<String, String>>()
     val protectionChanges = mutableListOf<Pair<String, Boolean>>()
     val moveDelayMillis = mutableMapOf<String, Long>()
+    val purgedRetentions = mutableListOf<Long>()
 
     override fun observePasses() = passes.asStateFlow()
     override suspend fun import(uri: Uri) = Result.failure<PassSnapshot>(UnsupportedOperationException())
@@ -413,9 +415,33 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     override suspend fun setPreferredArtwork(id: String, kind: org.ligi.passandroid.repository.PassArtworkKind?) {
         passes.value = passes.value.map { if (it.id == id) it.copy(preferredArtworkKind = kind) else it }
     }
+    override suspend fun trashPass(id: String) {
+        val pass = passes.value.first { it.id == id }
+        passes.value = passes.value.filterNot { it.id == id }
+        trashed.value = trashed.value + pass.copy(
+            trashedAtEpochMillis = org.threeten.bp.Instant.now().toEpochMilli(),
+        )
+    }
+    override suspend fun restoreFromTrash(id: String) {
+        val pass = trashed.value.first { it.id == id }
+        trashed.value = trashed.value.filterNot { it.id == id }
+        passes.value = passes.value + pass.copy(trashedAtEpochMillis = null)
+    }
+    override fun observeTrashedPasses() = trashed.asStateFlow()
+    override suspend fun purgeExpiredTrash(retention: org.threeten.bp.Duration) {
+        purgedRetentions += retention.toMillis()
+        val now = org.threeten.bp.Instant.now().toEpochMilli()
+        trashed.value.filter { pass ->
+            pass.trashedAtEpochMillis?.let { now - it > retention.toMillis() } == true
+        }.forEach { delete(it.id) }
+    }
+    override suspend fun emptyTrash() {
+        trashed.value.toList().forEach { delete(it.id) }
+    }
     override suspend fun delete(id: String): Boolean {
         deletedIds += id
         passes.value = passes.value.filterNot { it.id == id }
+        trashed.value = trashed.value.filterNot { it.id == id }
         return true
     }
     override suspend fun export(id: String, destination: Uri): Result<Unit> {

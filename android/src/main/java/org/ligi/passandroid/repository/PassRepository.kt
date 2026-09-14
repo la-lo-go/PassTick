@@ -23,9 +23,14 @@ import org.ligi.passandroid.repository.io.PassExporter
 import org.ligi.passandroid.repository.io.UnzipPassController
 import java.io.File
 import java.util.UUID
+import org.threeten.bp.Duration
+import org.threeten.bp.Instant
 import org.threeten.bp.ZonedDateTime
 
 const val DEFAULT_PASS_CATEGORY_ID = "new"
+
+/** Trash expiry is enforced lazily at the next app open, which fits the offline-first app. */
+val TRASH_RETENTION: Duration = Duration.ofDays(7)
 
 data class PassFieldSnapshot(
     val key: String?,
@@ -66,8 +71,10 @@ data class PassSnapshot(
     val tagIds: Set<String> = emptySet(),
     val isArchived: Boolean = false,
     val preferredArtworkKind: PassArtworkKind? = null,
+    val trashedAtEpochMillis: Long? = null,
 ) {
     val isPinned: Boolean get() = isFavorite
+    val isTrashed: Boolean get() = trashedAtEpochMillis != null
 }
 
 data class PassUpdate(
@@ -108,6 +115,16 @@ interface PassRepository {
     suspend fun setPreferredArtwork(id: String, kind: PassArtworkKind?)
 
     suspend fun delete(id: String): Boolean
+
+    suspend fun trashPass(id: String)
+
+    suspend fun restoreFromTrash(id: String)
+
+    fun observeTrashedPasses(): Flow<List<PassSnapshot>>
+
+    suspend fun purgeExpiredTrash(retention: Duration)
+
+    suspend fun emptyTrash()
 
     suspend fun export(id: String, destination: Uri): Result<Unit>
 
@@ -266,6 +283,36 @@ class FilePassRepository(
         }
     }
 
+    override suspend fun trashPass(id: String) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        metadataStore.setTrashedAt(id, Instant.now().toEpochMilli())
+        passStore.notifyChange()
+    }
+
+    override suspend fun restoreFromTrash(id: String) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        metadataStore.setTrashedAt(id, null)
+        passStore.notifyChange()
+    }
+
+    override fun observeTrashedPasses(): Flow<List<PassSnapshot>> = flow {
+        emit(trashedSnapshots())
+        emitAll(passStore.updates.map { trashedSnapshots() })
+    }
+
+    override suspend fun purgeExpiredTrash(retention: Duration) = withContext(ioDispatcher) {
+        val now = Instant.now().toEpochMilli()
+        trashedSnapshots().filter { snapshot ->
+            snapshot.trashedAtEpochMillis?.let { trashedAt -> now - trashedAt > retention.toMillis() } == true
+        }.forEach { delete(it.id) }
+    }
+
+    override suspend fun emptyTrash() = withContext(ioDispatcher) {
+        trashedSnapshots().forEach { delete(it.id) }
+    }
+
+    private fun trashedSnapshots() = snapshot().filter(PassSnapshot::isTrashed)
+
     override suspend fun export(id: String, destination: Uri): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
             val target = File.createTempFile("pass-export-", ".espass", context.cacheDir)
@@ -306,6 +353,12 @@ class FilePassRepository(
             migratedLegacyPassIds += pass.id
         }
         val currentTopic = passStore.classifier.getTopic(pass.id, context.getString(R.string.topic_new))
+        // Legacy classifier data keeps "trash" as a topic; it moves into trashedAt metadata on first read.
+        val trashedAt = metadataStore.trashedAt(pass.id) ?: if (currentTopic == "trash") {
+            Instant.now().toEpochMilli().also { metadataStore.setTrashedAt(pass.id, it) }
+        } else {
+            null
+        }
         pass.toSnapshot(
             passStore.getPathForID(pass.id),
             currentTopic,
@@ -314,10 +367,11 @@ class FilePassRepository(
             metadataStore.tags(pass.id),
             metadataStore.isArchived(pass.id),
             metadataStore.preferredArtwork(pass.id),
+            trashedAt,
         )
     }
 
-    private fun visibleSnapshots() = snapshot().filterNot { it.categoryId == "trash" }
+    private fun visibleSnapshots() = snapshot().filterNot { it.isTrashed || it.categoryId == "trash" }
 }
 
 private fun Pass.toSnapshot(
@@ -328,6 +382,7 @@ private fun Pass.toSnapshot(
     tagIds: Set<String> = emptySet(),
     isArchived: Boolean = false,
     preferredArtworkKind: PassArtworkKind? = null,
+    trashedAtEpochMillis: Long? = null,
 ) = PassSnapshot(
     id = id,
     description = description.orEmpty(),
@@ -352,6 +407,7 @@ private fun Pass.toSnapshot(
     tagIds = tagIds,
     isArchived = isArchived,
     preferredArtworkKind = preferredArtworkKind,
+    trashedAtEpochMillis = trashedAtEpochMillis,
 )
 
 internal fun bestArtworkFile(path: File, kind: PassArtworkKind): File? {

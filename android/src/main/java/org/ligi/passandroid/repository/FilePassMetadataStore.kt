@@ -12,6 +12,7 @@ class FilePassMetadataStore(private val backingFile: File) {
     private val tagsByPass = loadTags(backingFile)
     private val archivedPassIds = loadSet(backingFile, "archived")
     private val preferredArtworkByPass = loadPreferredArtwork(backingFile)
+    private val trashedAtByPass = loadTrashedAt(backingFile)
 
     @Synchronized fun tags(passId: String): Set<String> = tagsByPass[passId].orEmpty()
 
@@ -22,7 +23,7 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = tagsByPass.toMutableMap().apply {
             if (normalized.isEmpty()) remove(passId) else put(passId, normalized)
         }
-        persist(updated, archivedPassIds, preferredArtworkByPass)
+        persist(updated, archivedPassIds, preferredArtworkByPass, trashedAtByPass)
         tagsByPass.clear()
         tagsByPass.putAll(updated)
     }
@@ -35,7 +36,7 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = archivedPassIds.toMutableSet().apply {
             if (archived) add(passId) else remove(passId)
         }
-        persist(tagsByPass, updated, preferredArtworkByPass)
+        persist(tagsByPass, updated, preferredArtworkByPass, trashedAtByPass)
         archivedPassIds.clear()
         archivedPassIds.addAll(updated)
     }
@@ -48,29 +49,48 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = preferredArtworkByPass.toMutableMap().apply {
             if (kind == null) remove(passId) else put(passId, kind)
         }
-        persist(tagsByPass, archivedPassIds, updated)
+        persist(tagsByPass, archivedPassIds, updated, trashedAtByPass)
         preferredArtworkByPass.clear()
         preferredArtworkByPass.putAll(updated)
+    }
+
+    @Synchronized fun trashedAt(passId: String): Long? = trashedAtByPass[passId]
+
+    @Synchronized fun setTrashedAt(passId: String, epochMillis: Long?) {
+        require(passId.isNotBlank()) { "Pass ID cannot be empty" }
+        if (epochMillis == trashedAtByPass[passId]) return
+        val updated = trashedAtByPass.toMutableMap().apply {
+            if (epochMillis == null) remove(passId) else put(passId, epochMillis)
+        }
+        persist(tagsByPass, archivedPassIds, preferredArtworkByPass, updated)
+        trashedAtByPass.clear()
+        trashedAtByPass.putAll(updated)
     }
 
     @Synchronized fun remove(passId: String) {
         val updatedTags = tagsByPass.toMutableMap().apply { remove(passId) }
         val updatedArchived = archivedPassIds.toMutableSet().apply { remove(passId) }
         val updatedArtwork = preferredArtworkByPass.toMutableMap().apply { remove(passId) }
-        if (updatedTags == tagsByPass && updatedArchived == archivedPassIds && updatedArtwork == preferredArtworkByPass) return
-        persist(updatedTags, updatedArchived, updatedArtwork)
+        val updatedTrashedAt = trashedAtByPass.toMutableMap().apply { remove(passId) }
+        if (updatedTags == tagsByPass && updatedArchived == archivedPassIds &&
+            updatedArtwork == preferredArtworkByPass && updatedTrashedAt == trashedAtByPass
+        ) return
+        persist(updatedTags, updatedArchived, updatedArtwork, updatedTrashedAt)
         tagsByPass.clear()
         tagsByPass.putAll(updatedTags)
         archivedPassIds.clear()
         archivedPassIds.addAll(updatedArchived)
         preferredArtworkByPass.clear()
         preferredArtworkByPass.putAll(updatedArtwork)
+        trashedAtByPass.clear()
+        trashedAtByPass.putAll(updatedTrashedAt)
     }
 
     private fun persist(
         tags: Map<String, Set<String>>,
         archived: Set<String>,
         preferredArtwork: Map<String, PassArtworkKind>,
+        trashedAt: Map<String, Long>,
     ) {
         val parent = requireNotNull(backingFile.absoluteFile.parentFile) { "Metadata file needs a parent directory" }
         check(parent.isDirectory || (!parent.exists() && parent.mkdirs())) { "Cannot create metadata directory" }
@@ -80,6 +100,8 @@ class FilePassMetadataStore(private val backingFile: File) {
                 tags.toSortedMap().forEach { (id, values) -> put(id, JSONArray(values.sorted())) }
             }).put("archived", JSONArray(archived.sorted())).put("preferredArtwork", JSONObject().apply {
                 preferredArtwork.toSortedMap().forEach { (id, kind) -> put(id, kind.name) }
+            }).put("trashedAt", JSONObject().apply {
+                trashedAt.toSortedMap().forEach { (id, millis) -> put(id, millis) }
             })
             temporary.writeText(json.toString())
             try {
@@ -114,6 +136,13 @@ class FilePassMetadataStore(private val backingFile: File) {
                 values.keys().forEach { id ->
                     runCatching { PassArtworkKind.valueOf(values.getString(id)) }.getOrNull()?.let { put(id, it) }
                 }
+            }.toMutableMap()
+        }.getOrDefault(mutableMapOf())
+
+        fun loadTrashedAt(file: File): MutableMap<String, Long> = runCatching {
+            val values = JSONObject(file.readText()).optJSONObject("trashedAt") ?: return@runCatching mutableMapOf()
+            buildMap {
+                values.keys().forEach { id -> values.optLong(id, Long.MIN_VALUE).takeIf { it != Long.MIN_VALUE }?.let { put(id, it) } }
             }.toMutableMap()
         }.getOrDefault(mutableMapOf())
     }

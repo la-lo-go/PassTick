@@ -24,6 +24,48 @@ class FilePassMetadataStoreTest {
     }
 
     @Test
+    fun `stores trashedAt across reopen and clears it with null`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).setTrashedAt("pass-1", 1_700_000_000_000)
+
+            assertThat(FilePassMetadataStore(file).trashedAt("pass-1")).isEqualTo(1_700_000_000_000)
+
+            FilePassMetadataStore(file).setTrashedAt("pass-1", null)
+
+            assertThat(FilePassMetadataStore(file).trashedAt("pass-1")).isNull()
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `trashedAt is independent from archived tags and remove clears it`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).apply {
+                setTags("pass-1", setOf("travel"))
+                setArchived("pass-1", true)
+                setTrashedAt("pass-1", 1_700_000_000_000)
+            }
+
+            FilePassMetadataStore(file).apply {
+                assertThat(trashedAt("pass-1")).isEqualTo(1_700_000_000_000)
+                assertThat(tags("pass-1")).containsExactly("travel")
+                assertThat(isArchived("pass-1")).isTrue()
+
+                remove("pass-1")
+
+                assertThat(trashedAt("pass-1")).isNull()
+                assertThat(tags("pass-1")).isEmpty()
+                assertThat(isArchived("pass-1")).isFalse()
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun `remove clears tags archive and artwork for one pass without touching others`() {
         val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
         try {
