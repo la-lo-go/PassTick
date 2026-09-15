@@ -112,12 +112,15 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.displayArtwork
 import org.ligi.passandroid.ui.state.occursToday
+import org.ligi.passandroid.ui.state.resolvePassCardTextLines
+import org.ligi.passandroid.ui.state.resolvePassCardTitle
 import org.ligi.passandroid.ui.state.searchDocument
 import org.ligi.passandroid.ui.state.searchTerms
 import org.ligi.passandroid.ui.state.AppAction
@@ -488,6 +491,9 @@ fun PassHomeScreen(
                             protectedPassIds = protectedPassIds,
                             blurProtectedPassCards = state.settings.blurProtectedPassCards,
                             showLockIcon = state.settings.showProtectedPassLockIcon,
+                            sectionOrder = state.settings.homeCardSectionOrder,
+                            hiddenSections = state.settings.hiddenHomeCardSections,
+                            tagCategories = state.categories,
                             onRestore = { onAction(HomeAction.RestoreFromTrash(it)) },
                             onDeleteForever = { deleteForeverPassId = it },
                             onEmptyTrash = { showEmptyTrashConfirm = true },
@@ -885,6 +891,9 @@ private fun TrashSection(
     protectedPassIds: Set<String>,
     blurProtectedPassCards: Boolean,
     showLockIcon: Boolean,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
+    tagCategories: List<PassCategory>,
     onRestore: (String) -> Unit,
     onDeleteForever: (String) -> Unit,
     onEmptyTrash: () -> Unit,
@@ -940,6 +949,9 @@ private fun TrashSection(
                     locked = pass.id in protectedPassIds && !unlocked,
                     blurProtectedPassCards = blurProtectedPassCards,
                     showLockIcon = showLockIcon,
+                    sectionOrder = sectionOrder,
+                    hiddenSections = hiddenSections,
+                    tagCategories = tagCategories,
                     onRestore = { onRestore(pass.id) },
                     onDeleteForever = { onDeleteForever(pass.id) },
                 )
@@ -954,6 +966,9 @@ private fun TrashPassCard(
     locked: Boolean,
     blurProtectedPassCards: Boolean,
     showLockIcon: Boolean,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
+    tagCategories: List<PassCategory>,
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
 ) {
@@ -989,7 +1004,7 @@ private fun TrashPassCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            pass.description,
+                            resolvePassCardTitle(pass, sectionOrder, hiddenSections, tagCategories),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 2,
@@ -999,6 +1014,17 @@ private fun TrashPassCard(
                             Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    resolvePassCardTextLines(pass, sectionOrder, hiddenSections, tagCategories)
+                        .drop(1)
+                        .forEach { line ->
+                            Text(
+                                line,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     Text(
                         trashDeletedLabel(pass.trashedAtEpochMillis),
                         style = MaterialTheme.typography.bodySmall,
