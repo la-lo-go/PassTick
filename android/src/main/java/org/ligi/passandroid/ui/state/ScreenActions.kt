@@ -1,7 +1,7 @@
 package org.ligi.passandroid.ui.state
 
 import org.ligi.passandroid.model.comparator.PassSortOrder
-import org.ligi.passandroid.repository.AccentPalette
+import org.ligi.passandroid.repository.ColorStyle
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
@@ -60,7 +60,9 @@ sealed interface SettingsAction {
     data object Back : SettingsAction
     data class SetTheme(val value: ThemeMode) : SettingsAction
     data class SetAmoledBlackBackground(val value: Boolean) : SettingsAction
-    data class SetAccentPalette(val value: AccentPalette) : SettingsAction
+    data class SetDynamicColors(val value: Boolean) : SettingsAction
+    data class SetAccentColor(val value: Long?) : SettingsAction
+    data class SetColorStyle(val value: ColorStyle) : SettingsAction
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction

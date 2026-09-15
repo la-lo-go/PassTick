@@ -19,7 +19,9 @@ class DataStoreSettingsRepositoryTest {
             )
             repository.setThemeMode(ThemeMode.DARK)
             repository.setAmoledBlackBackground(true)
-            repository.setAccentPalette(AccentPalette.GREEN)
+            repository.setDynamicColors(false)
+            repository.setAccentColor(0xFF006C4CL)
+            repository.setColorStyle(ColorStyle.VIBRANT)
             repository.setAutomaticBrightness(false)
             repository.setSortOrder(PassSortOrder.TYPE)
             repository.setPassOrder(listOf("pass-3", "pass-1"))
@@ -61,7 +63,7 @@ class DataStoreSettingsRepositoryTest {
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
-                    it.accentPalette == AccentPalette.GREEN &&
+                    !it.dynamicColors && it.accentColor == 0xFF006C4CL && it.colorStyle == ColorStyle.VIBRANT &&
                     it.sortOrder == PassSortOrder.TYPE && it.passOrder == listOf("pass-3", "pass-1") &&
                     it.categories == categories &&
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
@@ -90,7 +92,9 @@ class DataStoreSettingsRepositoryTest {
                 AppSettings(
                     ThemeMode.DARK,
                     amoledBlackBackground = true,
-                    accentPalette = AccentPalette.GREEN,
+                    dynamicColors = false,
+                    accentColor = 0xFF006C4CL,
+                    colorStyle = ColorStyle.VIBRANT,
                     automaticBrightness = false,
                     sortOrder = PassSortOrder.TYPE,
                     passOrder = listOf("pass-3", "pass-1"),
@@ -137,7 +141,9 @@ class DataStoreSettingsRepositoryTest {
             )
             repository.setThemeMode(ThemeMode.SYSTEM)
             repository.setAmoledBlackBackground(false)
-            repository.setAccentPalette(AccentPalette.DYNAMIC)
+            repository.setDynamicColors(true)
+            repository.setAccentColor(null)
+            repository.setColorStyle(ColorStyle.TONAL_SPOT)
             repository.setAutomaticBrightness(true)
             repository.setSortOrder(PassSortOrder.DATE_DESC)
             repository.setPassOrder(emptyList())

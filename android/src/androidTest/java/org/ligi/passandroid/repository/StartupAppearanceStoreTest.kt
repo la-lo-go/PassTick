@@ -10,39 +10,60 @@ class StartupAppearanceStoreTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun missingKeyReadsDefaults() {
-        StartupAppearanceStore.write(context, ThemeMode.SYSTEM, false, AccentPalette.DYNAMIC)
+    fun missingKeysReadDefaults() {
+        StartupAppearanceStore.write(context, ThemeMode.SYSTEM, false)
         context.getSharedPreferences("startup_appearance", Context.MODE_PRIVATE).edit().clear().commit()
 
         val appearance = StartupAppearanceStore.read(context)
 
         assertThat(appearance.themeMode).isEqualTo(ThemeMode.SYSTEM)
         assertThat(appearance.amoledBlackBackground).isFalse()
-        assertThat(appearance.accentPalette).isEqualTo(AccentPalette.DYNAMIC)
+        assertThat(appearance.dynamicColors).isTrue()
+        assertThat(appearance.accentColor).isNull()
+        assertThat(appearance.colorStyle).isEqualTo(ColorStyle.TONAL_SPOT)
     }
 
     @Test
-    fun unknownAccentValueFallsBackToDynamic() {
-        StartupAppearanceStore.write(context, ThemeMode.DARK, true, AccentPalette.GREEN)
-        context.getSharedPreferences("startup_appearance", Context.MODE_PRIVATE)
-            .edit().putString("accent_palette", "NOT_A_PALETTE").commit()
+    fun legacyPaletteNameMigratesToItsSeedColor() {
+        context.getSharedPreferences("startup_appearance", Context.MODE_PRIVATE).edit().clear()
+            .putString("theme_mode", "DARK")
+            .putBoolean("amoled", true)
+            .putString("accent_palette", "GREEN")
+            .commit()
 
-        assertThat(StartupAppearanceStore.read(context).accentPalette).isEqualTo(AccentPalette.DYNAMIC)
+        val appearance = StartupAppearanceStore.read(context)
+
+        assertThat(appearance.dynamicColors).isFalse()
+        assertThat(appearance.accentColor).isEqualTo(0xFF006C4CL)
+    }
+
+    @Test
+    fun unknownLegacyPaletteFallsBackToDynamicDefaults() {
+        context.getSharedPreferences("startup_appearance", Context.MODE_PRIVATE).edit().clear()
+            .putString("accent_palette", "NOT_A_PALETTE")
+            .commit()
+
+        val appearance = StartupAppearanceStore.read(context)
+
+        assertThat(appearance.dynamicColors).isTrue()
+        assertThat(appearance.accentColor).isNull()
     }
 
     @Test
     fun writePersistsAllAppearanceValues() {
-        StartupAppearanceStore.write(context, ThemeMode.LIGHT, false, AccentPalette.TEAL)
+        StartupAppearanceStore.write(context, ThemeMode.LIGHT, false, false, 0xFF765848L, ColorStyle.VIBRANT)
 
         val appearance = StartupAppearanceStore.read(context)
 
         assertThat(appearance.themeMode).isEqualTo(ThemeMode.LIGHT)
         assertThat(appearance.amoledBlackBackground).isFalse()
-        assertThat(appearance.accentPalette).isEqualTo(AccentPalette.TEAL)
+        assertThat(appearance.dynamicColors).isFalse()
+        assertThat(appearance.accentColor).isEqualTo(0xFF765848L)
+        assertThat(appearance.colorStyle).isEqualTo(ColorStyle.VIBRANT)
     }
 
     @After
     fun resetAppearance() {
-        StartupAppearanceStore.write(context, ThemeMode.SYSTEM, false, AccentPalette.DYNAMIC)
+        StartupAppearanceStore.write(context, ThemeMode.SYSTEM, false)
     }
 }

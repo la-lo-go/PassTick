@@ -587,8 +587,14 @@ private class FakeSettingsRepository : SettingsRepository {
     var savedReminderActions: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>> = emptyMap()
     override suspend fun setThemeMode(value: ThemeMode) = Unit
     override suspend fun setAmoledBlackBackground(value: Boolean) = Unit
-    override suspend fun setAccentPalette(value: org.ligi.passandroid.repository.AccentPalette) {
-        settings.value = settings.value.copy(accentPalette = value)
+    override suspend fun setDynamicColors(value: Boolean) {
+        settings.value = settings.value.copy(dynamicColors = value)
+    }
+    override suspend fun setAccentColor(value: Long?) {
+        settings.value = settings.value.copy(accentColor = value)
+    }
+    override suspend fun setColorStyle(value: org.ligi.passandroid.repository.ColorStyle) {
+        settings.value = settings.value.copy(colorStyle = value)
     }
     override suspend fun setAutomaticBrightness(value: Boolean) = Unit
     override suspend fun setSortOrder(value: PassSortOrder) {

@@ -135,15 +135,15 @@ class PassScreensTest {
 
     @Test
     fun settingsExposeThemeAndAccessibilityOptions() {
-        val settings = AppSettings(themeMode = ThemeMode.DARK)
+        val settings = AppSettings(themeMode = ThemeMode.DARK, dynamicColors = false)
         composeRule.setContent {
-            PassTheme(settings.themeMode, settings.amoledBlackBackground) {
+            PassTheme(settings.themeMode, settings.amoledBlackBackground, dynamicColors = false) {
                 SettingsScreen(settings, onAction = {})
             }
         }
 
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
-        composeRule.onNodeWithText("Accent color").assertIsDisplayed()
+        composeRule.onNodeWithText("Accent color").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Use AMOLED black background").assertIsDisplayed()
         composeRule.onNodeWithText("Use HDR and maximum code brightness").assertIsDisplayed()
     }
@@ -152,24 +152,29 @@ class PassScreensTest {
     fun accentColorRowCapturesSelectionAction() {
         val actions = mutableListOf<SettingsAction>()
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+            PassTheme(ThemeMode.LIGHT, dynamicColors = false) {
+                SettingsScreen(AppSettings(dynamicColors = false), onAction = actions::add)
+            }
         }
 
-        composeRule.onNodeWithText("Green").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("#FFEF9A9A").performClick()
 
-        assertThat(actions).containsExactly(SettingsAction.SetAccentPalette(org.ligi.passandroid.repository.AccentPalette.GREEN))
+        assertThat(actions).containsExactly(
+            SettingsAction.SetAccentColor(0xFFEF9A9AL),
+        )
     }
 
     @Test
-    fun accentPaletteRendersWithoutDynamicColors() {
+    fun accentAndStyleRowsRenderWhenDynamicColorsAreOff() {
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT, accentPalette = org.ligi.passandroid.repository.AccentPalette.GREEN) {
-                SettingsScreen(AppSettings(), onAction = {})
+            PassTheme(ThemeMode.LIGHT, dynamicColors = false) {
+                SettingsScreen(AppSettings(dynamicColors = false), onAction = {})
             }
         }
 
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
-        composeRule.onNodeWithText("Accent color").assertIsDisplayed()
+        composeRule.onNodeWithText("Accent color").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Color style").performScrollTo().assertIsDisplayed()
     }
 
     @Test

@@ -3,6 +3,7 @@ package org.ligi.passandroid.repository
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -18,20 +19,38 @@ import org.ligi.passandroid.reminder.NotificationAction
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
-enum class AccentPalette {
-    DYNAMIC,
-    BLUE,
-    INDIGO,
-    PURPLE,
-    PINK,
-    RED,
-    ORANGE,
-    AMBER,
-    YELLOW,
-    GREEN,
-    TEAL,
-    CYAN,
-    BROWN,
+// Light primaries of the removed curated palettes. They keep the visual identity of a user who
+// picked a palette before the seed model existed.
+internal val legacyAccentSeeds = mapOf(
+    "BLUE" to 0xFF2859C5L,
+    "INDIGO" to 0xFF565FA8L,
+    "PURPLE" to 0xFF6750A4L,
+    "PINK" to 0xFF8E4957L,
+    "RED" to 0xFFBA1A1AL,
+    "ORANGE" to 0xFF964F00L,
+    "AMBER" to 0xFF745B00L,
+    "YELLOW" to 0xFF6E5D00L,
+    "GREEN" to 0xFF006C4CL,
+    "TEAL" to 0xFF00796BL,
+    "CYAN" to 0xFF00696EL,
+    "BROWN" to 0xFF765848L,
+)
+
+internal data class AccentSettings(val dynamicColors: Boolean, val accentColor: Long?)
+
+internal fun resolveAccentSettings(
+    storedDynamicColors: Boolean?,
+    storedAccentColor: Long?,
+    legacyPalette: String?,
+): AccentSettings {
+    if (storedDynamicColors != null || storedAccentColor != null) {
+        return AccentSettings(storedDynamicColors ?: true, storedAccentColor)
+    }
+    val seed = legacyPalette
+        ?.takeUnless { it == "DYNAMIC" }
+        ?.let(legacyAccentSeeds::get)
+        ?: return AccentSettings(true, null)
+    return AccentSettings(false, seed)
 }
 
 enum class PassCategoryRole { INBOX, FAVORITES, ARCHIVE, PAST, TRASH, CUSTOM }
@@ -125,7 +144,9 @@ val defaultPassCategories = builtInPassCategories + recommendedPassTags
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val amoledBlackBackground: Boolean = false,
-    val accentPalette: AccentPalette = AccentPalette.DYNAMIC,
+    val dynamicColors: Boolean = true,
+    val accentColor: Long? = null,
+    val colorStyle: ColorStyle = ColorStyle.TONAL_SPOT,
     val automaticBrightness: Boolean = true,
     val sortOrder: PassSortOrder = PassSortOrder.DATE_DESC,
     val passOrder: List<String> = emptyList(),
@@ -169,7 +190,9 @@ interface SettingsRepository {
 
         suspend fun setThemeMode(value: ThemeMode)
     suspend fun setAmoledBlackBackground(value: Boolean)
-    suspend fun setAccentPalette(value: AccentPalette)
+    suspend fun setDynamicColors(value: Boolean)
+    suspend fun setAccentColor(value: Long?)
+    suspend fun setColorStyle(value: ColorStyle)
     suspend fun setAutomaticBrightness(value: Boolean)
     suspend fun setSortOrder(value: PassSortOrder)
     suspend fun setPassOrder(value: List<String>)
@@ -206,14 +229,21 @@ private val Context.settingsDataStore by preferencesDataStore(name = "app_settin
 
 class DataStoreSettingsRepository(private val context: Context) : SettingsRepository {
     override val settings = context.settingsDataStore.data.map { preferences ->
+        val accent = resolveAccentSettings(
+            storedDynamicColors = preferences[DYNAMIC_COLORS],
+            storedAccentColor = preferences[ACCENT_COLOR],
+            legacyPalette = preferences[ACCENT],
+        )
         AppSettings(
             themeMode = preferences[THEME]?.let { value ->
                 if (value == "AMOLED") ThemeMode.DARK else runCatching { ThemeMode.valueOf(value) }.getOrNull()
             } ?: ThemeMode.SYSTEM,
             amoledBlackBackground = preferences[AMOLED_BLACK_BACKGROUND] ?: (preferences[THEME] == "AMOLED"),
-            accentPalette = preferences[ACCENT]?.let { value ->
-                runCatching { AccentPalette.valueOf(value) }.getOrNull()
-            } ?: AccentPalette.DYNAMIC,
+            dynamicColors = accent.dynamicColors,
+            accentColor = accent.accentColor,
+            colorStyle = preferences[COLOR_STYLE]?.let { value ->
+                runCatching { ColorStyle.valueOf(value) }.getOrNull()
+            } ?: ColorStyle.TONAL_SPOT,
             automaticBrightness = preferences[AUTOMATIC_BRIGHTNESS] ?: true,
             sortOrder = preferences[SORT]?.let { runCatching { PassSortOrder.valueOf(it) }.getOrNull() }
                 ?: PassSortOrder.DATE_DESC,
@@ -271,21 +301,75 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
 
     override suspend fun setThemeMode(value: ThemeMode) {
         val current = StartupAppearanceStore.read(context)
-        StartupAppearanceStore.write(context, value, current.amoledBlackBackground, current.accentPalette)
+        StartupAppearanceStore.write(
+            context,
+            value,
+            current.amoledBlackBackground,
+            current.dynamicColors,
+            current.accentColor,
+            current.colorStyle,
+        )
         update(THEME, value.name)
     }
 
     override suspend fun setAmoledBlackBackground(value: Boolean) {
         val current = StartupAppearanceStore.read(context)
-        StartupAppearanceStore.write(context, current.themeMode, value, current.accentPalette)
+        StartupAppearanceStore.write(
+            context,
+            current.themeMode,
+            value,
+            current.dynamicColors,
+            current.accentColor,
+            current.colorStyle,
+        )
         update(AMOLED_BLACK_BACKGROUND, value)
     }
 
-    override suspend fun setAccentPalette(value: AccentPalette) {
+    override suspend fun setDynamicColors(value: Boolean) {
         val current = StartupAppearanceStore.read(context)
-        StartupAppearanceStore.write(context, current.themeMode, current.amoledBlackBackground, value)
-        update(ACCENT, value.name)
+        StartupAppearanceStore.write(
+            context,
+            current.themeMode,
+            current.amoledBlackBackground,
+            value,
+            current.accentColor,
+            current.colorStyle,
+        )
+        update(DYNAMIC_COLORS, value)
     }
+
+    override suspend fun setAccentColor(value: Long?) {
+        val current = StartupAppearanceStore.read(context)
+        StartupAppearanceStore.write(
+            context,
+            current.themeMode,
+            current.amoledBlackBackground,
+            current.dynamicColors,
+            value,
+            current.colorStyle,
+        )
+        context.settingsDataStore.edit { preferences ->
+            if (value == null) {
+                preferences.remove(ACCENT_COLOR)
+            } else {
+                preferences[ACCENT_COLOR] = value
+            }
+        }
+    }
+
+    override suspend fun setColorStyle(value: ColorStyle) {
+        val current = StartupAppearanceStore.read(context)
+        StartupAppearanceStore.write(
+            context,
+            current.themeMode,
+            current.amoledBlackBackground,
+            current.dynamicColors,
+            current.accentColor,
+            value,
+        )
+        update(COLOR_STYLE, value.name)
+    }
+
     override suspend fun setAutomaticBrightness(value: Boolean) = update(AUTOMATIC_BRIGHTNESS, value)
     override suspend fun setSortOrder(value: PassSortOrder) = update(SORT, value.name)
     override suspend fun setPassOrder(value: List<String>) = update(PASS_ORDER, encodePassOrder(value))
@@ -388,7 +472,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
 
     private companion object {
         val THEME = stringPreferencesKey("theme")
+        // Legacy key that held the removed AccentPalette enum name. Read-only for migration.
         val ACCENT = stringPreferencesKey("accent_palette")
+        val DYNAMIC_COLORS = booleanPreferencesKey("dynamic_colors")
+        val ACCENT_COLOR = longPreferencesKey("accent_color")
+        val COLOR_STYLE = stringPreferencesKey("color_style")
         val AMOLED_BLACK_BACKGROUND = booleanPreferencesKey("amoled_black_background")
         val AUTOMATIC_BRIGHTNESS = booleanPreferencesKey("automatic_brightness")
         val SORT = stringPreferencesKey("sort_order")

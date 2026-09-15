@@ -2,10 +2,13 @@ package org.ligi.passandroid.ui.compose
 
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -53,16 +56,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import org.ligi.passandroid.repository.AccentPalette
 import org.ligi.passandroid.repository.AppSettings
+import org.ligi.passandroid.repository.ColorStyle
+import org.ligi.passandroid.repository.DEFAULT_ACCENT_COLOR
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.theme.PassIcons
-import org.ligi.passandroid.ui.theme.accentSwatchColor
+import org.ligi.passandroid.ui.theme.accentSeedColors
+import org.ligi.passandroid.ui.theme.brandAccentColor
+import org.ligi.passandroid.ui.theme.generateAccentColorScheme
 import androidx.compose.ui.res.stringResource
 import org.ligi.passandroid.R
 
@@ -120,19 +130,27 @@ private const val RemindersSectionIndex = 5
 
 @Composable
 private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    val dynamicAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     SettingsGroup(
         title = stringResource(R.string.settings_theme),
         entries = buildList {
             ThemeMode.entries.forEach { mode ->
                 add(settingsItem { ThemeSetting(mode, settings.themeMode, onAction) })
             }
-            add(settingsHeader(stringResource(R.string.settings_accent_color)))
-            // Dynamic color exists only from API 31; on API 29/30 BLUE is the default fallback.
-            val dynamicAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-            val visiblePalettes = (if (dynamicAvailable) listOf(AccentPalette.DYNAMIC) else emptyList()) +
-                AccentPalette.entries.filterNot { it == AccentPalette.DYNAMIC }
-            visiblePalettes.forEach { palette ->
-                add(settingsItem { AccentSetting(palette, settings.accentPalette, onAction) })
+            if (dynamicAvailable) {
+                add(
+                    settingsItem {
+                        SettingSwitch(stringResource(R.string.settings_dynamic_color), settings.dynamicColors) {
+                            onAction(SettingsAction.SetDynamicColors(it))
+                        }
+                    },
+                )
+            }
+            if (!dynamicAvailable || !settings.dynamicColors) {
+                add(settingsHeader(stringResource(R.string.settings_accent_color)))
+                add(settingsItem { AccentColorChoices(settings.accentColor, onAction) })
+                add(settingsHeader(stringResource(R.string.settings_color_style)))
+                add(settingsItem { ColorStyleChoices(settings.accentColor, settings.colorStyle, onAction) })
             }
             if (settings.themeMode == ThemeMode.DARK) {
                 add(
@@ -164,27 +182,66 @@ private fun ThemeSetting(mode: ThemeMode, selectedMode: ThemeMode, onAction: (Se
 }
 
 @Composable
-private fun AccentSetting(
-    palette: AccentPalette,
-    selectedPalette: AccentPalette,
-    onAction: (SettingsAction) -> Unit,
-) {
-    val label = if (palette == AccentPalette.DYNAMIC) {
-        stringResource(R.string.settings_dynamic_color)
-    } else {
-        palette.name.lowercase().replaceFirstChar(Char::uppercase)
+private fun AccentColorChoices(selectedColor: Long?, onAction: (SettingsAction) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AccentColorChoice(seed = null, selected = selectedColor == null, onAction = onAction)
+        accentSeedColors.forEach { seed ->
+            AccentColorChoice(seed = seed, selected = selectedColor == seed, onAction = onAction)
+        }
     }
-    ListItem(
-        leadingContent = {
-            Box(Modifier.size(24.dp).clip(CircleShape).background(accentSwatchColor(palette) ?: Color.Transparent))
-        },
-        trailingContent = {
-            RadioButton(palette == selectedPalette, { onAction(SettingsAction.SetAccentPalette(palette)) })
-        },
-        modifier = Modifier.clickable { onAction(SettingsAction.SetAccentPalette(palette)) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    ) { Text(label) }
 }
+
+@Composable
+private fun AccentColorChoice(seed: Long?, selected: Boolean, onAction: (SettingsAction) -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        Modifier.size(40.dp)
+            .clip(shape)
+            .background(seed?.let(::Color) ?: brandAccentColor)
+            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+            .clickable(role = Role.RadioButton) { onAction(SettingsAction.SetAccentColor(seed)) }
+            .semantics { contentDescription = formatPickerColor((seed ?: DEFAULT_ACCENT_COLOR).toInt()) },
+    )
+}
+
+@Composable
+private fun ColorStyleChoices(accentColor: Long?, selectedStyle: ColorStyle, onAction: (SettingsAction) -> Unit) {
+    val dark = isSystemInDarkTheme()
+    Column {
+        ColorStyle.entries.forEach { style ->
+            val scheme = remember(accentColor, style, dark) {
+                generateAccentColorScheme(Color(accentColor ?: DEFAULT_ACCENT_COLOR), dark, style)
+            }
+            ListItem(
+                leadingContent = {
+                    Box(Modifier.size(24.dp).clip(CircleShape).background(scheme.primary))
+                },
+                trailingContent = { RadioButton(style == selectedStyle, { onAction(SettingsAction.SetColorStyle(style)) }) },
+                modifier = Modifier.clickable { onAction(SettingsAction.SetColorStyle(style)) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            ) { Text(colorStyleLabel(style)) }
+        }
+    }
+}
+
+@Composable
+private fun colorStyleLabel(style: ColorStyle): String = stringResource(
+    when (style) {
+        ColorStyle.TONAL_SPOT -> R.string.settings_color_style_tonal_spot
+        ColorStyle.VIBRANT -> R.string.settings_color_style_vibrant
+        ColorStyle.EXPRESSIVE -> R.string.settings_color_style_expressive
+        ColorStyle.RAINBOW -> R.string.settings_color_style_rainbow
+        ColorStyle.FRUIT_SALAD -> R.string.settings_color_style_fruit_salad
+        ColorStyle.CONTENT -> R.string.settings_color_style_content
+        ColorStyle.FIDELITY -> R.string.settings_color_style_fidelity
+        ColorStyle.NEUTRAL -> R.string.settings_color_style_neutral
+        ColorStyle.MONOCHROME -> R.string.settings_color_style_monochrome
+    },
+)
 
 @Composable
 private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {

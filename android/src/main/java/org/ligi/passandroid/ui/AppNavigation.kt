@@ -452,8 +452,16 @@ private fun handleAppearanceSettingsAction(
         dependencies.viewModel.onAction(AppAction.SetAmoledBlackBackground(action.value))
         true
     }
-    is SettingsAction.SetAccentPalette -> {
-        dependencies.viewModel.onAction(AppAction.SetAccentPalette(action.value))
+    is SettingsAction.SetDynamicColors -> {
+        dependencies.viewModel.onAction(AppAction.SetDynamicColors(action.value))
+        true
+    }
+    is SettingsAction.SetAccentColor -> {
+        dependencies.viewModel.onAction(AppAction.SetAccentColor(action.value))
+        true
+    }
+    is SettingsAction.SetColorStyle -> {
+        dependencies.viewModel.onAction(AppAction.SetColorStyle(action.value))
         true
     }
     is SettingsAction.SetAutomaticBrightness -> {

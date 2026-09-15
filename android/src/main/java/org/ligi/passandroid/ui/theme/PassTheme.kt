@@ -12,12 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
-import org.ligi.passandroid.repository.AccentPalette
+import org.ligi.passandroid.repository.ColorStyle
+import org.ligi.passandroid.repository.DEFAULT_ACCENT_COLOR
 import org.ligi.passandroid.repository.ThemeMode
-
-// Blue baseline fallback for API 29/30; shares its stops with AccentPalette.BLUE.
-private val LightColors = accentColorSchemes(AccentPalette.BLUE)!!.first
-private val DarkColors = accentColorSchemes(AccentPalette.BLUE)!!.second
 
 private val PassShapes = Shapes(
     small = RoundedCornerShape(12.dp),
@@ -30,7 +27,9 @@ private val PassShapes = Shapes(
 fun PassTheme(
     themeMode: ThemeMode,
     amoledBlackBackground: Boolean = false,
-    accentPalette: AccentPalette = AccentPalette.DYNAMIC,
+    dynamicColors: Boolean = true,
+    accentColor: Long? = null,
+    colorStyle: ColorStyle = ColorStyle.TONAL_SPOT,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode) {
@@ -39,17 +38,12 @@ fun PassTheme(
         ThemeMode.DARK -> true
     }
     val context = LocalContext.current
-    // A curated accent palette wins on every API level; DYNAMIC falls back to wallpaper colors
-    // from API 31 and to the blue baseline below.
-    val baseColors = if (accentPalette != AccentPalette.DYNAMIC) {
-        val (light, darkScheme) = accentColorSchemes(accentPalette)!!
-        if (dark) darkScheme else light
-    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    // Wallpaper colors need API 31. Without them, and whenever a seed color exists, the whole
+    // scheme is generated from the seed.
+    val baseColors = if (dynamicColors && accentColor == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else if (dark) {
-        DarkColors
     } else {
-        LightColors
+        generateAccentColorScheme(Color(accentColor ?: DEFAULT_ACCENT_COLOR), dark, colorStyle)
     }
     val colors = if (dark && amoledBlackBackground) {
         baseColors.copy(

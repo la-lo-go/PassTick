@@ -414,9 +414,21 @@ class MainViewModel(
             }
             true
         }
-        is AppAction.SetAccentPalette -> {
+        is AppAction.SetDynamicColors -> {
             viewModelScope.launch {
-                settingsRepository.setAccentPalette(action.value)
+                settingsRepository.setDynamicColors(action.value)
+            }
+            true
+        }
+        is AppAction.SetAccentColor -> {
+            viewModelScope.launch {
+                settingsRepository.setAccentColor(action.value)
+            }
+            true
+        }
+        is AppAction.SetColorStyle -> {
+            viewModelScope.launch {
+                settingsRepository.setColorStyle(action.value)
             }
             true
         }

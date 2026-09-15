@@ -89,10 +89,20 @@ fun PassTickApp(
     } else {
         state.settings.amoledBlackBackground
     }
-    val displayedAccent = if (state.isContentLoading) {
-        startupAppearance.accentPalette
+    val displayedAccentColor = if (state.isContentLoading) {
+        startupAppearance.accentColor
     } else {
-        state.settings.accentPalette
+        state.settings.accentColor
+    }
+    val displayedDynamicColors = if (state.isContentLoading) {
+        startupAppearance.dynamicColors
+    } else {
+        state.settings.dynamicColors
+    }
+    val displayedColorStyle = if (state.isContentLoading) {
+        startupAppearance.colorStyle
+    } else {
+        state.settings.colorStyle
     }
     val darkSystemBars = displayedThemeMode == org.ligi.passandroid.repository.ThemeMode.DARK ||
         displayedThemeMode == org.ligi.passandroid.repository.ThemeMode.SYSTEM && isSystemInDarkTheme()
@@ -103,14 +113,18 @@ fun PassTickApp(
         state.isContentLoading,
         state.settings.themeMode,
         state.settings.amoledBlackBackground,
-        state.settings.accentPalette,
+        state.settings.dynamicColors,
+        state.settings.accentColor,
+        state.settings.colorStyle,
     ) {
         if (!state.isContentLoading) {
             StartupAppearanceStore.write(
                 activity,
                 state.settings.themeMode,
                 state.settings.amoledBlackBackground,
-                state.settings.accentPalette,
+                state.settings.dynamicColors,
+                state.settings.accentColor,
+                state.settings.colorStyle,
             )
         }
     }
@@ -493,7 +507,13 @@ fun PassTickApp(
         }
     }
 
-    PassTheme(displayedThemeMode, displayedAmoled, displayedAccent) {
+    PassTheme(
+        displayedThemeMode,
+        displayedAmoled,
+        displayedDynamicColors,
+        displayedAccentColor,
+        displayedColorStyle,
+    ) {
         if (showCalendarPermissionWarning) {
             AlertDialog(
                 onDismissRequest = { showCalendarPermissionWarning = false },

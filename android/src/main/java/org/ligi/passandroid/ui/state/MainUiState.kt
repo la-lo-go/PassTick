@@ -5,7 +5,7 @@ import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
-import org.ligi.passandroid.repository.AccentPalette
+import org.ligi.passandroid.repository.ColorStyle
 import org.ligi.passandroid.repository.PassImageExportOptions
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
@@ -183,7 +183,9 @@ sealed interface AppAction {
     data class MoveCategory(val categoryId: String, val offset: Int) : AppAction
     data class SetTheme(val value: ThemeMode) : AppAction
     data class SetAmoledBlackBackground(val value: Boolean) : AppAction
-    data class SetAccentPalette(val value: AccentPalette) : AppAction
+    data class SetDynamicColors(val value: Boolean) : AppAction
+    data class SetAccentColor(val value: Long?) : AppAction
+    data class SetColorStyle(val value: ColorStyle) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
     data class ReorderPass(val orderedVisibleIds: List<String>) : AppAction
