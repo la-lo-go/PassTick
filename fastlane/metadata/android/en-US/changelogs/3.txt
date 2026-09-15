@@ -1,8 +1,12 @@
-Version 0.2.0.
+First release of PassTick.
 
-- Add Trash: restore deleted passes or delete them forever.
-- Add pass notes, included in search and exported images.
-- Add an agenda calendar with infinite scrolling and day jumps.
-- Add accent palettes and full color customization.
-- Add home card customization with live previews.
-- List third-party licenses in the about section.
+- Keep your tickets and cards on your phone and show them offline.
+- Import from files, email, or the share button.
+- Full-screen code at maximum brightness.
+- Reminders before each event.
+- Timeline and calendar with all your dates.
+- Colored tags, pins, archive, and trash with undo.
+- Fingerprint lock and screenshot protection.
+- Widgets, image export, and printing.
+- Themes and colors, dark mode, and AMOLED.
+- Free, no account, no ads, no tracking.
