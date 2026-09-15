@@ -206,6 +206,7 @@
     <string name="timeline_past">Past</string>
     <string name="timeline_view_list">List view</string>
     <string name="timeline_view_agenda">Agenda view</string>
+    <string name="agenda_back_to_today">Back to today</string>
     <string name="calendar_selected_day">Selected day</string>
     <plurals name="calendar_day_passes">
         <item quantity="one">%1$d pass</item>

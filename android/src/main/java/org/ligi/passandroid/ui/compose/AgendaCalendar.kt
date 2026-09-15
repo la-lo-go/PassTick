@@ -16,10 +16,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.ligi.passandroid.R
 import org.ligi.passandroid.domain.timeline.PassEvent
 import org.ligi.passandroid.domain.timeline.PassTimeline
@@ -82,6 +88,7 @@ internal fun AgendaCalendar(
     val currentMonth = remember(today) { YearMonth.from(today) }
     val weekdays = remember(firstDayOfWeek) { (0L..6L).map(firstDayOfWeek::plus) }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = CurrentMonthIndex)
+    val scope = rememberCoroutineScope()
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth()) {
@@ -95,25 +102,38 @@ internal fun AgendaCalendar(
                 )
             }
         }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = 64.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            items(
-                count = MonthsBefore + MonthsAfter + 1,
-                key = { it },
-            ) { index ->
-                AgendaMonthBlock(
-                    month = currentMonth.plusMonths((index - CurrentMonthIndex).toLong()),
-                    firstDayOfWeek = firstDayOfWeek,
-                    monthFormatter = monthFormatter,
-                    dayFormatter = dayFormatter,
-                    passCounts = passCounts,
-                    selectedDay = selectedDay,
-                    today = today,
-                    onDayClick = onDayClick,
+        Box(Modifier.weight(1f)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 64.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                items(
+                    count = MonthsBefore + MonthsAfter + 1,
+                    key = { it },
+                ) { index ->
+                    AgendaMonthBlock(
+                        month = currentMonth.plusMonths((index - CurrentMonthIndex).toLong()),
+                        firstDayOfWeek = firstDayOfWeek,
+                        monthFormatter = monthFormatter,
+                        dayFormatter = dayFormatter,
+                        passCounts = passCounts,
+                        selectedDay = selectedDay,
+                        today = today,
+                        onDayClick = onDayClick,
+                    )
+                }
+            }
+            SmallFloatingActionButton(
+                onClick = { scope.launch { listState.scrollToItem(CurrentMonthIndex) } },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp),
+            ) {
+                Icon(
+                    Icons.Default.Today,
+                    contentDescription = stringResource(R.string.agenda_back_to_today),
                 )
             }
         }
