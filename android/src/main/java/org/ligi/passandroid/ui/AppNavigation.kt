@@ -66,6 +66,7 @@ import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction
 import org.ligi.passandroid.ui.state.PassImageExportAction
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.resolvePassCardTitle
 import org.ligi.passandroid.ui.state.SettingsAction
 
 internal class AppNavigationDependencies(
@@ -202,6 +203,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                 )
             }
             entry<AppDestination.Timeline> {
+                val passById = state.passes.associateBy(PassUiModel::id)
                 TimelineScreen(
                     state = TimelineUiState(
                         timeline = if (state.settings.separateProtectedPasses && !dependencies.protectedPassesUnlocked) {
@@ -225,6 +227,16 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                                 .mapTo(mutableSetOf()) { it.id }
                         } else {
                             emptySet()
+                        },
+                        passCardTitles = state.timeline.days.flatMap { it.events }.associate { event ->
+                            event.pass.passId to (passById[event.pass.passId]?.let { pass ->
+                                resolvePassCardTitle(
+                                    pass,
+                                    state.settings.homeCardSectionOrder,
+                                    state.settings.hiddenHomeCardSections,
+                                    state.categories,
+                                )
+                            } ?: event.title)
                         },
                     ),
                     onAction = { action ->

@@ -77,6 +77,7 @@ import org.ligi.passandroid.R
 data class TimelineUiState(
     val timeline: PassTimeline = PassTimeline.empty(),
     val reminderEventIds: Set<String> = emptySet(),
+    val passCardTitles: Map<String, String> = emptyMap(),
 )
 
 sealed interface TimelineAction {
@@ -193,6 +194,7 @@ private fun AgendaContent(
                     items(selectedEvents, key = PassEvent::id) { event ->
                         TimelineEventRow(
                             event = event,
+                            title = state.passCardTitles[event.pass.passId] ?: event.title,
                             zoneId = state.timeline.zoneId,
                             reminderEnabled = event.id in state.reminderEventIds,
                             highlighted = event.id == state.timeline.nearestEventId,
@@ -260,6 +262,7 @@ private fun TimelineContent(
             items(day.events.asReversed(), key = PassEvent::id) { event ->
                 TimelineEventRow(
                     event = event,
+                    title = state.passCardTitles[event.pass.passId] ?: event.title,
                     zoneId = state.timeline.zoneId,
                     reminderEnabled = event.id in state.reminderEventIds,
                     highlighted = event.id == state.timeline.nearestEventId,
@@ -276,6 +279,7 @@ private fun TimelineContent(
 @Composable
 private fun TimelineEventRow(
     event: PassEvent,
+    title: String,
     zoneId: org.threeten.bp.ZoneId,
     reminderEnabled: Boolean,
     highlighted: Boolean,
@@ -320,7 +324,7 @@ private fun TimelineEventRow(
                     .background(containerColor)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
-                EventSummary(event, zoneId, Modifier.fillMaxWidth())
+                EventSummary(event, title, zoneId, Modifier.fillMaxWidth())
             }
         }
     }
@@ -466,6 +470,7 @@ internal fun timelineItemIndex(timeline: PassTimeline, eventId: String?): Int? {
 @Composable
 private fun EventSummary(
     event: PassEvent,
+    title: String,
     zoneId: org.threeten.bp.ZoneId,
     modifier: Modifier = Modifier,
 ) {
@@ -478,7 +483,7 @@ private fun EventSummary(
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = event.title,
+            text = title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             maxLines = 3,
