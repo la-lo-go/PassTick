@@ -1,0 +1,8 @@
+Version 0.2.0.
+
+- Add Trash: restore deleted passes or delete them forever.
+- Add pass notes, included in search and exported images.
+- Add an agenda calendar with infinite scrolling and day jumps.
+- Add accent palettes and full color customization.
+- Add home card customization with live previews.
+- List third-party licenses in the about section.
