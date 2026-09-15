@@ -115,7 +115,7 @@ object PassImageExporter {
         content.barcode && !hasNonBarcodeContent(content)
 
     private fun hasNonBarcodeContent(content: PassImageContent): Boolean =
-        content.artwork || content.details || content.dateTime || content.location
+        content.artwork || content.details || content.notes || content.dateTime || content.location
 
     private fun drawExportBitmap(
         blocks: List<ContentBlock>,
@@ -226,17 +226,24 @@ object PassImageExporter {
         }
         val lines = detailLines(pass, content)
         if (lines.isNotEmpty()) {
-            val details = textLayout(
-                text = lines.joinToString("\n"),
-                layoutWidth = contentWidth,
-                textSize = width * DETAILS_TEXT_RATIO,
-                color = Color.BLACK,
-                bold = false,
-                centered = false,
-                lineSpacingAdd = width * DETAILS_TEXT_RATIO * 0.35f,
-            )
-            add(ContentBlock(details.height.toFloat()) { canvas, left, top -> canvas.drawLayout(details, left, top) })
+            add(bodyTextBlock(lines.joinToString("\n"), contentWidth, width))
         }
+        if (content.notes && pass.notes.isNotBlank()) {
+            add(bodyTextBlock(pass.notes, contentWidth, width))
+        }
+    }
+
+    private fun bodyTextBlock(text: String, contentWidth: Int, width: Float): ContentBlock {
+        val layout = textLayout(
+            text = text,
+            layoutWidth = contentWidth,
+            textSize = width * DETAILS_TEXT_RATIO,
+            color = Color.BLACK,
+            bold = false,
+            centered = false,
+            lineSpacingAdd = width * DETAILS_TEXT_RATIO * 0.35f,
+        )
+        return ContentBlock(layout.height.toFloat()) { canvas, left, top -> canvas.drawLayout(layout, left, top) }
     }
 
     private fun titleBlock(
@@ -279,7 +286,6 @@ object PassImageExporter {
     private fun detailLines(pass: PassUiModel, content: PassImageContent): List<String> = buildList {
         if (content.details) {
             pass.creator?.takeIf { it.isNotBlank() }?.let { add("Created by: $it") }
-            pass.notes.takeIf(String::isNotBlank)?.let { add("Note: $it") }
             pass.fields.filter { !it.hidden || content.hiddenFields }.forEach { add("${it.label}: ${it.value}") }
         }
         if (content.dateTime) {

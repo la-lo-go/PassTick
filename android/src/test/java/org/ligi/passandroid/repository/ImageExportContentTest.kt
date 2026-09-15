@@ -36,4 +36,19 @@ class ImageExportContentTest {
     fun `missing stored content decodes to the defaults`() {
         assertThat(decodePassImageContent(null)).isEqualTo(PassImageContent())
     }
+
+    @Test
+    fun `notes round trip through the stored encoding`() {
+        val disabled = PassImageContent(notes = false)
+
+        assertThat(decodePassImageContent(encodePassImageContent(disabled)).notes).isFalse()
+        assertThat(decodePassImageContent(encodePassImageContent(PassImageContent(notes = true))).notes).isTrue()
+    }
+
+    @Test
+    fun `legacy stored content without the notes key keeps notes enabled`() {
+        val legacy = setOf("artwork", "details", "barcode", "dateTime", "location")
+
+        assertThat(decodePassImageContent(legacy).notes).isTrue()
+    }
 }

@@ -169,6 +169,7 @@
     <string name="customize_automatic">Automatic</string>
     <string name="export_artwork">Artwork</string>
     <string name="export_details">Details</string>
+    <string name="export_notes">Notes</string>
     <string name="export_date">Date</string>
     <string name="export_location">Location</string>
     <string name="export_hidden">Hidden</string>

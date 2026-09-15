@@ -198,6 +198,7 @@ fun PassTickApp(
                 content = PassImageContent(
                     artwork = false,
                     details = false,
+                    notes = false,
                     barcode = true,
                     dateTime = false,
                     location = false,

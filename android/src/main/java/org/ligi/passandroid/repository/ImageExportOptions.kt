@@ -18,6 +18,7 @@ enum class PassImageOrientation { PORTRAIT, LANDSCAPE }
 data class PassImageContent(
     val artwork: Boolean = true,
     val details: Boolean = true,
+    val notes: Boolean = true,
     val barcode: Boolean = true,
     val dateTime: Boolean = true,
     val location: Boolean = true,
@@ -30,6 +31,9 @@ data class PassImageExportOptions(
     val content: PassImageContent = PassImageContent(),
 )
 
+// Notes default on, so the key stores the disabled state. Stored sets from older versions lack the key and keep notes on.
+private const val NOTES_DISABLED_KEY = "notesDisabled"
+
 internal fun encodePassImageContent(value: PassImageContent): Set<String> = buildSet {
     if (value.artwork) add("artwork")
     if (value.details) add("details")
@@ -37,6 +41,7 @@ internal fun encodePassImageContent(value: PassImageContent): Set<String> = buil
     if (value.dateTime) add("dateTime")
     if (value.location) add("location")
     if (value.hiddenFields) add("hiddenFields")
+    if (!value.notes) add(NOTES_DISABLED_KEY)
 }
 
 internal fun decodePassImageContent(values: Set<String>?): PassImageContent =
@@ -50,5 +55,6 @@ internal fun decodePassImageContent(values: Set<String>?): PassImageContent =
             dateTime = "dateTime" in values,
             location = "location" in values,
             hiddenFields = "hiddenFields" in values,
+            notes = NOTES_DISABLED_KEY !in values,
         )
     }

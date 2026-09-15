@@ -197,6 +197,9 @@ private fun ExportOptions(
                     ContentChip(stringResource(R.string.export_artwork), content.artwork) { setContent(content.copy(artwork = !content.artwork)) }
                 }
                 ContentChip(stringResource(R.string.export_details), content.details) { setContent(content.copy(details = !content.details)) }
+                if (pass.notes.isNotBlank()) {
+                    ContentChip(stringResource(R.string.export_notes), content.notes) { setContent(content.copy(notes = !content.notes)) }
+                }
                 if (pass.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
                     ContentChip(stringResource(R.string.edit_pass_code), content.barcode) { setContent(content.copy(barcode = !content.barcode)) }
                 }

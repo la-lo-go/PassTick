@@ -165,9 +165,9 @@ class PassImageExporterTest {
     }
 
     @Test
-    fun notesRenderIntoTheDetailsWhenEnabled() {
+    fun notesRenderAsTheirOwnBlockWhenEnabled() {
         val options = PassImageExportOptions(
-            content = PassImageContent(artwork = false, details = true, barcode = false, dateTime = false, location = false),
+            content = PassImageContent(artwork = false, details = false, barcode = false, dateTime = false, location = false),
         )
         val withoutNotes = PassImageExporter.renderBitmap(pass, options)
         val withNotes = PassImageExporter.renderBitmap(pass.copy(notes = "Gate opens at six\nRow 1, seat 12A"), options)
