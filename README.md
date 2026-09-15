@@ -10,23 +10,23 @@ This repository is an independent modernization of the original [PassAndroid pro
 
 <table width="100%">
   <tr>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/homepage.webp" width="100%" alt="PassTick home screen with Today and Other passes sections"></td>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/coastal-express.webp" width="100%" alt="A train pass with travel artwork and an Aztec code"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/home-today.webp" width="100%" alt="PassTick home screen with the Today section and passes tagged Travel and Work"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/pass-detail.webp" width="100%" alt="A train pass with travel artwork and a QR code"></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><strong>Homepage</strong></td>
-    <td width="50%" align="center"><strong>Coastal Express</strong></td>
+    <td width="50%" align="center"><strong>Today</strong></td>
+    <td width="50%" align="center"><strong>Pass details</strong></td>
   </tr>
 </table>
 
 <table width="100%">
   <tr>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/lumen-live.webp" width="100%" alt="A concert pass with event artwork and a QR code"></td>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/glass-horizons.webp" width="100%" alt="A museum pass with exhibition artwork and a PDF417 code"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/timeline.webp" width="100%" alt="Calendar timeline with the today event selected and upcoming event days marked"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/export-image.webp" width="100%" alt="Export a pass as an image with aspect ratio and content options"></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><strong>Lumen Live</strong></td>
-    <td width="50%" align="center"><strong>Glass Horizons</strong></td>
+    <td width="50%" align="center"><strong>Timeline</strong></td>
+    <td width="50%" align="center"><strong>Image export</strong></td>
   </tr>
 </table>
 
