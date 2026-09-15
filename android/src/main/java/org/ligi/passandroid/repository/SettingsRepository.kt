@@ -493,29 +493,6 @@ private fun decodeReminderActions(value: String): Map<String, Set<NotificationAc
     }
 }.getOrDefault(emptyMap())
 
-private fun encodePassImageContent(value: PassImageContent): Set<String> = buildSet {
-    if (value.artwork) add("artwork")
-    if (value.details) add("details")
-    if (value.barcode) add("barcode")
-    if (value.dateTime) add("dateTime")
-    if (value.location) add("location")
-    if (value.hiddenFields) add("hiddenFields")
-}
-
-private fun decodePassImageContent(values: Set<String>?): PassImageContent =
-    if (values == null) {
-        PassImageContent()
-    } else {
-        PassImageContent(
-            artwork = "artwork" in values,
-            details = "details" in values,
-            barcode = "barcode" in values,
-            dateTime = "dateTime" in values,
-            location = "location" in values,
-            hiddenFields = "hiddenFields" in values,
-        )
-    }
-
 private fun encodeCategories(categories: List<PassCategory>) = JSONArray().apply {
     categories.forEach { category ->
         put(
