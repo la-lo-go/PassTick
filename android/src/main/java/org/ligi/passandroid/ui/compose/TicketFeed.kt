@@ -859,10 +859,6 @@ internal fun HomeCardBody(
     modifier: Modifier = Modifier,
     thumbnailFallback: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    val visibleSections = sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }
-    val creatorTypeCombined = visibleSections.indexOf(HomeCardSection.CREATOR).let { creatorIndex ->
-        creatorIndex >= 0 && visibleSections.getOrNull(creatorIndex + 1) == HomeCardSection.PASS_TYPE && !pass.creator.isNullOrBlank()
-    }
     val cardLines = resolvePassCardLines(pass, sectionOrder, hiddenSections, tagCategories, hero)
     Row(
         modifier.fillMaxWidth(),

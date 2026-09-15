@@ -45,50 +45,68 @@ fun resolvePassCardLines(
     hiddenSections: Set<HomeCardSection>,
     tagCategories: List<PassCategory>,
     hero: Boolean = false,
-): List<PassCardLine> {
-    val visibleSections = sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }
-    val typeLabel = pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase)
-    val creatorTypeCombined = visibleSections.indexOf(HomeCardSection.CREATOR).let { creatorIndex ->
+): List<PassCardLine> = PassCardLineResolver(pass, sectionOrder, hiddenSections, tagCategories, hero).resolve()
+
+private class PassCardLineResolver(
+    private val pass: PassUiModel,
+    sectionOrder: List<HomeCardSection>,
+    hiddenSections: Set<HomeCardSection>,
+    private val tagCategories: List<PassCategory>,
+    private val hero: Boolean,
+) {
+    private val visibleSections = sectionOrder.filterNot { it in hiddenSections || it == HomeCardSection.ARTWORK }
+    private val typeLabel = pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase)
+    private val creatorTypeCombined = visibleSections.indexOf(HomeCardSection.CREATOR).let { creatorIndex ->
         creatorIndex >= 0 && visibleSections.getOrNull(creatorIndex + 1) == HomeCardSection.PASS_TYPE && !pass.creator.isNullOrBlank()
     }
-    var typeRendered = false
-    var tagsRendered = false
-    val lines = mutableListOf<PassCardLine>()
-    visibleSections.forEach { section ->
-        when (section) {
-            HomeCardSection.ARTWORK -> Unit
-            HomeCardSection.TITLE -> lines += PassCardLine.Text(pass.description, maxLines = 2, ellipsize = true)
-            HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()
-                ?.takeUnless { hero && it == pass.todayStartTimeLabel() }
-                ?.let { lines += PassCardLine.Text(it, maxLines = 1, ellipsize = true) }
-            HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let { lines += PassCardLine.Text(it) }
-            HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let { creator ->
-                val value = if (creatorTypeCombined) {
-                    typeRendered = true
-                    "$creator • $typeLabel"
-                } else {
-                    creator
-                }
-                lines += PassCardLine.Text(value, maxLines = 1, ellipsize = true)
-            }
-            HomeCardSection.CATEGORY,
-            HomeCardSection.PASS_TYPE,
-            -> {
-                val showType = HomeCardSection.PASS_TYPE in visibleSections && !typeRendered && !creatorTypeCombined
-                val visibleTags = if (HomeCardSection.CATEGORY in visibleSections && !tagsRendered) {
-                    tagCategories.filter { it.role == PassCategoryRole.CUSTOM && it.id in pass.tagIds }
-                } else {
-                    emptyList()
-                }
-                if (showType || visibleTags.isNotEmpty()) {
-                    if (showType) typeRendered = true
-                    if (visibleTags.isNotEmpty()) tagsRendered = true
-                    lines += PassCardLine.Metadata(typeLabel.takeIf { showType }, visibleTags)
-                }
-            }
-        }
+    private var typeRendered = false
+    private var tagsRendered = false
+    private val lines = mutableListOf<PassCardLine>()
+
+    fun resolve(): List<PassCardLine> {
+        visibleSections.forEach(::appendSection)
+        return lines
     }
-    return lines
+
+    private fun appendSection(section: HomeCardSection) = when (section) {
+        HomeCardSection.ARTWORK -> Unit
+        HomeCardSection.TITLE -> lines += PassCardLine.Text(pass.description, maxLines = 2, ellipsize = true)
+        HomeCardSection.PRIMARY_FIELD -> appendPrimaryField()
+        HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let { lines += PassCardLine.Text(it) }
+        HomeCardSection.CREATOR -> appendCreator()
+        HomeCardSection.CATEGORY,
+        HomeCardSection.PASS_TYPE,
+        -> appendMetadata()
+    }
+
+    private fun appendPrimaryField() {
+        val value = pass.homeCardDetail()?.takeUnless { hero && it == pass.todayStartTimeLabel() } ?: return
+        lines += PassCardLine.Text(value, maxLines = 1, ellipsize = true)
+    }
+
+    private fun appendCreator() {
+        val creator = pass.creator?.takeIf(String::isNotBlank) ?: return
+        val value = if (creatorTypeCombined) {
+            typeRendered = true
+            "$creator • $typeLabel"
+        } else {
+            creator
+        }
+        lines += PassCardLine.Text(value, maxLines = 1, ellipsize = true)
+    }
+
+    private fun appendMetadata() {
+        val showType = HomeCardSection.PASS_TYPE in visibleSections && !typeRendered && !creatorTypeCombined
+        val visibleTags = if (HomeCardSection.CATEGORY in visibleSections && !tagsRendered) {
+            tagCategories.filter { it.role == PassCategoryRole.CUSTOM && it.id in pass.tagIds }
+        } else {
+            emptyList()
+        }
+        if (!showType && visibleTags.isEmpty()) return
+        if (showType) typeRendered = true
+        if (visibleTags.isNotEmpty()) tagsRendered = true
+        lines += PassCardLine.Metadata(typeLabel.takeIf { showType }, visibleTags)
+    }
 }
 
 fun resolvePassCardTextLines(
