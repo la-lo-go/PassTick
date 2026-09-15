@@ -1,4 +1,4 @@
-package org.ligi.passandroid.ui.compose
+﻿package org.ligi.passandroid.ui.compose
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
@@ -64,14 +64,6 @@ class AgendaCalendarTest {
             assertThat(cells.filterNotNull().last().dayOfMonth)
                 .isEqualTo(YearMonth.of(2026, month).lengthOfMonth())
         }
-    }
-
-    @Test
-    fun `badge label caps at nine plus`() {
-        assertThat(agendaBadgeLabel(1)).isEqualTo("1")
-        assertThat(agendaBadgeLabel(9)).isEqualTo("9")
-        assertThat(agendaBadgeLabel(10)).isEqualTo("9+")
-        assertThat(agendaBadgeLabel(23)).isEqualTo("9+")
     }
 
     @Test

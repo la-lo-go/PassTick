@@ -206,8 +206,6 @@
     <string name="timeline_past">Past</string>
     <string name="timeline_view_list">List view</string>
     <string name="timeline_view_agenda">Agenda view</string>
-    <string name="calendar_previous_month">Previous month</string>
-    <string name="calendar_next_month">Next month</string>
     <string name="calendar_selected_day">Selected day</string>
     <plurals name="calendar_day_passes">
         <item quantity="one">%1$d pass</item>

@@ -6,18 +6,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.R
+import org.ligi.passandroid.domain.timeline.PassEvent
 import org.ligi.passandroid.domain.timeline.PassTimeline
 import org.ligi.passandroid.ui.theme.PassDesignSystem
 import org.threeten.bp.DayOfWeek
@@ -54,8 +53,6 @@ internal fun monthGridCells(month: YearMonth, firstDayOfWeek: DayOfWeek): List<L
     return cells
 }
 
-internal fun agendaBadgeLabel(count: Int): String = if (count > 9) "9+" else count.toString()
-
 internal fun timelineDayIndex(timeline: PassTimeline, date: LocalDate): Int? {
     var itemIndex = 0
     timeline.days.asReversed().forEach { day ->
@@ -68,13 +65,16 @@ internal fun timelineDayIndex(timeline: PassTimeline, date: LocalDate): Int? {
 private const val GridRows = 6
 private const val GridColumns = 7
 private const val DayCellDiameter = 40
+// A fixed month backlog seeds the infinite vertical scroll in both directions;
+// the initial scroll index lands on today's month.
+private const val MonthsBefore = 100
+private const val MonthsAfter = 100
+private const val CurrentMonthIndex = MonthsBefore
 
 @Composable
 internal fun AgendaCalendar(
     timeline: PassTimeline,
     selectedDay: LocalDate?,
-    displayedMonth: YearMonth,
-    onMonthChange: (YearMonth) -> Unit,
     onDayClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -85,39 +85,11 @@ internal fun AgendaCalendar(
     val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("MMMM d, yyyy", locale) }
     val passCounts = remember(timeline) { timeline.days.associate { it.date to it.events.size } }
     val today = remember(timeline.zoneId) { LocalDate.now(timeline.zoneId) }
-    val cells = remember(displayedMonth, firstDayOfWeek) { monthGridCells(displayedMonth, firstDayOfWeek) }
+    val currentMonth = remember(today) { YearMonth.from(today) }
     val weekdays = remember(firstDayOfWeek) { (0L..6L).map(firstDayOfWeek::plus) }
-    val earliestMonth = passCounts.keys.minOrNull()?.let { YearMonth.from(it).minusMonths(1) }
-    val latestMonth = passCounts.keys.maxOrNull()?.let { YearMonth.from(it).plusMonths(1) }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = CurrentMonthIndex)
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = { onMonthChange(displayedMonth.minusMonths(1)) },
-                enabled = earliestMonth == null || displayedMonth.isAfter(earliestMonth),
-            ) {
-                Icon(
-                    Icons.Default.ChevronLeft,
-                    contentDescription = stringResource(R.string.calendar_previous_month),
-                )
-            }
-            Text(
-                text = displayedMonth.format(monthFormatter),
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            IconButton(
-                onClick = { onMonthChange(displayedMonth.plusMonths(1)) },
-                enabled = latestMonth == null || displayedMonth.isBefore(latestMonth),
-            ) {
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = stringResource(R.string.calendar_next_month),
-                )
-            }
-        }
         Row(Modifier.fillMaxWidth()) {
             weekdays.forEach { dayOfWeek ->
                 Text(
@@ -129,7 +101,52 @@ internal fun AgendaCalendar(
                 )
             }
         }
-        // Fixed six-row grid height so switching months never moves the layout.
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = 64.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            items(
+                count = MonthsBefore + MonthsAfter + 1,
+                key = { it },
+            ) { index ->
+                AgendaMonthBlock(
+                    month = currentMonth.plusMonths((index - CurrentMonthIndex).toLong()),
+                    firstDayOfWeek = firstDayOfWeek,
+                    monthFormatter = monthFormatter,
+                    dayFormatter = dayFormatter,
+                    passCounts = passCounts,
+                    selectedDay = selectedDay,
+                    today = today,
+                    onDayClick = onDayClick,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgendaMonthBlock(
+    month: YearMonth,
+    firstDayOfWeek: DayOfWeek,
+    monthFormatter: DateTimeFormatter,
+    dayFormatter: DateTimeFormatter,
+    passCounts: Map<LocalDate, Int>,
+    selectedDay: LocalDate?,
+    today: LocalDate,
+    onDayClick: (LocalDate) -> Unit,
+) {
+    val cells = remember(month, firstDayOfWeek) { monthGridCells(month, firstDayOfWeek) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = month.format(monthFormatter),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        // Fixed six-row grid height so every month block keeps the same size.
         Column(Modifier.height((GridRows * DayCellDiameter).dp)) {
             repeat(GridRows) { row ->
                 Row(Modifier.fillMaxWidth().height(DayCellDiameter.dp)) {
@@ -177,6 +194,7 @@ private fun AgendaDayCell(
         isPast -> PassDesignSystem.Past
         else -> MaterialTheme.colorScheme.onSurface
     }
+    val dotColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
     val description = date.format(dayFormatter) +
         count?.let { label -> ", " + pluralStringResource(R.plurals.calendar_day_passes, label, label) } +
         if (isSelected) ", " + stringResource(R.string.calendar_selected_day) else ""
@@ -193,26 +211,22 @@ private fun AgendaDayCell(
                 .then(circleModifier),
             contentAlignment = Alignment.Center,
         ) {
-            if (count != null) {
-                BadgedBox(
-                    badge = {
-                        Badge { Text(agendaBadgeLabel(count)) }
-                    },
-                ) {
-                    Text(
-                        text = date.dayOfMonth.toString(),
-                        color = dayColor,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = date.dayOfMonth.toString(),
                     color = dayColor,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
+                // The pass count is a dot under the number so the day number stays readable.
+                if (count != null) {
+                    Box(
+                        Modifier
+                            .padding(top = 1.dp)
+                            .size(5.dp)
+                            .background(dotColor, CircleShape),
+                    )
+                }
             }
         }
     }

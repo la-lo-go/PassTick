@@ -69,7 +69,6 @@ import org.ligi.passandroid.ui.theme.PassActionButton
 import org.ligi.passandroid.ui.theme.PassActionButtonGroup
 import org.ligi.passandroid.ui.theme.passActionButtonGroupWidth
 import org.threeten.bp.LocalDate
-import org.threeten.bp.YearMonth
 import org.threeten.bp.format.DateTimeFormatter
 import androidx.compose.ui.res.stringResource
 import org.ligi.passandroid.R
@@ -98,10 +97,8 @@ fun TimelineScreen(
 ) {
     var viewMode by rememberSaveable { mutableStateOf(TimelineViewMode.List) }
     var selectedDayEpoch by rememberSaveable { mutableStateOf<Long?>(null) }
-    var displayedMonthValue by rememberSaveable { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val passCounts = remember(state.timeline) { state.timeline.days.associate { it.date to it.events.size } }
     val nearestIndex = remember(state.timeline.days, state.timeline.nearestEventId) {
         timelineItemIndex(state.timeline, state.timeline.nearestEventId)
     }
@@ -148,14 +145,10 @@ fun TimelineScreen(
             when (viewMode) {
                 TimelineViewMode.List -> TimelineContent(state, onAction, listState, Modifier.padding(padding))
                 TimelineViewMode.Agenda -> {
-                    val currentMonth = remember(state.timeline.zoneId) {
-                        YearMonth.from(LocalDate.now(state.timeline.zoneId))
-                    }
+                    val passCounts = remember(state.timeline) { state.timeline.days.associate { it.date to it.events.size } }
                     AgendaCalendar(
                         timeline = state.timeline,
                         selectedDay = selectedDayEpoch?.let(LocalDate::ofEpochDay),
-                        displayedMonth = displayedMonthValue?.toYearMonth() ?: currentMonth,
-                        onMonthChange = { month -> displayedMonthValue = month.year * 12L + month.monthValue },
                         onDayClick = { date ->
                             selectedDayEpoch = date.toEpochDay()
                             if (passCounts.containsKey(date)) {
@@ -419,14 +412,6 @@ internal fun timelineItemIndex(timeline: PassTimeline, eventId: String?): Int? {
         itemIndex += day.events.size
     }
     return null
-}
-
-// A month is encoded as year * 12 + monthValue (1..12); decode without losing December.
-private fun Long.toYearMonth(): YearMonth {
-    val remainder = ((this % 12) + 12) % 12
-    val monthValue = if (remainder == 0L) 12 else remainder.toInt()
-    val year = (this - monthValue) / 12
-    return YearMonth.of(year.toInt(), monthValue)
 }
 
 @Composable
