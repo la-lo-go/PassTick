@@ -94,6 +94,8 @@ jobs:
           api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
+          # The emulator 37.x default userdata partition is 12 GB and the runner has less space.
+          disk-size: 2048M
           script: ./gradlew :android:connectedDebugAndroidTest
 
       - name: Archive reports
