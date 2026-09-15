@@ -26,6 +26,7 @@ import org.ligi.passandroid.ui.state.StringResolver
 import org.ligi.passandroid.reminder.AndroidReminderScheduler
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
+import org.ligi.passandroid.widget.WidgetSnapshotPublisher
 import java.io.File
 
 open class App : Application() {
@@ -48,7 +49,7 @@ open class App : Application() {
             single<SettingsRepository> { DataStoreSettingsRepository(this@App) }
             single<PlatformActions> { AndroidPlatformActions(this@App, activityProvider = { currentActivity }) }
             single<ReminderScheduler> { AndroidReminderScheduler(this@App) }
-            single { PassWidgetSnapshotPublisher(this@App) }
+            single<WidgetSnapshotPublisher> { PassWidgetSnapshotPublisher(this@App) }
             single<StringResolver> {
                 val context = get<Context>()
                 object : StringResolver {
