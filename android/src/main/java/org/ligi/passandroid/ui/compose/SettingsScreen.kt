@@ -8,7 +8,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -32,6 +35,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -148,9 +152,9 @@ private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction)
             }
             if (!dynamicAvailable || !settings.dynamicColors) {
                 add(settingsHeader(stringResource(R.string.settings_accent_color)))
-                add(settingsItem { AccentColorChoices(settings.accentColor, onAction) })
+                add(settingsItem { AccentColorSelector(settings.accentColor, onAction) })
                 add(settingsHeader(stringResource(R.string.settings_color_style)))
-                add(settingsItem { ColorStyleChoices(settings.accentColor, settings.colorStyle, onAction) })
+                add(settingsItem { ColorStyleSelector(settings.accentColor, settings.colorStyle, onAction) })
             }
             if (settings.themeMode == ThemeMode.DARK) {
                 add(
@@ -182,49 +186,116 @@ private fun ThemeSetting(mode: ThemeMode, selectedMode: ThemeMode, onAction: (Se
 }
 
 @Composable
-private fun AccentColorChoices(selectedColor: Long?, onAction: (SettingsAction) -> Unit) {
-    FlowRow(
-        Modifier.fillMaxWidth().padding(16.dp),
+private fun AccentColorSelector(selectedColor: Long?, onAction: (SettingsAction) -> Unit) {
+    var customColorOpen by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val seeds = remember { listOf<Long?>(null) + accentSeedColors }
+    val customColorSelected = selectedColor != null && selectedColor !in accentSeedColors
+    LaunchedEffect(selectedColor) {
+        val index = seeds.indexOf(selectedColor)
+        if (index >= 0) listState.scrollToItem(index)
+    }
+    LazyRow(
+        state = listState,
+        modifier = Modifier.fillMaxWidth().testTag("accent_color_row"),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        AccentColorChoice(seed = null, selected = selectedColor == null, onAction = onAction)
-        accentSeedColors.forEach { seed ->
-            AccentColorChoice(seed = seed, selected = selectedColor == seed, onAction = onAction)
+        items(seeds, key = { it ?: Long.MIN_VALUE }) { seed ->
+            AccentColorSwatch(seed, selected = seed == selectedColor) {
+                onAction(SettingsAction.SetAccentColor(seed))
+            }
+        }
+        item {
+            CustomColorSwatch(selected = customColorSelected) { customColorOpen = true }
+        }
+    }
+    if (customColorOpen) {
+        ColorPickerDialog(
+            title = stringResource(R.string.settings_accent_color),
+            initialColor = (selectedColor ?: DEFAULT_ACCENT_COLOR).toInt(),
+            onDismiss = { customColorOpen = false },
+            onColorSelected = { color ->
+                onAction(SettingsAction.SetAccentColor(color.toLong() and 0xFFFFFFFFL))
+                customColorOpen = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun AccentColorSwatch(seed: Long?, selected: Boolean, onClick: () -> Unit) {
+    val description = seed?.let { formatPickerColor(it.toInt()) } ?: stringResource(R.string.settings_accent_default)
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        Modifier.size(48.dp)
+            .clip(shape)
+            .background(seed?.let(::Color) ?: brandAccentColor)
+            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .semantics { contentDescription = description },
+    )
+}
+
+@Composable
+private fun CustomColorSwatch(selected: Boolean, onClick: () -> Unit) {
+    val description = stringResource(R.string.settings_accent_custom)
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        Modifier.size(48.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Default.Edit, null)
+    }
+}
+
+@Composable
+private fun ColorStyleSelector(accentColor: Long?, selectedStyle: ColorStyle, onAction: (SettingsAction) -> Unit) {
+    val listState = rememberLazyListState()
+    val dark = isSystemInDarkTheme()
+    val seed = Color(accentColor ?: DEFAULT_ACCENT_COLOR)
+    LaunchedEffect(selectedStyle) {
+        val index = ColorStyle.entries.indexOf(selectedStyle)
+        if (index >= 0) listState.scrollToItem(index)
+    }
+    LazyRow(
+        state = listState,
+        modifier = Modifier.fillMaxWidth().testTag("color_style_row"),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        items(ColorStyle.entries) { style ->
+            val scheme = remember(seed, dark, style) { generateAccentColorScheme(seed, dark, style) }
+            ColorStyleSwatch(style, scheme, selected = style == selectedStyle) {
+                onAction(SettingsAction.SetColorStyle(style))
+            }
         }
     }
 }
 
 @Composable
-private fun AccentColorChoice(seed: Long?, selected: Boolean, onAction: (SettingsAction) -> Unit) {
+private fun ColorStyleSwatch(
+    style: ColorStyle,
+    scheme: ColorScheme,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val description = colorStyleLabel(style)
     val shape = RoundedCornerShape(12.dp)
     Box(
-        Modifier.size(40.dp)
+        Modifier.size(48.dp)
             .clip(shape)
-            .background(seed?.let(::Color) ?: brandAccentColor)
             .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
-            .clickable(role = Role.RadioButton) { onAction(SettingsAction.SetAccentColor(seed)) }
-            .semantics { contentDescription = formatPickerColor((seed ?: DEFAULT_ACCENT_COLOR).toInt()) },
-    )
-}
-
-@Composable
-private fun ColorStyleChoices(accentColor: Long?, selectedStyle: ColorStyle, onAction: (SettingsAction) -> Unit) {
-    val dark = isSystemInDarkTheme()
-    Column {
-        ColorStyle.entries.forEach { style ->
-            val scheme = remember(accentColor, style, dark) {
-                generateAccentColorScheme(Color(accentColor ?: DEFAULT_ACCENT_COLOR), dark, style)
-            }
-            ListItem(
-                leadingContent = {
-                    Box(Modifier.size(24.dp).clip(CircleShape).background(scheme.primary))
-                },
-                trailingContent = { RadioButton(style == selectedStyle, { onAction(SettingsAction.SetColorStyle(style)) }) },
-                modifier = Modifier.clickable { onAction(SettingsAction.SetColorStyle(style)) },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            ) { Text(colorStyleLabel(style)) }
-        }
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .semantics { contentDescription = description },
+    ) {
+        Box(Modifier.fillMaxSize().padding(4.dp).clip(shape).background(scheme.primary))
+        Box(Modifier.align(Alignment.BottomEnd).fillMaxSize(0.5f).background(scheme.secondaryContainer))
     }
 }
 

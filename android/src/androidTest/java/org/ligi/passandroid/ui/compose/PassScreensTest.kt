@@ -178,6 +178,22 @@ class PassScreensTest {
     }
 
     @Test
+    fun colorStyleRowCapturesSelectionAction() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT, dynamicColors = false) {
+                SettingsScreen(AppSettings(dynamicColors = false), onAction = actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Vibrant").performScrollTo().performClick()
+
+        assertThat(actions).containsExactly(
+            SettingsAction.SetColorStyle(org.ligi.passandroid.repository.ColorStyle.VIBRANT),
+        )
+    }
+
+    @Test
     fun settingsExposeProtectedPassPrivacyOptions() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = {}) }
