@@ -336,6 +336,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
             entry<AppDestination.Settings> {
                 SettingsScreen(
                     settings = state.settings,
+                    systemAccentColor = state.systemAccentColor,
                     scrollToNotifications = dependencies.scrollSettingsToNotifications,
                     onNotificationScrollConsumed = { dependencies.onSettingsScrollConsumed() },
                 ) { action ->

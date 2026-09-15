@@ -56,6 +56,7 @@ class MainViewModel(
     private val message = MutableStateFlow<String?>(null)
     private val selectedCategoryId = MutableStateFlow<String?>(null)
     private val pendingDeletionIds = MutableStateFlow<Set<String>>(emptySet())
+    private val systemAccentColor = platformActions.systemAccentColor()
     private val categoryMoves = Channel<AppAction.MovePass>(Channel.UNLIMITED)
     private val passes = passRepository.observePasses()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -98,6 +99,7 @@ class MainViewModel(
                 ) || categories.any { it.id == requested }
             },
             timeline = timeline,
+            systemAccentColor = systemAccentColor,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
@@ -420,7 +422,7 @@ class MainViewModel(
                 // Keep the wallpaper accent as the seed the first time dynamic colors turn off,
                 // so the scheme does not jump to the default color.
                 if (!action.value && settingsRepository.settings.first().accentColor == null) {
-                    platformActions.systemAccentColor()?.let { settingsRepository.setAccentColor(it) }
+                    systemAccentColor?.let { settingsRepository.setAccentColor(it) }
                 }
                 settingsRepository.setDynamicColors(action.value)
             }

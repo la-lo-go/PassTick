@@ -150,6 +150,7 @@ data class MainUiState(
     val categories: List<PassCategory> = emptyList(),
     val selectedCategoryId: String? = null,
     val timeline: PassTimeline = PassTimeline.empty(),
+    val systemAccentColor: Long? = null,
 )
 
 sealed interface AppAction {

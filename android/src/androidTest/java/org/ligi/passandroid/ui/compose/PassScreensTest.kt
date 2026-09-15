@@ -157,10 +157,10 @@ class PassScreensTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("#FF1ABC9C").performClick()
+        composeRule.onNodeWithContentDescription("#FF48C9B0").performClick()
 
         assertThat(actions).containsExactly(
-            SettingsAction.SetAccentColor(0xFF1ABC9CL),
+            SettingsAction.SetAccentColor(0xFF48C9B0L),
         )
     }
 
