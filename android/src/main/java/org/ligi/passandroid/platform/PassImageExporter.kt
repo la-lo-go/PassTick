@@ -205,24 +205,10 @@ object PassImageExporter {
             add(dividerBlock(pass, contentWidth, width))
         }
         if (barcode != null) {
-            val quietZone = if (barcodeOnly) 0f else width * BARCODE_PADDING_RATIO
-            add(ContentBlock(barcode.height + 2 * quietZone) { canvas, left, top ->
-                val x = left + (contentWidth - barcode.width) / 2f
-                canvas.drawBitmap(barcode, x, top + quietZone, imagePaint)
-            })
+            add(barcodeBlock(barcode, contentWidth, width, barcodeOnly, imagePaint))
         }
         if (artwork != null) {
-            val scale = minOf(
-                contentWidth / artwork.width.toFloat(),
-                width * MAX_ARTWORK_HEIGHT_RATIO / artwork.height.toFloat(),
-                1f,
-            )
-            val drawWidth = (artwork.width * scale).toInt().coerceAtLeast(1)
-            val drawHeight = (artwork.height * scale).toInt().coerceAtLeast(1)
-            add(ContentBlock(drawHeight.toFloat()) { canvas, left, top ->
-                val x = left + (contentWidth - drawWidth) / 2f
-                canvas.drawBitmap(artwork, null, RectF(x, top, x + drawWidth, top + drawHeight), imagePaint)
-            })
+            add(artworkBlock(artwork, contentWidth, width, imagePaint))
         }
         val lines = detailLines(pass, content)
         if (lines.isNotEmpty()) {
@@ -230,6 +216,39 @@ object PassImageExporter {
         }
         if (content.notes && pass.notes.isNotBlank()) {
             add(bodyTextBlock(pass.notes, contentWidth, width))
+        }
+    }
+
+    private fun barcodeBlock(
+        barcode: Bitmap,
+        contentWidth: Int,
+        width: Float,
+        barcodeOnly: Boolean,
+        imagePaint: Paint,
+    ): ContentBlock {
+        val quietZone = if (barcodeOnly) 0f else width * BARCODE_PADDING_RATIO
+        return ContentBlock(barcode.height + 2 * quietZone) { canvas, left, top ->
+            val x = left + (contentWidth - barcode.width) / 2f
+            canvas.drawBitmap(barcode, x, top + quietZone, imagePaint)
+        }
+    }
+
+    private fun artworkBlock(
+        artwork: Bitmap,
+        contentWidth: Int,
+        width: Float,
+        imagePaint: Paint,
+    ): ContentBlock {
+        val scale = minOf(
+            contentWidth / artwork.width.toFloat(),
+            width * MAX_ARTWORK_HEIGHT_RATIO / artwork.height.toFloat(),
+            1f,
+        )
+        val drawWidth = (artwork.width * scale).toInt().coerceAtLeast(1)
+        val drawHeight = (artwork.height * scale).toInt().coerceAtLeast(1)
+        return ContentBlock(drawHeight.toFloat()) { canvas, left, top ->
+            val x = left + (contentWidth - drawWidth) / 2f
+            canvas.drawBitmap(artwork, null, RectF(x, top, x + drawWidth, top + drawHeight), imagePaint)
         }
     }
 
