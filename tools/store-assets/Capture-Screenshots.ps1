@@ -7,7 +7,11 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
 $outputDirectory = Join-Path $repositoryRoot "build/screenshots-raw"
 $packageName = "dev.lalogo.passtick"
+$testApplicationId = "$packageName.test"
+$testRunner = "org.ligi.passandroid.AppReplacingRunner"
 $testClass = "org.ligi.passandroid.screenshots.StoreScreenshotTest"
+$appApk = Join-Path $repositoryRoot "android/build/outputs/apk/debug/android-debug.apk"
+$testApk = Join-Path $repositoryRoot "android/build/outputs/apk/androidTest/debug/android-debug-androidTest.apk"
 
 function Resolve-SdkRoot {
     foreach ($candidate in @($env:ANDROID_HOME, $env:ANDROID_SDK_ROOT, (Join-Path $env:LOCALAPPDATA "Android/Sdk"))) {
@@ -32,9 +36,10 @@ function Get-EmulatorSerial {
 
 function Start-Emulator {
     Write-Host "Starting emulator $Avd"
-    Start-Process -FilePath $emulator -ArgumentList "-avd", $Avd, "-no-snapshot", "-no-boot-anim", "-prop", "persist.sys.locale=en-US" | Out-Null
+    Start-Process -FilePath $emulator -ArgumentList "-avd", $Avd, "-no-snapshot", "-no-boot-anim", "-prop", "persist.sys.locale=en-US", "-timezone", "Europe/Madrid" | Out-Null
     $deadline = (Get-Date).AddMinutes(8)
     $booted = ""
+    $serial = $null
     do {
         Start-Sleep -Seconds 5
         $serial = Get-EmulatorSerial
@@ -53,17 +58,32 @@ if ($Serial) {
 if (-not $target) { throw "No Android emulator is available for the capture. Start one or pass -Serial." }
 
 Write-Host "Using device $target"
-& $adb -s $target shell "settings put system system_locales en-US" | Out-Null
-& $adb -s $target shell "rm -rf /sdcard/Android/data/$packageName/files/screenshots" | Out-Null
 
-$env:ANDROID_SERIAL = $target
 Push-Location $repositoryRoot
 try {
-    & (Join-Path $repositoryRoot "gradlew.bat") ":android:connectedDebugAndroidTest" "-Pandroid.testInstrumentationRunnerArguments.class=$testClass"
-    if ($LASTEXITCODE -ne 0) { throw "Instrumented screenshot test failed with exit code $LASTEXITCODE." }
+    & (Join-Path $repositoryRoot "gradlew.bat") ":android:assembleDebug" ":android:assembleDebugAndroidTest"
+    if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 }
 finally {
     Pop-Location
+}
+
+& $adb -s $target install -r -t $appApk
+if ($LASTEXITCODE -ne 0) { throw "Could not install the app on $target." }
+& $adb -s $target install -r -t $testApk
+if ($LASTEXITCODE -ne 0) { throw "Could not install the test app on $target." }
+
+& $adb -s $target shell "settings put system system_locales en-US" | Out-Null
+& $adb -s $target shell "setprop persist.sys.timezone Europe/Madrid" | Out-Null
+& $adb -s $target shell "rm -rf /sdcard/Android/data/$packageName/files/screenshots" | Out-Null
+
+# The capture test hides the navigation bar, so capture only needs the education prompt suppressed.
+& $adb -s $target shell "settings put secure immersive_mode_confirmations confirmed" | Out-Null
+
+$instrumentation = & $adb -s $target shell am instrument -w -r -e class $testClass "$testApplicationId/$testRunner" 2>&1
+$instrumentation | Select-Object -Last 8 | ForEach-Object { Write-Host $_ }
+if (($instrumentation -join "`n") -match "FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|Process crashed") {
+    throw "Instrumented screenshot test failed."
 }
 
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null

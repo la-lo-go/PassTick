@@ -3,20 +3,36 @@ package org.ligi.passandroid.screenshots
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.ligi.passandroid.domain.timeline.buildPassTimeline
 import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
+import org.ligi.passandroid.repository.ColorStyle
+import org.ligi.passandroid.repository.PassArtworkSnapshot
+import org.ligi.passandroid.repository.PassFieldSnapshot
+import org.ligi.passandroid.repository.PassLocationSnapshot
+import org.ligi.passandroid.repository.PassSnapshot
+import org.ligi.passandroid.repository.PassTimeSpanSnapshot
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.defaultPassCategories
 import org.ligi.passandroid.repository.recommendedPassTags
@@ -26,6 +42,8 @@ import org.ligi.passandroid.ui.compose.ExportImageScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
 import org.ligi.passandroid.ui.compose.PassHomeScreen
 import org.ligi.passandroid.ui.compose.SettingsScreen
+import org.ligi.passandroid.ui.compose.TimelineScreen
+import org.ligi.passandroid.ui.compose.TimelineUiState
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PassArtworkUiModel
 import org.ligi.passandroid.ui.state.PassFieldUiModel
@@ -35,9 +53,13 @@ import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassImageExportOptions
+import org.threeten.bp.Instant
+import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId
 import org.threeten.bp.ZonedDateTime
+import org.threeten.bp.format.DateTimeFormatter
 import java.io.File
+import java.util.Locale
 
 /**
  * Renders the showcase state on a real device and writes PNG captures for the store listing.
@@ -54,6 +76,17 @@ class StoreScreenshotTest {
 
     private val artworkCache = mutableMapOf<String, ByteArray>()
 
+    @Before
+    fun hideNavigationBar() {
+        composeRule.activityRule.scenario.onActivity { activity ->
+            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+            WindowInsetsControllerCompat(activity.window, activity.window.decorView).apply {
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                hide(WindowInsetsCompat.Type.navigationBars())
+            }
+        }
+    }
+
     @Test
     fun homeShowsTodaysPasses() {
         setBrandContent {
@@ -64,12 +97,22 @@ class StoreScreenshotTest {
     }
 
     @Test
-    fun homeShowsPinnedTaggedAndProtectedPasses() {
+    fun timelineShowsUpcomingEvents() {
+        val passes = showcasePasses()
         setBrandContent {
-            PassHomeScreen(showcaseState(highlightToday = false), onAction = {}, showTodayHero = false)
+            TimelineScreen(
+                state = TimelineUiState(
+                    timeline = buildPassTimeline(passes.map { it.toSnapshot() }, Instant.now(), ZONE),
+                    passCardTitles = passes.associate { it.id to it.description },
+                ),
+                onAction = {},
+            )
         }
 
-        capture("home-all")
+        composeRule.onNodeWithContentDescription("Agenda view").performClick()
+        val todayLabel = LocalDate.now(ZONE).format(DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US))
+        composeRule.onNodeWithContentDescription(todayLabel, substring = true).performClick()
+        capture("timeline")
     }
 
     @Test
@@ -90,7 +133,7 @@ class StoreScreenshotTest {
     @Test
     fun exportImageShowsPreviewAndOptions() {
         composeRule.setContent {
-            PassTheme(ThemeMode.DARK, dynamicColors = false, accentColor = CORAL) {
+            PassTheme(ThemeMode.DARK, dynamicColors = false, accentColor = CORAL, colorStyle = ColorStyle.FIDELITY) {
                 ExportImageScreen(
                     pass = coastalExpressPass(),
                     options = PassImageExportOptions(),
@@ -107,12 +150,18 @@ class StoreScreenshotTest {
     }
 
     @Test
-    fun settingsShowBrandAppearance() {
-        setBrandContent {
-            SettingsScreen(showcaseSettings(), onAction = {})
+    fun themesShowMaterialYou() {
+        var variant by mutableStateOf(ThemeVariant("coral", CORAL, ColorStyle.FIDELITY, ThemeMode.DARK))
+        composeRule.setContent {
+            PassTheme(variant.mode, dynamicColors = false, accentColor = variant.accent, colorStyle = variant.style) {
+                PassHomeScreen(showcaseState(), onAction = {})
+            }
         }
 
-        capture("settings-appearance")
+        themeVariants.forEach { themeVariant ->
+            variant = themeVariant
+            capture("theme-${themeVariant.name}")
+        }
     }
 
     @Test
@@ -145,11 +194,14 @@ class StoreScreenshotTest {
 
     private fun setBrandContent(themeMode: ThemeMode = ThemeMode.DARK, content: @Composable () -> Unit) {
         composeRule.setContent {
-            PassTheme(themeMode, dynamicColors = false, accentColor = CORAL) { content() }
+            PassTheme(themeMode, dynamicColors = false, accentColor = CORAL, colorStyle = ColorStyle.FIDELITY) { content() }
         }
     }
 
     private fun capture(name: String) {
+        composeRule.waitForIdle()
+        // Let the system bar hide animation settle before the raster.
+        Thread.sleep(400)
         composeRule.waitForIdle()
         val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
         val directory = File(context.getExternalFilesDir(null), "screenshots")
@@ -157,28 +209,28 @@ class StoreScreenshotTest {
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    private fun showcaseState(highlightToday: Boolean = true) = MainUiState(
+    private fun showcaseState() = MainUiState(
         passes = showcasePasses(),
-        settings = showcaseSettings(highlightToday),
+        settings = showcaseSettings(),
         categories = defaultPassCategories,
         isContentLoading = false,
     )
 
-    private fun showcaseSettings(highlightToday: Boolean = true) = AppSettings(
+    private fun showcaseSettings() = AppSettings(
         themeMode = ThemeMode.DARK,
         dynamicColors = false,
         accentColor = CORAL,
-        highlightTodayPasses = highlightToday,
+        colorStyle = ColorStyle.FIDELITY,
         blurProtectedPassCards = true,
         showProtectedPassLockIcon = true,
     )
 
     private fun showcasePasses() = listOf(
+        auroraAirPass(),
         coastalExpressPass(),
         lumenLivePass(),
         glassHorizonsPass(),
         skylineFitnessPass(),
-        auroraAirPass(),
         bellaNapoliPass(),
         solFestivalPass(),
     )
@@ -220,7 +272,7 @@ class StoreScreenshotTest {
             field("entry", "Entry", "East", hint = "secondaryFields"),
         ),
         locations = listOf(PassLocationUiModel("Lumen Arena", 41.3802, 2.1220)),
-        timeSpan = todayAt(20, 30) to todayAt(23, 30),
+        timeSpan = daysFromNow(1, 20, 30) to daysFromNow(1, 23, 30),
         artworkName = "lumen-live",
         tagIds = setOf("music", "events"),
     )
@@ -240,7 +292,7 @@ class StoreScreenshotTest {
             field("gallery", "Gallery", "Atrium 2", hint = "secondaryFields"),
         ),
         locations = listOf(PassLocationUiModel("Museum of Light", 41.3875, 2.1150)),
-        timeSpan = todayAt(11, 0) to todayAt(18, 0),
+        timeSpan = daysFromNow(2, 11, 0) to daysFromNow(2, 18, 0),
         artworkName = "glass-horizons",
         tagIds = setOf("events"),
     )
@@ -375,13 +427,49 @@ class StoreScreenshotTest {
         hint: String? = null,
     ) = PassFieldUiModel(key, label, value, hidden, hint)
 
+    private fun PassUiModel.toSnapshot() = PassSnapshot(
+        id = id,
+        description = description,
+        creator = creator,
+        type = type,
+        accentColor = accentColor,
+        barcodeFormat = barcodeFormat,
+        barcodeMessage = barcodeMessage,
+        barcodeAlternativeText = barcodeAlternativeText,
+        fields = fields.map { PassFieldSnapshot(it.key, it.label, it.value, it.hidden, it.hint) },
+        locations = locations.map { PassLocationSnapshot(it.name, it.latitude, it.longitude) },
+        calendarTimeSpan = calendarTimeSpan?.let { PassTimeSpanSnapshot(it.from, it.to) },
+        artwork = artwork.map { PassArtworkSnapshot(it.kind, it.bytes) },
+        isProtected = isProtected,
+        isFavorite = isFavorite,
+        tagIds = tagIds,
+        notes = notes,
+    )
+
+    private data class ThemeVariant(
+        val name: String,
+        val accent: Long,
+        val style: ColorStyle,
+        val mode: ThemeMode,
+    )
+
+    private val themeVariants = listOf(
+        ThemeVariant("coral", CORAL, ColorStyle.FIDELITY, ThemeMode.DARK),
+        ThemeVariant("coral-light", CORAL, ColorStyle.FIDELITY, ThemeMode.LIGHT),
+        ThemeVariant("ocean", 0xFF0F6E8CL, ColorStyle.VIBRANT, ThemeMode.DARK),
+        ThemeVariant("violet", 0xFF7B1FA2L, ColorStyle.VIBRANT, ThemeMode.DARK),
+        ThemeVariant("amber", 0xFFF57C00L, ColorStyle.VIBRANT, ThemeMode.DARK),
+        ThemeVariant("forest", 0xFF2E7D32L, ColorStyle.TONAL_SPOT, ThemeMode.DARK),
+    )
+
     private fun todayAt(hour: Int, minute: Int): ZonedDateTime =
-        ZonedDateTime.now(ZoneId.systemDefault()).withHour(hour).withMinute(minute).withSecond(0).withNano(0)
+        ZonedDateTime.now(ZONE).withHour(hour).withMinute(minute).withSecond(0).withNano(0)
 
     private fun daysFromNow(days: Long, hour: Int, minute: Int): ZonedDateTime =
         todayAt(hour, minute).plusDays(days)
 
     private companion object {
         const val CORAL = 0xFFFF6249L
+        val ZONE = ZoneId.of("Europe/Madrid")
     }
 }
