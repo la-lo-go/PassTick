@@ -123,6 +123,11 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.material.kolor) {
+        // Material Kolor ships JetBrains Compose wrappers for prebuilt artifacts; this app builds
+        // against the pinned androidx.compose.material3 only.
+        exclude(group = "org.jetbrains.compose.material3")
+    }
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
     implementation(libs.navigation3.runtime)
