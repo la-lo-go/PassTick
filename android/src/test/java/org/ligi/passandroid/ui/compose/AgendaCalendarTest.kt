@@ -1,4 +1,4 @@
-﻿package org.ligi.passandroid.ui.compose
+package org.ligi.passandroid.ui.compose
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
@@ -67,16 +67,18 @@ class AgendaCalendarTest {
     }
 
     @Test
-    fun `timeline day index resolves header in reversed order`() {
+    fun `timeline events for date returns the day events in order`() {
         val timeline = timeline()
 
-        assertThat(timelineDayIndex(timeline, LocalDate.of(2026, 1, 2))).isEqualTo(0)
-        assertThat(timelineDayIndex(timeline, LocalDate.of(2026, 1, 1))).isEqualTo(2)
+        assertThat(timelineEventsForDate(timeline, LocalDate.of(2026, 1, 1)))
+            .containsExactly(event("first"), event("second"))
+        assertThat(timelineEventsForDate(timeline, LocalDate.of(2026, 1, 2)))
+            .containsExactly(event("third"))
     }
 
     @Test
-    fun `timeline day index is null for unknown date`() {
-        assertThat(timelineDayIndex(timeline(), LocalDate.of(2026, 3, 1))).isNull()
+    fun `timeline events for unknown date are empty`() {
+        assertThat(timelineEventsForDate(timeline(), LocalDate.of(2026, 3, 1))).isEmpty()
     }
 
     private fun timeline() = PassTimeline(

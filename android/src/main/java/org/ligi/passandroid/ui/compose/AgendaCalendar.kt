@@ -53,14 +53,8 @@ internal fun monthGridCells(month: YearMonth, firstDayOfWeek: DayOfWeek): List<L
     return cells
 }
 
-internal fun timelineDayIndex(timeline: PassTimeline, date: LocalDate): Int? {
-    var itemIndex = 0
-    timeline.days.asReversed().forEach { day ->
-        if (day.date == date) return itemIndex
-        itemIndex += 1 + day.events.size
-    }
-    return null
-}
+internal fun timelineEventsForDate(timeline: PassTimeline, date: LocalDate): List<PassEvent> =
+    timeline.days.firstOrNull { it.date == date }?.events.orEmpty()
 
 private const val GridRows = 6
 private const val GridColumns = 7

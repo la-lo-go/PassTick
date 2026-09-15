@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
@@ -43,7 +45,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -60,7 +61,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import org.ligi.passandroid.domain.timeline.EventTemporalState
 import org.ligi.passandroid.domain.timeline.PassEvent
@@ -98,7 +98,6 @@ fun TimelineScreen(
     var viewMode by rememberSaveable { mutableStateOf(TimelineViewMode.List) }
     var selectedDayEpoch by rememberSaveable { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val nearestIndex = remember(state.timeline.days, state.timeline.nearestEventId) {
         timelineItemIndex(state.timeline, state.timeline.nearestEventId)
     }
@@ -144,24 +143,74 @@ fun TimelineScreen(
         } else {
             when (viewMode) {
                 TimelineViewMode.List -> TimelineContent(state, onAction, listState, Modifier.padding(padding))
-                TimelineViewMode.Agenda -> {
-                    val passCounts = remember(state.timeline) { state.timeline.days.associate { it.date to it.events.size } }
-                    AgendaCalendar(
-                        timeline = state.timeline,
-                        selectedDay = selectedDayEpoch?.let(LocalDate::ofEpochDay),
-                        onDayClick = { date ->
-                            selectedDayEpoch = date.toEpochDay()
-                            if (passCounts.containsKey(date)) {
-                                viewMode = TimelineViewMode.List
-                                scope.launch {
-                                    timelineDayIndex(state.timeline, date)?.let { listState.scrollToItem(it) }
-                                }
-                            }
-                        },
-                        modifier = Modifier.padding(padding).padding(16.dp),
-                    )
+                TimelineViewMode.Agenda -> AgendaContent(
+                    state = state,
+                    onAction = onAction,
+                    selectedDayEpoch = selectedDayEpoch,
+                    onDaySelect = { date -> selectedDayEpoch = date?.toEpochDay() },
+                    modifier = Modifier.padding(padding),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgendaContent(
+    state: TimelineUiState,
+    onAction: (TimelineAction) -> Unit,
+    selectedDayEpoch: Long?,
+    onDaySelect: (LocalDate?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var openEventId by remember { mutableStateOf<String?>(null) }
+    val locale = LocalConfiguration.current.locales[0]
+    val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", locale) }
+    val selectedDate = selectedDayEpoch?.let(LocalDate::ofEpochDay)
+    val selectedEvents = remember(state.timeline, selectedDate) {
+        selectedDate?.let { timelineEventsForDate(state.timeline, it).asReversed() }.orEmpty()
+    }
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        // Cap the selected-day section so it never pushes the calendar off screen.
+        val sectionMaxHeight = maxHeight * 0.45f
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (selectedEvents.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = sectionMaxHeight),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    item(key = "agendaSelectedDay") {
+                        Text(
+                            text = selectedDate?.format(dayFormatter).orEmpty(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    items(selectedEvents, key = PassEvent::id) { event ->
+                        TimelineEventRow(
+                            event = event,
+                            zoneId = state.timeline.zoneId,
+                            reminderEnabled = event.id in state.reminderEventIds,
+                            highlighted = event.id == state.timeline.nearestEventId,
+                            onAction = onAction,
+                            openEventId = openEventId,
+                            onOpenEvent = { openEventId = it },
+                        )
+                    }
                 }
             }
+            AgendaCalendar(
+                timeline = state.timeline,
+                selectedDay = selectedDate,
+                onDayClick = { date ->
+                    onDaySelect(date.takeIf { timelineEventsForDate(state.timeline, it).isNotEmpty() })
+                },
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
         }
     }
 }
