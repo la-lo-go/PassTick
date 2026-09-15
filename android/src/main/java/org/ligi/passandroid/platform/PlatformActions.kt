@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.provider.CalendarContract
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.FileProvider
@@ -36,6 +37,9 @@ interface PlatformActions {
     fun openLocation(location: PlatformLocation)
     fun openUrl(url: String)
     fun shareImage(pass: PassUiModel, options: PassImageExportOptions)
+
+    // Wallpaper-derived accent color, or null when the platform has no dynamic colors.
+    fun systemAccentColor(): Long? = null
 }
 
 class AndroidPlatformActions(
@@ -110,6 +114,12 @@ class AndroidPlatformActions(
             bitmap.recycle()
         }
         share(FileProvider.getUriForFile(context, context.getString(R.string.authority_fileprovider), file), "image/png")
+    }
+
+    override fun systemAccentColor(): Long? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        ContextCompat.getColor(context, android.R.color.system_accent1_500).toLong() and 0xFFFFFFFFL
+    } else {
+        null
     }
 }
 

@@ -145,7 +145,7 @@ class PassScreensTest {
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
         composeRule.onNodeWithText("Accent color").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Use AMOLED black background").assertIsDisplayed()
-        composeRule.onNodeWithText("Use HDR and maximum code brightness").assertIsDisplayed()
+        composeRule.onNodeWithText("Use max brightness for codes").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -157,10 +157,10 @@ class PassScreensTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("#FFEF9A9A").performClick()
+        composeRule.onNodeWithContentDescription("#FF1ABC9C").performClick()
 
         assertThat(actions).containsExactly(
-            SettingsAction.SetAccentColor(0xFFEF9A9AL),
+            SettingsAction.SetAccentColor(0xFF1ABC9CL),
         )
     }
 

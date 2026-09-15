@@ -47,6 +47,16 @@ internal val accentSeedColors: List<Long> = listOf(
     0xFFC0392BL, 0xFFA93226L, 0xFF922B21L, 0xFF7B241CL, 0xFF641E16L,
 )
 
+private const val SEED_TONES_PER_FAMILY = 10
+
+// The ramp is grouped into hue families: the first row of the selector shows one preview per
+// family and the second row shows every tone of the selected family.
+internal val accentSeedFamilies: List<List<Long>> = accentSeedColors.chunked(SEED_TONES_PER_FAMILY)
+
+internal val accentSeedFamilyPreviews: List<Long> = accentSeedFamilies.map { it[SEED_TONES_PER_FAMILY / 2] }
+
+internal fun accentSeedFamilyOf(color: Long): List<Long>? = accentSeedFamilies.firstOrNull { color in it }
+
 internal fun generateAccentColorScheme(seed: Color, dark: Boolean, style: ColorStyle): ColorScheme =
     dynamicColorScheme(seedColor = seed, isDark = dark, style = style.toPaletteStyle())
 

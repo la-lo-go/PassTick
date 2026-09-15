@@ -12,4 +12,5 @@ enum class ColorStyle {
     MONOCHROME,
 }
 
-const val DEFAULT_ACCENT_COLOR = 0xFF2859C5L
+// Matches the launcher icon background so the default scheme stays on brand.
+const val DEFAULT_ACCENT_COLOR = 0xFF102F4FL

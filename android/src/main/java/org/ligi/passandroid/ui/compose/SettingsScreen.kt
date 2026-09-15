@@ -83,7 +83,9 @@ import org.ligi.passandroid.repository.DEFAULT_ACCENT_COLOR
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.ui.state.SettingsAction
 import org.ligi.passandroid.ui.theme.PassIcons
-import org.ligi.passandroid.ui.theme.accentSeedColors
+import org.ligi.passandroid.ui.theme.accentSeedFamilies
+import org.ligi.passandroid.ui.theme.accentSeedFamilyOf
+import org.ligi.passandroid.ui.theme.accentSeedFamilyPreviews
 import org.ligi.passandroid.ui.theme.brandAccentColor
 import org.ligi.passandroid.ui.theme.generateAccentColorScheme
 import androidx.compose.ui.res.stringResource
@@ -129,6 +131,7 @@ fun SettingsScreen(
                 item { AppearanceSettings(settings, onAction) }
                 item { HomeSettings(settings, onAction) }
                 item { PassListSettings(onAction) }
+                item { CodeSettings(settings, onAction) }
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
                 item { ReminderSettings(settings, onAction) }
@@ -139,7 +142,7 @@ fun SettingsScreen(
 }
 
 // Must match the order of the settings sections above.
-private const val RemindersSectionIndex = 5
+private const val RemindersSectionIndex = 6
 
 @Composable
 private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
@@ -174,13 +177,6 @@ private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction)
                     },
                 )
             }
-            add(
-                settingsItem {
-                    SettingSwitch(stringResource(R.string.settings_use_hdr_and_maximum_code_brightness), settings.automaticBrightness) {
-                        onAction(SettingsAction.SetAutomaticBrightness(it))
-                    }
-                },
-            )
         },
     )
 }
@@ -197,38 +193,75 @@ private fun ThemeSetting(mode: ThemeMode, selectedMode: ThemeMode, onAction: (Se
 @Composable
 private fun AccentColorSelector(selectedColor: Long?, onAction: (SettingsAction) -> Unit) {
     var customColorOpen by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
-    val seeds = remember { listOf<Long?>(null) + accentSeedColors }
-    val customColorSelected = selectedColor != null && selectedColor !in accentSeedColors
-    val selectedIndex = when {
-        customColorSelected -> seeds.size
-        else -> seeds.indexOf(selectedColor)
+    val familyRowState = rememberLazyListState()
+    val toneRowState = rememberLazyListState()
+    val selectedFamily = selectedColor?.let(::accentSeedFamilyOf)
+    val customColorSelected = selectedColor != null && selectedFamily == null
+    val selectedRowIndex = when {
+        selectedColor == null -> 0
+        customColorSelected -> accentSeedFamilyPreviews.size + 1
+        else -> accentSeedFamilies.indexOf(selectedFamily) + 1
     }
-    LaunchedEffect(selectedIndex) {
-        if (selectedIndex >= 0) listState.animateScrollToItem(selectedIndex)
+    LaunchedEffect(selectedRowIndex) {
+        familyRowState.animateScrollToItem(selectedRowIndex)
     }
-    LazyRow(
-        state = listState,
-        modifier = Modifier.fillMaxWidth().testTag("accent_color_row"),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        items(seeds, key = { it ?: Long.MIN_VALUE }) { seed ->
-            SelectionSwatch(
-                selected = seed == selectedColor,
-                contentDescription = seed?.let { formatPickerColor(it.toInt()) } ?: stringResource(R.string.settings_accent_default),
-                color = seed?.let(::Color) ?: brandAccentColor,
-                onClick = { onAction(SettingsAction.SetAccentColor(seed)) },
-            )
+    val selectedToneIndex = selectedFamily?.indexOf(selectedColor) ?: -1
+    LaunchedEffect(selectedFamily, selectedToneIndex) {
+        if (selectedToneIndex >= 0) toneRowState.animateScrollToItem(selectedToneIndex)
+    }
+    Column {
+        LazyRow(
+            state = familyRowState,
+            modifier = Modifier.fillMaxWidth().testTag("accent_color_row"),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            item(key = "default") {
+                SelectionSwatch(
+                    selected = selectedColor == null,
+                    contentDescription = stringResource(R.string.settings_accent_default),
+                    color = brandAccentColor,
+                    onClick = { onAction(SettingsAction.SetAccentColor(null)) },
+                )
+            }
+            items(accentSeedFamilyPreviews, key = { it }) { preview ->
+                SelectionSwatch(
+                    selected = selectedFamily != null && selectedFamily == accentSeedFamilyOf(preview),
+                    contentDescription = formatPickerColor(preview.toInt()),
+                    color = Color(preview),
+                    onClick = { onAction(SettingsAction.SetAccentColor(preview)) },
+                )
+            }
+            item(key = "custom") {
+                SelectionSwatch(
+                    selected = customColorSelected,
+                    contentDescription = stringResource(R.string.settings_accent_custom),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    onClick = { customColorOpen = true },
+                ) {
+                    Icon(Icons.Default.Edit, null)
+                }
+            }
         }
-        item {
-            SelectionSwatch(
-                selected = customColorSelected,
-                contentDescription = stringResource(R.string.settings_accent_custom),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                onClick = { customColorOpen = true },
+        AnimatedVisibility(
+            visible = selectedFamily != null,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            LazyRow(
+                state = toneRowState,
+                modifier = Modifier.fillMaxWidth().testTag("accent_tone_row"),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             ) {
-                Icon(Icons.Default.Edit, null)
+                items(selectedFamily.orEmpty(), key = { it }) { tone ->
+                    SelectionSwatch(
+                        selected = tone == selectedColor,
+                        contentDescription = formatPickerColor(tone.toInt()),
+                        color = Color(tone),
+                        onClick = { onAction(SettingsAction.SetAccentColor(tone)) },
+                    )
+                }
             }
         }
     }
@@ -339,6 +372,22 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
                     settings.trashEnabled,
                     supportingText = stringResource(R.string.settings_deleted_passes_wait_in_trash),
                 ) { onAction(SettingsAction.SetTrashEnabled(it)) }
+            },
+        ),
+    )
+}
+
+@Composable
+private fun CodeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+    SettingsGroup(
+        title = stringResource(R.string.settings_pass_codes),
+        entries = listOf(
+            settingsItem {
+                SettingSwitch(
+                    stringResource(R.string.settings_use_max_brightness_for_codes),
+                    settings.automaticBrightness,
+                    supportingText = stringResource(R.string.settings_use_max_brightness_for_codes_support),
+                ) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
             },
         ),
     )

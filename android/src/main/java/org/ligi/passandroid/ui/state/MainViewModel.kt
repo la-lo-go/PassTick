@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.channels.Channel
@@ -416,6 +417,11 @@ class MainViewModel(
         }
         is AppAction.SetDynamicColors -> {
             viewModelScope.launch {
+                // Keep the wallpaper accent as the seed the first time dynamic colors turn off,
+                // so the scheme does not jump to the default color.
+                if (!action.value && settingsRepository.settings.first().accentColor == null) {
+                    platformActions.systemAccentColor()?.let { settingsRepository.setAccentColor(it) }
+                }
                 settingsRepository.setDynamicColors(action.value)
             }
             true
