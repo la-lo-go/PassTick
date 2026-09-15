@@ -83,6 +83,7 @@ sealed interface SettingsAction {
     data class SetSeparateProtectedPasses(val value: Boolean) : SettingsAction
     data class SetBlockScreenshots(val value: Boolean) : SettingsAction
     data object OpenPrivacyPolicy : SettingsAction
+    data object OpenThirdPartyLicenses : SettingsAction
     data object OpenSourceCode : SettingsAction
     data object OpenBugReportGitHub : SettingsAction
     data object OpenBugReportEmail : SettingsAction

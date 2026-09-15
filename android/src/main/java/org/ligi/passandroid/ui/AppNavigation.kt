@@ -42,6 +42,7 @@ import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.ExportImageScreen
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
+import org.ligi.passandroid.ui.compose.LicensesScreen
 import org.ligi.passandroid.ui.compose.PassCustomizationScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
@@ -389,6 +390,9 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     }
                 }
             }
+            entry<AppDestination.Licenses> {
+                LicensesScreen(onBack = { dependencies.onBack() })
+            }
         },
     )
 }
@@ -423,6 +427,10 @@ private fun handleNavigationSettingsAction(
     }
     SettingsAction.OpenPrivacyPolicy -> {
         dependencies.viewModel.onAction(AppAction.OpenUrl(PRIVACY_POLICY_URL))
+        true
+    }
+    SettingsAction.OpenThirdPartyLicenses -> {
+        dependencies.backStack.add(AppDestination.Licenses)
         true
     }
     SettingsAction.OpenSourceCode -> {

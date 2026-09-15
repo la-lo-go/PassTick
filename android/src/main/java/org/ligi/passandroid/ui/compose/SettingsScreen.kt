@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Event
@@ -440,6 +441,11 @@ private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
             settingsItem {
                 PassListSetting(PassIcons.GitHub, "Source code and license") {
                     onAction(SettingsAction.OpenSourceCode)
+                }
+            },
+            settingsItem {
+                PassListSetting(Icons.Default.Description, stringResource(R.string.settings_third_party_licenses)) {
+                    onAction(SettingsAction.OpenThirdPartyLicenses)
                 }
             },
             settingsItem {

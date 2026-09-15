@@ -337,4 +337,18 @@
         <item quantity="one">%1$d pass</item>
         <item quantity="other">%1$d passes</item>
     </plurals>
+
+    <string name="settings_third_party_licenses">Third-party licenses</string>
+    <string name="licenses_intro">PassTick is built with these open source libraries. Expand a license to read the full text.</string>
+    <string name="licenses_show_text">View license text</string>
+    <string name="licenses_hide_text">Hide license text</string>
+    <string name="license_apache_2_0">Apache License 2.0</string>
+    <string name="license_mit">MIT License</string>
+    <string name="license_bsd_3_clause">BSD 3-Clause License</string>
+    <string name="licenses_app_license_note">PassTick itself is free software released under the GNU General Public License v3 or later. It is based on the original PassAndroid project.</string>
+
+    <plurals name="licenses_library_count">
+        <item quantity="one">%1$d library</item>
+        <item quantity="other">%1$d libraries</item>
+    </plurals>
 </resources>
