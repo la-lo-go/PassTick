@@ -99,10 +99,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
-import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.HomeCardSection
+import org.ligi.passandroid.ui.state.PassCardLine
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.dateLabel
 import org.ligi.passandroid.ui.state.displayArtwork
+import org.ligi.passandroid.ui.state.resolvePassCardLines
 import org.ligi.passandroid.ui.barcode.PassCodeImage
 import org.ligi.passandroid.ui.theme.PassActionButtonGroup
 import org.ligi.passandroid.ui.theme.PassActionButton
@@ -861,6 +863,7 @@ internal fun HomeCardBody(
     val creatorTypeCombined = visibleSections.indexOf(HomeCardSection.CREATOR).let { creatorIndex ->
         creatorIndex >= 0 && visibleSections.getOrNull(creatorIndex + 1) == HomeCardSection.PASS_TYPE && !pass.creator.isNullOrBlank()
     }
+    val cardLines = resolvePassCardLines(pass, sectionOrder, hiddenSections, tagCategories, hero)
     Row(
         modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -870,69 +873,21 @@ internal fun HomeCardBody(
             PassThumbnail(pass, Modifier.size(if (hero) 44.dp else 32.dp), thumbnailFallback)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val typeLabel = pass.type.name.replace('_', ' ').lowercase().replaceFirstChar(Char::uppercase)
-            var lineIndex = 0
-            var typeRendered = false
-            var tagsRendered = false
-            visibleSections.forEach { section ->
-                when (section) {
-                    HomeCardSection.ARTWORK -> Unit
-                    HomeCardSection.TITLE -> {
-                        val index = lineIndex++
-                        Text(
-                            pass.description,
-                            style = homeCardLineStyle(index),
-                            fontWeight = homeCardLineWeight(index),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    HomeCardSection.PRIMARY_FIELD -> pass.homeCardDetail()
-                        ?.takeUnless { hero && it == pass.todayStartTimeLabel() }
-                        ?.let {
-                            val index = lineIndex++
-                            Text(it, style = homeCardLineStyle(index), fontWeight = homeCardLineWeight(index), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    HomeCardSection.DATE -> pass.dateLabel(compactForToday = hero)?.let {
-                        val index = lineIndex++
-                        Text(it, style = homeCardLineStyle(index), fontWeight = homeCardLineWeight(index))
-                    }
-                    HomeCardSection.CREATOR -> pass.creator?.takeIf(String::isNotBlank)?.let { creator ->
-                        val index = lineIndex++
-                        if (creatorTypeCombined) {
-                            typeRendered = true
-                            Text(
-                                "$creator • $typeLabel",
-                                style = homeCardLineStyle(index),
-                                fontWeight = homeCardLineWeight(index),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        } else {
-                            Text(creator, style = homeCardLineStyle(index), fontWeight = homeCardLineWeight(index), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                    HomeCardSection.CATEGORY,
-                    HomeCardSection.PASS_TYPE,
-                    -> {
-                        val showType = HomeCardSection.PASS_TYPE in visibleSections && !typeRendered && !creatorTypeCombined
-                        val visibleTags = if (HomeCardSection.CATEGORY in visibleSections && !tagsRendered) {
-                            tagCategories.filter { it.role == PassCategoryRole.CUSTOM && it.id in pass.tagIds }
-                        } else {
-                            emptyList()
-                        }
-                        if (showType || visibleTags.isNotEmpty()) {
-                            if (showType) typeRendered = true
-                            if (visibleTags.isNotEmpty()) tagsRendered = true
-                            val index = lineIndex++
-                            CardMetadataRow(
-                                typeLabel = typeLabel.takeIf { showType },
-                                tags = visibleTags,
-                                typeStyle = homeCardLineStyle(index),
-                                typeWeight = homeCardLineWeight(index),
-                            )
-                        }
-                    }
+            cardLines.forEachIndexed { index, line ->
+                when (line) {
+                    is PassCardLine.Text -> Text(
+                        line.value,
+                        style = homeCardLineStyle(index),
+                        fontWeight = homeCardLineWeight(index),
+                        maxLines = line.maxLines,
+                        overflow = if (line.ellipsize) TextOverflow.Ellipsis else TextOverflow.Clip,
+                    )
+                    is PassCardLine.Metadata -> CardMetadataRow(
+                        typeLabel = line.typeLabel,
+                        tags = line.tags,
+                        typeStyle = homeCardLineStyle(index),
+                        typeWeight = homeCardLineWeight(index),
+                    )
                 }
             }
         }
