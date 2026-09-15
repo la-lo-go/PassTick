@@ -38,21 +38,15 @@ fun PassTheme(
         ThemeMode.DARK -> true
     }
     val context = LocalContext.current
-    // Wallpaper colors need API 31. Without them, and whenever a seed color exists, the whole
-    // scheme is generated from the seed.
-    val baseColors = if (dynamicColors && accentColor == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else {
-        generateAccentColorScheme(Color(accentColor ?: DEFAULT_ACCENT_COLOR), dark, colorStyle)
-    }
-    val colors = if (dark && amoledBlackBackground) {
-        baseColors.copy(
-            background = Color.Black,
-            surface = Color.Black,
-        )
-    } else {
-        baseColors
-    }
+    // Wallpaper colors win while dynamic colors are on. The stored seed stays untouched so
+    // switching dynamic colors off restores the previous scheme. Wallpaper colors need API 31.
+    val baseColors =
+        if (dynamicColors && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else {
+            generateAccentColorScheme(Color(accentColor ?: DEFAULT_ACCENT_COLOR), dark, colorStyle)
+        }
+    val colors = if (dark && amoledBlackBackground) baseColors.toAmoled() else baseColors
     MaterialExpressiveTheme(
         colorScheme = colors,
         motionScheme = MotionScheme.expressive(),

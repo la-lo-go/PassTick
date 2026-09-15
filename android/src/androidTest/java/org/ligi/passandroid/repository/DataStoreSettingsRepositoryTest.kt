@@ -134,7 +134,7 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
-    fun enablingDynamicColorsClearsTheSeedColor() {
+    fun enablingDynamicColorsKeepsTheSeedColor() {
         runBlocking {
             val repository = DataStoreSettingsRepository(
                 InstrumentationRegistry.getInstrumentation().targetContext,
@@ -143,10 +143,10 @@ class DataStoreSettingsRepositoryTest {
             repository.setAccentColor(0xFF006C4CL)
             repository.setDynamicColors(true)
 
-            val restored = repository.settings.first { it.dynamicColors && it.accentColor == null }
+            val restored = repository.settings.first { it.dynamicColors && it.accentColor != null }
 
             assertThat(restored.dynamicColors).isTrue()
-            assertThat(restored.accentColor).isNull()
+            assertThat(restored.accentColor).isEqualTo(0xFF006C4CL)
         }
     }
 

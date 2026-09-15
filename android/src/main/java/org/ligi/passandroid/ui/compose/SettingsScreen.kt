@@ -1,12 +1,21 @@
 package org.ligi.passandroid.ui.compose
 
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.animateInt
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -36,7 +45,6 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -136,6 +144,8 @@ private const val RemindersSectionIndex = 5
 @Composable
 private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     val dynamicAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val colorSelectorVisible = !dynamicAvailable || !settings.dynamicColors
+    val styleSelectorVisible = colorSelectorVisible && settings.accentColor != null
     SettingsGroup(
         title = stringResource(R.string.settings_theme),
         entries = buildList {
@@ -151,12 +161,10 @@ private fun AppearanceSettings(settings: AppSettings, onAction: (SettingsAction)
                     },
                 )
             }
-            if (!dynamicAvailable || !settings.dynamicColors) {
-                add(settingsHeader(stringResource(R.string.settings_accent_color)))
-                add(settingsItem { AccentColorSelector(settings.accentColor, onAction) })
-                add(settingsHeader(stringResource(R.string.settings_color_style)))
-                add(settingsItem { ColorStyleSelector(settings.accentColor, settings.colorStyle, onAction) })
-            }
+            add(settingsHeader(stringResource(R.string.settings_accent_color), visible = colorSelectorVisible))
+            add(settingsItem(visible = colorSelectorVisible) { AccentColorSelector(settings.accentColor, onAction) })
+            add(settingsHeader(stringResource(R.string.settings_color_style), visible = styleSelectorVisible))
+            add(settingsItem(visible = styleSelectorVisible) { ColorStyleSelector(settings.accentColor, settings.colorStyle, onAction) })
             if (settings.themeMode == ThemeMode.DARK) {
                 add(
                     settingsItem {
@@ -192,9 +200,12 @@ private fun AccentColorSelector(selectedColor: Long?, onAction: (SettingsAction)
     val listState = rememberLazyListState()
     val seeds = remember { listOf<Long?>(null) + accentSeedColors }
     val customColorSelected = selectedColor != null && selectedColor !in accentSeedColors
-    LaunchedEffect(selectedColor) {
-        val index = seeds.indexOf(selectedColor)
-        if (index >= 0) listState.scrollToItem(index)
+    val selectedIndex = when {
+        customColorSelected -> seeds.size
+        else -> seeds.indexOf(selectedColor)
+    }
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex >= 0) listState.animateScrollToItem(selectedIndex)
     }
     LazyRow(
         state = listState,
@@ -203,12 +214,22 @@ private fun AccentColorSelector(selectedColor: Long?, onAction: (SettingsAction)
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     ) {
         items(seeds, key = { it ?: Long.MIN_VALUE }) { seed ->
-            AccentColorSwatch(seed, selected = seed == selectedColor) {
-                onAction(SettingsAction.SetAccentColor(seed))
-            }
+            SelectionSwatch(
+                selected = seed == selectedColor,
+                contentDescription = seed?.let { formatPickerColor(it.toInt()) } ?: stringResource(R.string.settings_accent_default),
+                color = seed?.let(::Color) ?: brandAccentColor,
+                onClick = { onAction(SettingsAction.SetAccentColor(seed)) },
+            )
         }
         item {
-            CustomColorSwatch(selected = customColorSelected) { customColorOpen = true }
+            SelectionSwatch(
+                selected = customColorSelected,
+                contentDescription = stringResource(R.string.settings_accent_custom),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                onClick = { customColorOpen = true },
+            ) {
+                Icon(Icons.Default.Edit, null)
+            }
         }
     }
     if (customColorOpen) {
@@ -225,33 +246,33 @@ private fun AccentColorSelector(selectedColor: Long?, onAction: (SettingsAction)
 }
 
 @Composable
-private fun AccentColorSwatch(seed: Long?, selected: Boolean, onClick: () -> Unit) {
-    val description = seed?.let { formatPickerColor(it.toInt()) } ?: stringResource(R.string.settings_accent_default)
-    val shape = RoundedCornerShape(12.dp)
+private fun SelectionSwatch(
+    selected: Boolean,
+    contentDescription: String,
+    color: Color,
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit = {},
+) {
+    val transition = updateTransition(selected, "selected")
+    val cornerRadius by transition.animateInt(
+        transitionSpec = { MaterialTheme.motionScheme.defaultSpatialSpec() },
+    ) { if (it) 35 else 50 }
+    val borderColor by transition.animateColor(
+        transitionSpec = { MaterialTheme.motionScheme.defaultSpatialSpec() },
+    ) { if (it) MaterialTheme.colorScheme.primary else Color.Transparent }
+    val shape = RoundedCornerShape(cornerRadius)
     Box(
         Modifier.size(48.dp)
             .clip(shape)
-            .background(seed?.let(::Color) ?: brandAccentColor)
-            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
             .clickable(role = Role.RadioButton, onClick = onClick)
-            .semantics { contentDescription = description },
-    )
-}
-
-@Composable
-private fun CustomColorSwatch(selected: Boolean, onClick: () -> Unit) {
-    val description = stringResource(R.string.settings_accent_custom)
-    val shape = RoundedCornerShape(12.dp)
-    Box(
-        Modifier.size(48.dp)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
+            .border(2.dp, borderColor, shape)
+            .semantics { this.contentDescription = contentDescription },
     ) {
-        Icon(Icons.Default.Edit, null)
+        Box(
+            Modifier.fillMaxSize().padding(4.dp).clip(shape).background(color),
+            contentAlignment = Alignment.Center,
+            content = content,
+        )
     }
 }
 
@@ -260,9 +281,9 @@ private fun ColorStyleSelector(accentColor: Long?, selectedStyle: ColorStyle, on
     val listState = rememberLazyListState()
     val dark = isSystemInDarkTheme()
     val seed = Color(accentColor ?: DEFAULT_ACCENT_COLOR)
-    LaunchedEffect(selectedStyle) {
-        val index = ColorStyle.entries.indexOf(selectedStyle)
-        if (index >= 0) listState.scrollToItem(index)
+    val selectedIndex = ColorStyle.entries.indexOf(selectedStyle)
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex >= 0) listState.animateScrollToItem(selectedIndex)
     }
     LazyRow(
         state = listState,
@@ -272,31 +293,16 @@ private fun ColorStyleSelector(accentColor: Long?, selectedStyle: ColorStyle, on
     ) {
         items(ColorStyle.entries) { style ->
             val scheme = remember(seed, dark, style) { generateAccentColorScheme(seed, dark, style) }
-            ColorStyleSwatch(style, scheme, selected = style == selectedStyle) {
-                onAction(SettingsAction.SetColorStyle(style))
+            SelectionSwatch(
+                selected = style == selectedStyle,
+                contentDescription = colorStyleLabel(style),
+                color = scheme.secondary,
+                onClick = { onAction(SettingsAction.SetColorStyle(style)) },
+            ) {
+                Box(Modifier.fillMaxSize(0.5f).background(scheme.primary).align(Alignment.BottomStart))
+                Box(Modifier.fillMaxSize(0.5f).background(scheme.secondaryContainer).align(Alignment.BottomEnd))
             }
         }
-    }
-}
-
-@Composable
-private fun ColorStyleSwatch(
-    style: ColorStyle,
-    scheme: ColorScheme,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val description = colorStyleLabel(style)
-    val shape = RoundedCornerShape(12.dp)
-    Box(
-        Modifier.size(48.dp)
-            .clip(shape)
-            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
-            .clickable(role = Role.RadioButton, onClick = onClick)
-            .semantics { contentDescription = description },
-    ) {
-        Box(Modifier.fillMaxSize().padding(4.dp).clip(shape).background(scheme.primary))
-        Box(Modifier.align(Alignment.BottomEnd).fillMaxSize(0.5f).background(scheme.secondaryContainer))
     }
 }
 
@@ -632,13 +638,13 @@ private fun Set<Int>.toggle(value: Int) = toMutableSet().apply {
 }
 
 private sealed interface SettingsEntry {
-    data class Header(val text: String) : SettingsEntry
-    data class Item(val content: @Composable () -> Unit) : SettingsEntry
+    data class Header(val text: String, val visible: Boolean = true) : SettingsEntry
+    data class Item(val visible: Boolean = true, val content: @Composable () -> Unit) : SettingsEntry
 }
 
-private fun settingsItem(content: @Composable () -> Unit) = SettingsEntry.Item(content)
+private fun settingsItem(visible: Boolean = true, content: @Composable () -> Unit) = SettingsEntry.Item(visible, content)
 
-private fun settingsHeader(text: String) = SettingsEntry.Header(text)
+private fun settingsHeader(text: String, visible: Boolean = true) = SettingsEntry.Header(text, visible)
 
 @Composable
 private fun SettingsGroup(title: String, modifier: Modifier = Modifier, entries: List<SettingsEntry>) {
@@ -647,12 +653,22 @@ private fun SettingsGroup(title: String, modifier: Modifier = Modifier, entries:
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             entries.forEachIndexed { index, entry ->
                 when (entry) {
-                    is SettingsEntry.Header -> Text(
-                        entry.text,
-                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    is SettingsEntry.Item -> {
+                    is SettingsEntry.Header -> AnimatedVisibility(
+                        visible = entry.visible,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                        Text(
+                            entry.text,
+                            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                    is SettingsEntry.Item -> AnimatedVisibility(
+                        visible = entry.visible,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
                         val roundTop = index == 0 || entries[index - 1] is SettingsEntry.Header
                         val roundBottom = index == entries.lastIndex || entries[index + 1] is SettingsEntry.Header
                         val shape = RoundedCornerShape(

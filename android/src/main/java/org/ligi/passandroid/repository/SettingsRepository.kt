@@ -327,21 +327,17 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
 
     override suspend fun setDynamicColors(value: Boolean) {
         val current = StartupAppearanceStore.read(context)
-        // The seed color only exists for the generated scheme, so enabling wallpaper colors
-        // clears it and keeps the stored state coherent with the theme rule.
-        val accentColor = if (value) null else current.accentColor
+        // Wallpaper colors take precedence while enabled; the stored seed is kept so turning
+        // dynamic colors off restores the previous scheme without a visual jump.
         StartupAppearanceStore.write(
             context,
             current.themeMode,
             current.amoledBlackBackground,
             value,
-            accentColor,
+            current.accentColor,
             current.colorStyle,
         )
-        context.settingsDataStore.edit { preferences ->
-            preferences[DYNAMIC_COLORS] = value
-            if (value) preferences.remove(ACCENT_COLOR)
-        }
+        update(DYNAMIC_COLORS, value)
     }
 
     override suspend fun setAccentColor(value: Long?) {
