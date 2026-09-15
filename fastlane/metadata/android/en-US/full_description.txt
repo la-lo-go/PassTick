@@ -1,27 +1,31 @@
-PassTick is an offline wallet for Apple Wallet (.pkpass) and esPass (.esPass) files.
+PassTick is a fast, free, open source wallet for your tickets.
 
-Import a pass from a file, an email attachment, or the Android share sheet. PassTick stores the pass on your device and shows the barcode when you need it. The app has no INTERNET permission, no account, no ads, and no trackers.
+Keep your boarding passes, event tickets, memberships, and loyalty cards on your phone. Open the app, show the code, and go. No account, no ads, and no subscriptions. It just works at any time!
 
-FEATURES
+ORGANIZE YOUR LIFE
 
-- Shows QR, Aztec, PDF417, Code 128, and other barcodes at maximum screen brightness.
-- Reminds you before an event and puts access actions in the notification.
-- Adds pass dates to your calendar.
-- Groups today's passes on the home screen and in a timeline.
-- Opens pass locations in your map app.
-- Organizes passes with tags, pins, archive, and trash with undo.
-- Protects passes with fingerprint or screen lock and can block screenshots.
-- Keeps protected content out of widgets, the lock screen, and notifications.
-- Shows home screen widgets with the passes that you select.
-- Exports and shares a pass image or the pass file.
-- Works fully offline.
+- One timeline for everything. Flights, concerts, matches, and hotel nights appear in date order. The agenda calendar shows the days ahead.
+- A reminder before each event, with the ticket one tap away.
+- Tags for every part of your life: Travel, Work, Family, or your own. Each tag gets a color, so you find any ticket in seconds.
+- Pin what matters now, archive what is done, and undo any mistake from the trash.
+- Add a date to your calendar and open the location in your map app.
+- Search every detail: destination, seat, gate, name, or note.
 
-PRIVACY
+MAKE IT YOURS
 
-PassTick keeps all data in app-private storage on your device. The app collects no data and sends no data. Android Auto Backup is disabled.
+- Your home screen, your way. Show, hide, and reorder the sections you care about.
+- Your pass screen, your way. Keep the details you use and hide the rest.
+- Your colors. Match your phone, pick an accent, use dark mode, or go full black to save battery.
+- A widget with the tickets you choose, right on your home screen.
+- Looks great on every screen, from small phones to tablets and foldables.
 
-LICENSE
+ALWAYS READY
 
-PassTick is free software under GPL-3.0. It is an independent modernization of the PassAndroid project by ligi and contributors.
+- Your tickets live on your phone. No login, no connection, no waiting.
+- The code shows full screen at maximum brightness, so the scanner reads it on the first try.
+- Add tickets in seconds from a file, an email attachment, or the share button.
+- Private by default. No account, no ads, no trackers. Nothing is sent anywhere.
 
-Source code: https://github.com/la-lo-go/PassTick
+FREE AND OPEN SOURCE
+
+PassTick is free software under GPL-3.0, and it stays free. It is an independent modern version of the PassAndroid project. You can read the code and help improve it at https://github.com/la-lo-go/PassTick
