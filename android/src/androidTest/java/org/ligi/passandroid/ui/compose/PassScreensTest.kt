@@ -25,6 +25,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
@@ -51,6 +52,7 @@ import org.ligi.passandroid.ui.state.PassArtworkUiModel
 import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
+import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction
@@ -75,6 +77,60 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Your passes live here").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Import passes").assertIsDisplayed()
+    }
+
+    @Test
+    fun trashViewReplacesTheImportActionWithEmptyTrash() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(trashState(), {}) }
+        }
+
+        composeRule.onNodeWithContentDescription("Import passes").assertDoesNotExist()
+        composeRule.onNodeWithTag("empty_trash_fab").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Empty trash").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyTrashHidesTheFloatingAction() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassHomeScreen(
+                    MainUiState(selectedCategoryId = TRASHED_PASSES_CATEGORY_ID, isContentLoading = false),
+                    {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Import passes").assertDoesNotExist()
+        composeRule.onNodeWithTag("empty_trash_fab").assertDoesNotExist()
+    }
+
+    @Test
+    fun emptyTrashFabConfirmsBeforeDispatching() {
+        val actions = mutableListOf<HomeAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(trashState(), actions::add) }
+        }
+
+        composeRule.onNodeWithTag("empty_trash_fab").performClick()
+        composeRule.onNodeWithText("Empty the trash?").assertIsDisplayed()
+        composeRule.onNode(hasText("Empty trash") and hasAnyAncestor(isDialog())).performClick()
+
+        assertThat(actions).containsExactly(HomeAction.EmptyTrash)
+    }
+
+    @Test
+    fun trashCardActionsDispatchRestoreAndDeleteForever() {
+        val actions = mutableListOf<HomeAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(trashState(), actions::add) }
+        }
+
+        composeRule.onNodeWithContentDescription("Restore").performClick()
+        assertThat(actions).containsExactly(HomeAction.RestoreFromTrash("one"))
+
+        composeRule.onNodeWithContentDescription("Delete forever").performClick()
+        composeRule.onNodeWithText("Delete this pass forever?").assertIsDisplayed()
     }
 
     @Test
@@ -880,6 +936,12 @@ class PassScreensTest {
             pass("one", "Boarding pass", PassType.BOARDING),
             pass("two", "Event ticket", PassType.EVENT),
         ),
+        isContentLoading = false,
+    )
+
+    private fun trashState() = MainUiState(
+        trashedPasses = listOf(pass("one", "Boarding pass", PassType.BOARDING)),
+        selectedCategoryId = TRASHED_PASSES_CATEGORY_ID,
         isContentLoading = false,
     )
 

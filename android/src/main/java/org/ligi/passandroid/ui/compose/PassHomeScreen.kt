@@ -40,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Menu
@@ -55,10 +56,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LargeFloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -272,6 +276,7 @@ fun PassHomeScreen(
     val pinnedPasses = homeSections.pinned
     val remainingPasses = homeSections.other
     val trashSelected = state.selectedCategoryId == TRASHED_PASSES_CATEGORY_ID
+    val emptyTrashLabel = stringResource(R.string.home_empty_trash)
     var deleteForeverPassId by remember { mutableStateOf<String?>(null) }
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
 
@@ -496,7 +501,6 @@ fun PassHomeScreen(
                             tagCategories = state.categories,
                             onRestore = { onAction(HomeAction.RestoreFromTrash(it)) },
                             onDeleteForever = { deleteForeverPassId = it },
-                            onEmptyTrash = { showEmptyTrashConfirm = true },
                             onTrashEnabledChange = { onAction(HomeAction.SetTrashEnabled(it)) },
                         )
                     }
@@ -660,12 +664,23 @@ fun PassHomeScreen(
                     },
                 )
             }
-            LargeFloatingActionButton(
-                onClick = { onAction(HomeAction.ImportPass) },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
-                    .semantics { contentDescription = "Import passes" },
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(36.dp))
+            if (!trashSelected) {
+                LargeFloatingActionButton(
+                    onClick = { onAction(HomeAction.ImportPass) },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                        .semantics { contentDescription = "Import passes" },
+                ) {
+                    Icon(Icons.Default.Add, null, Modifier.size(36.dp))
+                }
+            } else if (state.trashedPasses.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = { showEmptyTrashConfirm = true },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+                        .semantics { contentDescription = emptyTrashLabel }
+                        .testTag("empty_trash_fab"),
+                    icon = { Icon(Icons.Default.DeleteSweep, null) },
+                    text = { Text(emptyTrashLabel) },
+                )
             }
             if (previewPass != null) {
                 Box(
@@ -896,22 +911,16 @@ private fun TrashSection(
     tagCategories: List<PassCategory>,
     onRestore: (String) -> Unit,
     onDeleteForever: (String) -> Unit,
-    onEmptyTrash: () -> Unit,
     onTrashEnabledChange: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.home_trash), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    pluralStringResource(R.plurals.home_trash_pass_count, passes.size, passes.size),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (passes.isNotEmpty()) {
-                TextButton(onClick = onEmptyTrash) { Text(stringResource(R.string.home_empty_trash)) }
-            }
+        Column(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.home_trash), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                pluralStringResource(R.plurals.home_trash_pass_count, passes.size, passes.size),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -978,7 +987,7 @@ private fun TrashPassCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(16.dp),
+            Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1032,11 +1041,19 @@ private fun TrashPassCard(
                     )
                 }
             }
-            IconButton(onClick = onRestore) {
-                Icon(Icons.Default.Restore, stringResource(R.string.home_restore), tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = onDeleteForever) {
-                Icon(Icons.Default.Delete, stringResource(R.string.home_delete_forever), tint = MaterialTheme.colorScheme.error)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FilledTonalIconButton(onClick = onRestore) {
+                    Icon(Icons.Default.Restore, stringResource(R.string.home_restore))
+                }
+                FilledTonalIconButton(
+                    onClick = onDeleteForever,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                ) {
+                    Icon(Icons.Default.Delete, stringResource(R.string.home_delete_forever))
+                }
             }
         }
     }
