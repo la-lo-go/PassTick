@@ -52,8 +52,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # SDK 37 uses the minor-versioned package name system-images;android-37.0.
-        api-level: [29, 37.0]
+        # Keep the levels quoted. YAML parses 37.0 as a number and drops the minor
+        # version, so the runner would look for platforms;android-37.
+        # API 37 ships as the minor-versioned packages android-37.0.
+        api-level: ['29', '37.0']
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -73,10 +75,24 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      # The released emulator runner bundles command-line tools 20. Its avdmanager
+      # writes target=android-0 for minor-versioned packages such as android-37.0.
+      - name: Update SDK command-line tools
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --install "cmdline-tools;latest" > /dev/null
+          # sdkmanager does not replace the preinstalled directory; it installs to latest-2.
+          if [ -d "$SDK/cmdline-tools/latest-2" ]; then
+            rm -rf "$SDK/cmdline-tools/latest"
+            mv "$SDK/cmdline-tools/latest-2" "$SDK/cmdline-tools/latest"
+          fi
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --version
+
       - name: Run instrumented tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
+          target: google_apis
           arch: x86_64
           script: ./gradlew :android:connectedDebugAndroidTest
 
