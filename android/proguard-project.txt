@@ -23,3 +23,6 @@
 -keep class org.ligi.passandroid.model.InputStreamWithSource
 -keep class org.ligi.passandroid.ui.PassExporter
 -keep enum org.ligi.passandroid.model.pass.PassBarCodeFormat
+
+# Moshi reads enum constants by field name; obfuscation breaks EnumJsonAdapter.
+-keep enum org.ligi.passandroid.imports.ImportSource { *; }
