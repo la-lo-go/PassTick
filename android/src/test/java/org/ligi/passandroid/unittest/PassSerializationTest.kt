@@ -50,4 +50,23 @@ class PassSerializationTest {
         assertThat(restored.locations.single().lat).isEqualTo(original.locations.single().lat)
         assertThat(restored.serial).isEqualTo(original.serial)
     }
+
+    @Test
+    fun preservesAdditionalBarcodes() {
+        val original = PassImpl("pass-id").apply {
+            barCode = BarCode(PassBarCodeFormat.QR_CODE, "primary-code")
+            barCodes = mutableListOf(
+                BarCode(PassBarCodeFormat.AZTEC, "second-code"),
+                BarCode(PassBarCodeFormat.CODE_128, "third-code"),
+            )
+        }
+
+        val json = adapter.toJson(original)
+        val restored = requireNotNull(adapter.fromJson(json))
+
+        assertThat(json).contains("second-code")
+        assertThat(restored.barCode?.message).isEqualTo("primary-code")
+        assertThat(restored.barCodes.map { it.message })
+            .containsExactly("second-code", "third-code")
+    }
 }

@@ -42,6 +42,7 @@ import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.ExportImageScreen
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
+import org.ligi.passandroid.ui.compose.ImportReviewScreen
 import org.ligi.passandroid.ui.compose.LicensesScreen
 import org.ligi.passandroid.ui.compose.PassCustomizationScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
@@ -113,6 +114,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     state = state,
                     showTodayHero = state.settings.highlightTodayPasses,
                     protectedPassesUnlocked = dependencies.protectedPassesUnlocked,
+                    recentlyImportedIds = state.recentlyImportedIds,
                     onAction = dependencies.onHomeAction,
                 )
             }
@@ -124,6 +126,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                             state = state,
                             showTodayHero = state.settings.highlightTodayPasses,
                             protectedPassesUnlocked = dependencies.protectedPassesUnlocked,
+                            recentlyImportedIds = state.recentlyImportedIds,
                             onAction = { action ->
                                 if (action is HomeAction.OpenPass) {
                                     dependencies.onOpenPass(action.id, true)
@@ -195,6 +198,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                                 calendarEventPresent = calendarEventPresent,
                                 passDetailSectionOrder = state.settings.passDetailSectionOrder,
                                 hiddenPassDetailSections = state.settings.hiddenPassDetailSections,
+                                documentPages = dependencies.viewModel.documentPages,
                                 onAction = { action ->
                                     dependencies.onPassDetailAction(selected.passId, action)
                                 },
@@ -202,6 +206,17 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                         }
                     },
                 )
+            }
+            entry<AppDestination.ImportReview> {
+                val review = state.importReview
+                if (review == null) {
+                    LaunchedEffect(Unit) { dependencies.onBack() }
+                } else {
+                    ImportReviewScreen(
+                        state = review,
+                        onAction = dependencies.viewModel::onImportReviewAction,
+                    )
+                }
             }
             entry<AppDestination.Timeline> {
                 val passById = state.passes.associateBy(PassUiModel::id)

@@ -14,6 +14,10 @@ import org.ligi.passandroid.R
 import org.ligi.passandroid.Tracker
 import org.ligi.passandroid.functions.fromURI
 import org.ligi.passandroid.functions.APP
+import org.ligi.passandroid.imports.DocumentImportProcessor
+import org.ligi.passandroid.imports.ImportDraft
+import org.ligi.passandroid.imports.ImportEdits
+import org.ligi.passandroid.imports.ImportSource
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.PassBitmapDefinitions
 import org.ligi.passandroid.model.pass.Pass
@@ -31,6 +35,19 @@ const val DEFAULT_PASS_CATEGORY_ID = "new"
 
 /** Trash expiry is enforced lazily at the next app open, which fits the offline-first app. */
 val TRASH_RETENTION: Duration = Duration.ofDays(7)
+
+internal const val DOCUMENT_FILE_NAME = "source.pdf"
+private const val IMPORT_CACHE_DIR = "import"
+private const val PAGE_ZERO_FILE_NAME = "page0.png"
+internal const val THUMBNAIL_MAX_DIMENSION = 384
+private val STRIP_ARTWORK_FILE_NAMES = listOf(
+    PassBitmapDefinitions.BITMAP_STRIP + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES,
+    PassBitmapDefinitions.BITMAP_STRIP + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES_JPEG,
+)
+private val ARTWORK_EXTENSIONS = listOf(
+    org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES,
+    org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES_JPEG,
+)
 
 data class PassFieldSnapshot(
     val key: String?,
@@ -50,6 +67,11 @@ enum class PassArtworkKind(val fileName: String) {
 }
 data class PassArtworkSnapshot(val kind: PassArtworkKind, val bytes: ByteArray)
 data class PassArtworkUpdate(val kind: PassArtworkKind, val uri: Uri)
+data class PassBarcodeSnapshot(
+    val format: PassBarCodeFormat?,
+    val message: String?,
+    val alternativeText: String?,
+)
 
 data class PassSnapshot(
     val id: String,
@@ -73,6 +95,10 @@ data class PassSnapshot(
     val preferredArtworkKind: PassArtworkKind? = null,
     val trashedAtEpochMillis: Long? = null,
     val notes: String = "",
+    val importSource: ImportSource? = null,
+    val hasDocument: Boolean = false,
+    val documentPageCount: Int = 0,
+    val barcodes: List<PassBarcodeSnapshot> = emptyList(),
 ) {
     val isPinned: Boolean get() = isFavorite
     val isTrashed: Boolean get() = trashedAtEpochMillis != null
@@ -96,6 +122,14 @@ interface PassRepository {
     fun observePasses(): Flow<List<PassSnapshot>>
 
     suspend fun import(uri: Uri): Result<PassSnapshot>
+
+    suspend fun prepareDocumentImport(uri: Uri, source: ImportSource): Result<ImportDraft>
+
+    suspend fun commitDocumentImport(draft: ImportDraft, edits: ImportEdits): Result<PassSnapshot>
+
+    suspend fun discardDocumentImport(draftId: String)
+
+    suspend fun renderDocumentPage(id: String, pageIndex: Int, targetWidthPx: Int): Result<ByteArray>
 
     suspend fun create(update: PassUpdate): PassSnapshot
 
@@ -185,6 +219,158 @@ class FilePassRepository(
         }
     }
 
+    override suspend fun prepareDocumentImport(uri: Uri, source: ImportSource): Result<ImportDraft> =
+        withContext(ioDispatcher) {
+            runCatching {
+                val id = UUID.randomUUID().toString()
+                val staging = stagingDirectory(id).apply { mkdirs() }
+                try {
+                    when (source) {
+                        ImportSource.IMAGE, ImportSource.CAMERA ->
+                            prepareImageDraft(id, staging, uri, source)
+                        ImportSource.PDF -> preparePdfDraft(id, staging, uri)
+                    }
+                } catch (error: Throwable) {
+                    staging.deleteRecursively()
+                    throw error
+                }
+            }
+        }
+
+    private fun prepareImageDraft(id: String, staging: File, uri: Uri, source: ImportSource): ImportDraft {
+        val bitmap = DocumentImportProcessor.decodeNormalizedBitmap(context, uri)
+            ?: error(context.getString(R.string.import_review_unreadable))
+        val previewPng = DocumentImportProcessor.encodePng(bitmap)
+        File(staging, PAGE_ZERO_FILE_NAME).writeBytes(previewPng)
+        val displayName = DocumentImportProcessor.displayName(context, uri)
+            .takeUnless { source == ImportSource.CAMERA }
+        return ImportDraft(
+            id = id,
+            source = source,
+            suggestedTitle = DocumentImportProcessor.suggestTitle(
+                displayName = displayName,
+                fallbackLabel = context.getString(R.string.import_title_photo),
+                now = ZonedDateTime.now(),
+            ),
+            suggestedAccentColor = DocumentImportProcessor.suggestAccentColor(bitmap),
+            pageCount = 1,
+            previewPng = previewPng,
+            detectedCodes = DocumentImportProcessor.detectCodes(bitmap),
+        )
+    }
+
+    private fun preparePdfDraft(id: String, staging: File, uri: Uri): ImportDraft {
+        val pdf = File(staging, DOCUMENT_FILE_NAME)
+        DocumentImportProcessor.copyToFile(context, uri, pdf)
+        val pageCount = DocumentImportProcessor.pdfPageCount(pdf)
+        require(pageCount > 0) { context.getString(R.string.import_review_unreadable) }
+        val pageZero = DocumentImportProcessor.renderPdfPage(pdf, 0, DocumentImportProcessor.MAX_DIMENSION)
+            ?: error(context.getString(R.string.import_review_unreadable))
+        val previewPng = DocumentImportProcessor.encodePng(pageZero)
+        File(staging, PAGE_ZERO_FILE_NAME).writeBytes(previewPng)
+        val detectedCodes = LinkedHashMap<Pair<PassBarCodeFormat, String>, org.ligi.passandroid.imports.DetectedCode>()
+        DocumentImportProcessor.detectCodes(pageZero).forEach { code ->
+            detectedCodes.putIfAbsent(code.format to code.message, code)
+        }
+        for (index in 1 until minOf(pageCount, DocumentImportProcessor.MAX_DETECTION_PAGES)) {
+            val page = DocumentImportProcessor.renderPdfPage(
+                pdf,
+                index,
+                DocumentImportProcessor.DETECTION_WIDTH_PX,
+            ) ?: continue
+            DocumentImportProcessor.detectCodes(page).forEach { code ->
+                detectedCodes.putIfAbsent(code.format to code.message, code)
+            }
+        }
+        return ImportDraft(
+            id = id,
+            source = ImportSource.PDF,
+            suggestedTitle = DocumentImportProcessor.suggestTitle(
+                displayName = DocumentImportProcessor.displayName(context, uri),
+                fallbackLabel = context.getString(R.string.import_title_pdf),
+                now = ZonedDateTime.now(),
+            ),
+            suggestedAccentColor = DocumentImportProcessor.suggestAccentColor(pageZero),
+            pageCount = pageCount,
+            previewPng = previewPng,
+            detectedCodes = detectedCodes.values.toList(),
+        )
+    }
+
+    override suspend fun commitDocumentImport(draft: ImportDraft, edits: ImportEdits): Result<PassSnapshot> =
+        withContext(ioDispatcher) {
+            runCatching {
+                val staging = stagingDirectory(draft.id)
+                val pageZero = File(staging, PAGE_ZERO_FILE_NAME)
+                    .takeIf(File::isFile)
+                    ?.readBytes()
+                    ?.let(DocumentImportProcessor::decodePng)
+                    ?: error(context.getString(R.string.import_review_unreadable))
+                val rotation = ((edits.rotationDegrees % 360) + 360) % 360
+                val artwork = DocumentImportProcessor.crop(
+                    DocumentImportProcessor.rotate(pageZero, rotation),
+                    edits.crop,
+                )
+                val pass = org.ligi.passandroid.model.pass.PassImpl(UUID.randomUUID().toString()).apply {
+                    description = edits.title.trim().ifBlank { draft.suggestedTitle }
+                    accentColor = edits.accentColor
+                    type = PassType.EVENT
+                    app = APP
+                    importSource = draft.source
+                    documentPageCount = draft.pageCount
+                    val selectedCodes = edits.selectedCodeIndices.sorted()
+                        .mapNotNull(draft.detectedCodes::getOrNull)
+                    barCode = selectedCodes.firstOrNull()
+                        ?.let { org.ligi.passandroid.model.pass.BarCode(it.format, it.message) }
+                    barCodes = selectedCodes.drop(1).mapTo(mutableListOf()) {
+                        org.ligi.passandroid.model.pass.BarCode(it.format, it.message)
+                    }
+                }
+                val path = passStore.getPathForID(pass.id).apply { mkdirs() }
+                val artworkExtension = if (draft.source == ImportSource.PDF) {
+                    org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES
+                } else {
+                    org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES_JPEG
+                }
+                val artworkBytes = if (draft.source == ImportSource.PDF) {
+                    DocumentImportProcessor.encodePng(artwork)
+                } else {
+                    DocumentImportProcessor.encodeJpeg(artwork)
+                }
+                File(path, PassBitmapDefinitions.BITMAP_STRIP + artworkExtension).writeBytes(artworkBytes)
+                val thumbnail = DocumentImportProcessor.scaleToMaxDimension(artwork, THUMBNAIL_MAX_DIMENSION)
+                File(
+                    path,
+                    PassBitmapDefinitions.BITMAP_THUMBNAIL + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES,
+                ).writeBytes(DocumentImportProcessor.encodePng(thumbnail))
+                if (draft.source == ImportSource.PDF) {
+                    File(staging, DOCUMENT_FILE_NAME).copyTo(File(path, DOCUMENT_FILE_NAME), overwrite = true)
+                }
+                passStore.save(pass)
+                passStore.classifier.moveToTopic(pass, context.getString(R.string.topic_new))
+                staging.deleteRecursively()
+                pass.toSnapshot(path, context.getString(R.string.topic_new))
+            }
+        }
+
+    override suspend fun discardDocumentImport(draftId: String) = withContext(ioDispatcher) {
+        stagingDirectory(draftId).deleteRecursively()
+        Unit
+    }
+
+    override suspend fun renderDocumentPage(id: String, pageIndex: Int, targetWidthPx: Int): Result<ByteArray> =
+        withContext(ioDispatcher) {
+            runCatching {
+                val file = File(passStore.getPathForID(id), DOCUMENT_FILE_NAME)
+                require(file.isFile) { "Pass has no document" }
+                val bitmap = DocumentImportProcessor.renderPdfPage(file, pageIndex, targetWidthPx)
+                    ?: error("Cannot render the document page")
+                DocumentImportProcessor.encodePng(bitmap)
+            }
+        }
+
+    private fun stagingDirectory(draftId: String) = File(File(context.cacheDir, IMPORT_CACHE_DIR), draftId)
+
     override suspend fun create(update: PassUpdate): PassSnapshot = withContext(ioDispatcher) {
         val pass = org.ligi.passandroid.model.pass.PassImpl(UUID.randomUUID().toString()).apply { app = APP }
         applyUpdate(pass, update)
@@ -269,6 +455,8 @@ class FilePassRepository(
                 alternativeText = update.barcodeAlternativeText.ifBlank { null }
             }
         }
+        // The editor manages a single code; imported extra codes would otherwise stay stale.
+        pass.barCodes = mutableListOf()
     }
 
     private fun writeArtwork(id: String, updates: List<PassArtworkUpdate>) {
@@ -420,14 +608,37 @@ private fun Pass.toSnapshot(
     preferredArtworkKind = preferredArtworkKind,
     trashedAtEpochMillis = trashedAtEpochMillis,
     notes = notes,
+    importSource = importSource ?: inferredImportSource(path),
+    hasDocument = File(path, DOCUMENT_FILE_NAME).isFile,
+    documentPageCount = documentPageCount,
+    barcodes = (listOfNotNull(barCode) + barCodes)
+        .distinctBy { it.format to it.message }
+        .map { PassBarcodeSnapshot(it.format, it.message, it.alternativeText) },
 )
 
+/**
+ * Passes imported as photo or PDF before document metadata existed carry only strip artwork
+ * and no barcode. Treating them as document passes keeps them zoomable and visible on cards.
+ */
+private fun Pass.inferredImportSource(path: File): ImportSource? {
+    val impl = this as? org.ligi.passandroid.model.pass.PassImpl ?: return null
+    if (impl.app != APP || impl.barCode != null) return null
+    if (File(path, DOCUMENT_FILE_NAME).isFile) return ImportSource.PDF
+    if (STRIP_ARTWORK_FILE_NAMES.none { File(path, it).isFile }) return null
+    val otherArtwork = PassArtworkKind.entries
+        .filterNot { it == PassArtworkKind.STRIP }
+        .any { bestArtworkFile(path, it) != null }
+    return if (otherArtwork) null else ImportSource.IMAGE
+}
+
 internal fun bestArtworkFile(path: File, kind: PassArtworkKind): File? {
-    val candidates = listOf(
-        File(path, "${kind.fileName}@3x${org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES}"),
-        File(path, "${kind.fileName}@2x${org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES}"),
-        File(path, kind.fileName + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES),
-    ).filter { it.isFile && it.length() > 0L }
+    val candidates = buildList {
+        for (suffix in listOf("@3x", "@2x", "")) {
+            for (extension in ARTWORK_EXTENSIONS) {
+                add(File(path, kind.fileName + suffix + extension))
+            }
+        }
+    }.filter { it.isFile && it.length() > 0L }
     return candidates.mapNotNull { file -> pngPixelArea(file)?.let { area -> file to area } }
         .maxByOrNull { it.second }
         ?.first

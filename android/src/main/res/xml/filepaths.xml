@@ -2,4 +2,6 @@
 <paths>
     <cache-path
             path="share" name="share"/>
+    <cache-path
+            path="capture" name="capture"/>
 </paths>

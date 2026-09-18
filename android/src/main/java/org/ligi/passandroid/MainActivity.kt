@@ -1,6 +1,7 @@
 package org.ligi.passandroid
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,6 +19,7 @@ import org.ligi.passandroid.ui.state.MainViewModel
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModel()
     private val deepLinkRequest = MutableStateFlow<PassDeepLinkRequest?>(null)
+    private val documentImportRequest = MutableStateFlow<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
                 activity = this,
                 viewModel = viewModel,
                 deepLinkRequest = deepLinkRequest,
+                documentImportRequest = documentImportRequest,
                 startupAppearance = startupAppearance,
             )
         }
@@ -45,19 +48,30 @@ class MainActivity : ComponentActivity() {
 
     private fun importFrom(intent: Intent) {
         val uris = intent.importUris()
-        if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
+        if (uris.isEmpty()) return
+        val singleDocument = uris.singleOrNull()?.takeIf { isDocument(it, intent.type) }
+        if (singleDocument != null) {
+            documentImportRequest.value = singleDocument
+        } else {
+            viewModel.onAction(AppAction.ImportFiles(uris))
+        }
+    }
+
+    private fun isDocument(uri: Uri, fallbackType: String?): Boolean {
+        val mimeType = contentResolver.getType(uri) ?: fallbackType ?: return false
+        return mimeType == "application/pdf" || mimeType.startsWith("image/")
     }
 }
 
 @Suppress("DEPRECATION")
-private fun Intent.importUris(): List<android.net.Uri> = buildList {
+private fun Intent.importUris(): List<Uri> = buildList {
     data?.let(::add)
     clipData?.let { clip ->
         repeat(clip.itemCount) { index -> clip.getItemAt(index).uri?.let(::add) }
     }
     if (action == Intent.ACTION_SEND_MULTIPLE) {
-        getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let(::addAll)
+        getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let(::addAll)
     } else {
-        getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.let(::add)
+        getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let(::add)
     }
 }.filter { it.scheme == "content" }.distinct()

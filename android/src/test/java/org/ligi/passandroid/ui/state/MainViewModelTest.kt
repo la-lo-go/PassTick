@@ -21,6 +21,11 @@ import org.junit.Test
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.imports.DetectedCode
+import org.ligi.passandroid.imports.ImportDraft
+import org.ligi.passandroid.imports.ImportEdits
+import org.ligi.passandroid.imports.ImportSource
+import org.ligi.passandroid.imports.NormalizedRect
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.platform.PlatformLocation
 import org.ligi.passandroid.functions.CalendarEvent
@@ -59,6 +64,71 @@ class MainViewModelTest {
 
         assertThat(repository.deletedIds).containsExactly("pass-1")
         assertThat(viewModel.uiState.value.passes).isEmpty()
+    }
+
+    @Test
+    fun `preparing a document import exposes the review state`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        repository.preparedDraft = documentDraft()
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        val uri = org.mockito.Mockito.mock(Uri::class.java)
+        val result = viewModel.prepareDocumentImport(uri, ImportSource.IMAGE)
+        advanceUntilIdle()
+
+        assertThat(result.isSuccess).isTrue()
+        assertThat(repository.preparedRequest?.first).isSameAs(uri)
+        assertThat(repository.preparedRequest?.second).isEqualTo(ImportSource.IMAGE)
+        val review = viewModel.uiState.value.importReview
+        assertThat(review).isNotNull
+        assertThat(review!!.title).isEqualTo("Photo · 18 Sep 2026 12:00")
+        assertThat(review.detectedCodes).hasSize(1)
+        assertThat(review.selectedCodeIndices).containsExactly(0)
+        assertThat(review.crop).isEqualTo(NormalizedRect.Full)
+        assertThat(review.rotationDegrees).isEqualTo(0)
+    }
+
+    @Test
+    fun `confirming a document import commits the review edits`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        repository.preparedDraft = documentDraft()
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.prepareDocumentImport(org.mockito.Mockito.mock(Uri::class.java), ImportSource.IMAGE)
+        advanceUntilIdle()
+        viewModel.onImportReviewAction(ImportReviewAction.SetTitle("Concert ticket"))
+        viewModel.onImportReviewAction(ImportReviewAction.SetAccentColor(0xFF00AA00.toInt()))
+        viewModel.onImportReviewAction(ImportReviewAction.SelectCode(null))
+        viewModel.onImportReviewAction(ImportReviewAction.Confirm)
+        advanceUntilIdle()
+
+        val edits = repository.committedEdits
+        assertThat(edits).isNotNull
+        assertThat(edits!!.title).isEqualTo("Concert ticket")
+        assertThat(edits.accentColor).isEqualTo(0xFF00AA00.toInt())
+        assertThat(edits.selectedCodeIndices).isEmpty()
+        assertThat(viewModel.uiState.value.importReview).isNull()
+    }
+
+    @Test
+    fun `discarding a document import removes the staged draft`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        repository.preparedDraft = documentDraft()
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.prepareDocumentImport(org.mockito.Mockito.mock(Uri::class.java), ImportSource.IMAGE)
+        advanceUntilIdle()
+        viewModel.onImportReviewAction(ImportReviewAction.Discard)
+        advanceUntilIdle()
+
+        assertThat(repository.discardedDraftIds).containsExactly("draft-1")
+        assertThat(viewModel.uiState.value.importReview).isNull()
     }
 
     @Test
@@ -493,6 +563,16 @@ private fun snapshot(id: String, description: String, categoryId: String = "new"
     categoryId = categoryId,
 )
 
+private fun documentDraft() = ImportDraft(
+    id = "draft-1",
+    source = ImportSource.IMAGE,
+    suggestedTitle = "Photo · 18 Sep 2026 12:00",
+    suggestedAccentColor = 0xFF336699.toInt(),
+    pageCount = 1,
+    previewPng = byteArrayOf(1, 2, 3),
+    detectedCodes = listOf(DetectedCode(PassBarCodeFormat.QR_CODE, "ticket-code")),
+)
+
 private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     private val passes = MutableStateFlow(initial)
     private val trashed = MutableStateFlow<List<PassSnapshot>>(emptyList())
@@ -504,9 +584,27 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val protectionChanges = mutableListOf<Pair<String, Boolean>>()
     val moveDelayMillis = mutableMapOf<String, Long>()
     val purgedRetentions = mutableListOf<Long>()
+    var preparedDraft: ImportDraft? = null
+    var preparedRequest: Pair<Uri, ImportSource>? = null
+    var committedEdits: ImportEdits? = null
+    val discardedDraftIds = mutableListOf<String>()
 
     override fun observePasses() = passes.asStateFlow()
     override suspend fun import(uri: Uri) = Result.failure<PassSnapshot>(UnsupportedOperationException())
+    override suspend fun prepareDocumentImport(uri: Uri, source: ImportSource): Result<ImportDraft> {
+        preparedRequest = uri to source
+        val draft = preparedDraft ?: return Result.failure(UnsupportedOperationException())
+        return Result.success(draft)
+    }
+    override suspend fun commitDocumentImport(draft: ImportDraft, edits: ImportEdits): Result<PassSnapshot> {
+        committedEdits = edits
+        return Result.success(snapshot("imported", edits.title))
+    }
+    override suspend fun discardDocumentImport(draftId: String) {
+        discardedDraftIds += draftId
+    }
+    override suspend fun renderDocumentPage(id: String, pageIndex: Int, targetWidthPx: Int) =
+        Result.failure<ByteArray>(UnsupportedOperationException())
     override suspend fun create(update: PassUpdate): PassSnapshot {
         created += update
         return snapshot("created", update.description).also { passes.value += it }

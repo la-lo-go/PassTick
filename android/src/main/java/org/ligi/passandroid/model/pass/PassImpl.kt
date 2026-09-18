@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.JsonQualifier
+import org.ligi.passandroid.imports.ImportSource
 import org.ligi.passandroid.model.PassStore
 import org.threeten.bp.ZonedDateTime
 import java.io.File
@@ -36,6 +37,8 @@ class PassImpl(
 
     override var barCode: BarCode? = null
 
+    override var barCodes: MutableList<BarCode> = mutableListOf()
+
     override var description: String? = null
         get() = field.orEmpty()
 
@@ -55,6 +58,10 @@ class PassImpl(
 
     override var app: String? = null
 
+    override var importSource: ImportSource? = null
+
+    override var documentPageCount: Int = 0
+
     override var authToken: String? = null
 
     override var webServiceURL: String? = null
@@ -65,7 +72,11 @@ class PassImpl(
 
     override fun getBitmap(passStore: PassStore, @Pass.PassBitmap passBitmap: String): Bitmap? {
         return try {
-            val file = File(passStore.getPathForID(id), passBitmap + FILETYPE_IMAGES)
+            val directory = passStore.getPathForID(id)
+            val file = listOf(FILETYPE_IMAGES, FILETYPE_IMAGES_JPEG)
+                .map { extension -> File(directory, passBitmap + extension) }
+                .firstOrNull(File::isFile)
+                ?: File(directory, passBitmap + FILETYPE_IMAGES)
             BitmapFactory.decodeStream(FileInputStream(file))
         } catch (expectedInSomeCases_willJustReturnNull: FileNotFoundException) {
             null
@@ -90,6 +101,7 @@ class PassImpl(
 
     companion object {
         const val FILETYPE_IMAGES = ".png"
+        const val FILETYPE_IMAGES_JPEG = ".jpg"
     }
 
 }

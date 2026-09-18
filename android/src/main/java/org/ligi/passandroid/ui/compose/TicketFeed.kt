@@ -3,6 +3,8 @@ package org.ligi.passandroid.ui.compose
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -92,6 +94,7 @@ import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
@@ -134,6 +137,7 @@ internal fun TicketFeed(
     onProtectedPreviewRequested: () -> Unit,
     openSwipePassId: androidx.compose.runtime.MutableState<String?>,
     tagCategories: List<PassCategory>,
+    recentlyImportedIds: Set<String> = emptySet(),
 ) {
     val feeds = remember(passes, columns) {
         List(columns) { column -> passes.filterIndexed { index, _ -> index % columns == column } }
@@ -161,6 +165,7 @@ internal fun TicketFeed(
                     onProtectedPreviewRequested = onProtectedPreviewRequested,
                     openSwipePassId = openSwipePassId,
                     tagCategories = tagCategories,
+                    recentlyImportedIds = recentlyImportedIds,
                 )
             } else {
                 Spacer(Modifier.weight(1f))
@@ -194,6 +199,7 @@ private fun ReorderableTicketColumn(
     onProtectedPreviewRequested: () -> Unit,
     openSwipePassId: androidx.compose.runtime.MutableState<String?>,
     tagCategories: List<PassCategory>,
+    recentlyImportedIds: Set<String>,
 ) {
     var visualPasses by remember { mutableStateOf(passes) }
     var measuredBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
@@ -279,6 +285,7 @@ private fun ReorderableTicketColumn(
                     animationSpec = tween(120),
                     label = "reorderSiblingOffset",
                 )
+                val highlighted = pass.id in recentlyImportedIds
                 val isDragged = pass.id == draggedId
                 val isSettling = pass.id == settlingId
                 val visualOffset = when {
@@ -291,6 +298,7 @@ private fun ReorderableTicketColumn(
                 TicketSwipeContainer(
                     pass = pass,
                     category = category,
+                    highlighted = highlighted,
                     hero = hero,
                     sectionOrder = sectionOrder,
                     hiddenSections = hiddenSections,
@@ -403,6 +411,7 @@ private enum class SwipeRevealAnchor { Closed, StartActions, StartCommit, EndAct
 private fun TicketSwipeContainer(
     pass: PassUiModel,
     category: PassCategory?,
+    highlighted: Boolean,
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
@@ -622,6 +631,7 @@ private fun TicketSwipeContainer(
             TicketRow(
                 pass = pass,
                 category = category,
+                highlighted = highlighted,
                 hero = hero,
                 sectionOrder = sectionOrder,
                 hiddenSections = hiddenSections,
@@ -691,6 +701,7 @@ private fun SyncSwipeReveal(
 private fun TicketRow(
     pass: PassUiModel,
     category: PassCategory?,
+    highlighted: Boolean,
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
@@ -710,11 +721,36 @@ private fun TicketRow(
 ) {
     val interactionSource = remember(pass.id) { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
+    val windowInfo = LocalWindowInfo.current
+    val entranceDistancePx = remember(windowInfo.containerSize) {
+        windowInfo.containerSize.width.toFloat()
+    }
+    val slideIn = remember(pass.id) { Animatable(0f) }
+    LaunchedEffect(pass.id, highlighted) {
+        if (highlighted) {
+            slideIn.snapTo(1f)
+            slideIn.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+        } else {
+            slideIn.snapTo(0f)
+        }
+    }
+    val settleGlow by animateFloatAsState(
+        targetValue = if (highlighted) 1f else 0f,
+        animationSpec = tween(durationMillis = 900, delayMillis = 250),
+        label = "settleGlow",
+    )
     Surface(
         color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = shape,
-        modifier = modifier.fillMaxWidth().clip(shape).animateContentSize()
+        border = BorderStroke(
+            2.dp * settleGlow,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f * settleGlow),
+        ),
+        modifier = modifier.fillMaxWidth().clip(shape).graphicsLayer {
+            translationX = slideIn.value * entranceDistancePx
+            alpha = 1f - slideIn.value * 0.35f
+        }.animateContentSize()
             .indication(interactionSource, LocalIndication.current),
     ) {
         Box {
@@ -993,7 +1029,12 @@ internal fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modi
 @Composable
 private fun PassThumbnail(pass: PassUiModel, modifier: Modifier, fallback: (@Composable (Modifier) -> Unit)? = null) {
     val artworkDescription = stringResource(R.string.pass_detail_pass_artwork)
-    val artwork = pass.displayArtwork(listOf(PassArtworkKind.ICON, PassArtworkKind.THUMBNAIL, PassArtworkKind.LOGO))
+    val artworkKinds = if (pass.isDocumentPass) {
+        listOf(PassArtworkKind.THUMBNAIL, PassArtworkKind.STRIP, PassArtworkKind.ICON, PassArtworkKind.LOGO)
+    } else {
+        listOf(PassArtworkKind.ICON, PassArtworkKind.THUMBNAIL, PassArtworkKind.LOGO)
+    }
+    val artwork = pass.displayArtwork(artworkKinds)
     if (artwork != null) {
         AdaptivePassArtwork(
             bytes = artwork.bytes,

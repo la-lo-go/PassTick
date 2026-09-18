@@ -65,6 +65,8 @@ open class App : Application() {
 
         // Shared pass and image files are transient; remove leftovers from a previous session.
         File(cacheDir, "share").deleteRecursively()
+        File(cacheDir, "import").deleteRecursively()
+        File(cacheDir, "capture").deleteRecursively()
 
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit

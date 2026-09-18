@@ -14,4 +14,17 @@ class PassImportTypesTest {
             "application/octet-stream",
         )
     }
+
+    @Test
+    fun `pass file import types contain archive formats only`() {
+        assertThat(passFileImportMimeTypes).contains(
+            "application/vnd.apple.pkpass",
+            "application/pkpass",
+            "application/vnd.espass-espass",
+            "application/vnd.espass-espass+zip",
+            "application/zip",
+            "application/octet-stream",
+        )
+        assertThat(passFileImportMimeTypes).doesNotContain("image/*", "application/pdf")
+    }
 }

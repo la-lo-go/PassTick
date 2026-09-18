@@ -4,22 +4,29 @@ import android.Manifest
 import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
@@ -44,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,13 +60,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.navigation3.runtime.rememberNavBackStack
+import org.ligi.passandroid.imports.ImportSource
 import org.ligi.passandroid.navigation.AppDestination
 import org.ligi.passandroid.navigation.passCustomizationDestination
 import org.ligi.passandroid.navigation.PassDeepLinkRequest
-import org.ligi.passandroid.repository.supportedPassImportMimeTypes
+import org.ligi.passandroid.repository.passFileImportMimeTypes
 import org.ligi.passandroid.ui.compose.HomeAction
+import org.ligi.passandroid.ui.compose.ImportReviewScreen
+import org.ligi.passandroid.ui.compose.ImportSourceSheet
 import org.ligi.passandroid.ui.compose.toAppAction
 import org.ligi.passandroid.ui.state.AppAction
+import org.ligi.passandroid.ui.state.ImportReviewAction
 import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassDetailAction
@@ -75,11 +87,13 @@ import org.ligi.passandroid.MainActivity
 import org.ligi.passandroid.R
 import org.ligi.passandroid.repository.StartupAppearance
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PassTickApp(
     activity: MainActivity,
     viewModel: MainViewModel,
     deepLinkRequest: MutableStateFlow<PassDeepLinkRequest?>,
+    documentImportRequest: MutableStateFlow<Uri?>,
     startupAppearance: StartupAppearance,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -129,6 +143,7 @@ fun PassTickApp(
         }
     }
     val requestedPass by deepLinkRequest.collectAsStateWithLifecycle()
+    val requestedDocumentImport by documentImportRequest.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val backStack = rememberNavBackStack(AppDestination.PassList)
     fun popBackStack() {
@@ -196,6 +211,56 @@ fun PassTickApp(
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
+    }
+    var showImportSourceSheet by remember { mutableStateOf(false) }
+    var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingCaptureFile by remember { mutableStateOf<java.io.File?>(null) }
+    fun prepareDocumentImport(uri: Uri, source: ImportSource) {
+        coroutineScope.launch {
+            if (viewModel.prepareDocumentImport(uri, source).isSuccess) {
+                backStack.removeAll { it == AppDestination.ImportReview }
+                backStack.add(AppDestination.ImportReview)
+            }
+        }
+    }
+    LaunchedEffect(requestedDocumentImport) {
+        val uri = requestedDocumentImport ?: return@LaunchedEffect
+        documentImportRequest.value = null
+        val mimeType = context.contentResolver.getType(uri)
+        val source = if (mimeType == "application/pdf") ImportSource.PDF else ImportSource.IMAGE
+        prepareDocumentImport(uri, source)
+    }
+    val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { prepareDocumentImport(it, ImportSource.IMAGE) }
+    }
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { prepareDocumentImport(it, ImportSource.PDF) }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val uri = pendingCaptureUri
+        val file = pendingCaptureFile
+        pendingCaptureUri = null
+        pendingCaptureFile = null
+        when {
+            success && uri != null -> prepareDocumentImport(uri, ImportSource.CAMERA)
+            else -> file?.delete()
+        }
+    }
+    fun launchCamera() {
+        val file = java.io.File(
+            java.io.File(activity.cacheDir, "capture").apply { mkdirs() },
+            "capture-${System.currentTimeMillis()}.jpg",
+        )
+        val uri = runCatching {
+            FileProvider.getUriForFile(activity, activity.getString(R.string.authority_fileprovider), file)
+        }.getOrNull()
+        if (uri == null) {
+            file.delete()
+        } else {
+            pendingCaptureUri = uri
+            pendingCaptureFile = file
+            cameraLauncher.launch(uri)
+        }
     }
     var exportPassId by remember { mutableStateOf<String?>(null) }
     val exportPassLauncher = rememberLauncherForActivityResult(
@@ -384,7 +449,7 @@ fun PassTickApp(
             is HomeAction.SetTrashEnabled -> viewModel.onAction(AppAction.SetTrashEnabled(action.value))
             HomeAction.EmptyTrash -> viewModel.onAction(AppAction.EmptyTrash)
             is HomeAction.Undo -> viewModel.onAction(action.operation.toAppAction().copy(announce = false))
-            HomeAction.ImportPass -> importLauncher.launch(supportedPassImportMimeTypes.toTypedArray())
+            HomeAction.ImportPass -> showImportSourceSheet = true
             HomeAction.OpenSettings -> backStack.add(AppDestination.Settings)
             HomeAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
             HomeAction.OpenHomeCardSettings -> backStack.add(AppDestination.HomeCardLayoutSettings)
@@ -418,8 +483,16 @@ fun PassTickApp(
             }
             PassDetailAction.OpenPassViewSettings -> backStack.add(AppDestination.PassDetailLayoutSettings)
             PassDetailAction.OpenPassCustomization -> {
-                val artworkKinds = state.passes.firstOrNull { it.id == passId }?.artwork.orEmpty().map { it.kind }
-                backStack.add(passCustomizationDestination(passId, artworkKinds))
+                val pass = state.passes.firstOrNull { it.id == passId }
+                val artworkKinds = pass?.artwork.orEmpty().map { it.kind }
+                // Imported documents only carry one image at two sizes; nothing to choose.
+                backStack.add(
+                    if (pass?.isDocumentPass == true) {
+                        AppDestination.PassDetailLayoutSettings
+                    } else {
+                        passCustomizationDestination(passId, artworkKinds)
+                    },
+                )
             }
             PassDetailAction.OpenTagSettings -> backStack.add(AppDestination.CategorySettings)
             is PassDetailAction.ConfigureReminder -> {
@@ -567,7 +640,12 @@ fun PassTickApp(
                     viewModel = viewModel,
                     activity = activity,
                     backStack = backStack,
-                    onBack = ::popBackStack,
+                    onBack = {
+                        if (backStack.lastOrNull() == AppDestination.ImportReview) {
+                            viewModel.onImportReviewAction(ImportReviewAction.Discard)
+                        }
+                        popBackStack()
+                    },
                     onOpenPass = { passId, replaceCurrent -> openPass(passId, replaceCurrent = replaceCurrent) },
                     onHomeAction = ::handleHomeAction,
                     onPassDetailAction = ::handlePassDetailAction,
@@ -601,13 +679,36 @@ fun PassTickApp(
                     snackbarHostState = snackbarHostState,
                 ),
             )
-            }
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(16.dp),
+            if (showImportSourceSheet) {
+                ImportSourceSheet(
+                    onDismiss = { showImportSourceSheet = false },
+                    onPickPassFile = { importLauncher.launch(passFileImportMimeTypes.toTypedArray()) },
+                    onPickPhoto = {
+                        photoLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onPickPdf = { pdfLauncher.launch(arrayOf("application/pdf")) },
+                    onTakePhoto = ::launchCamera,
                 )
+            }
+            }
+            if (state.isPreparingImport) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.35f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LoadingIndicator()
+                }
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp),
+            )
             }
         }
     }

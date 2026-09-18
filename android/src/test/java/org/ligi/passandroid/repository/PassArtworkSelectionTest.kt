@@ -43,6 +43,23 @@ class PassArtworkSelectionTest {
         assertThat(bestArtworkFile(directory, PassArtworkKind.ICON)).isEqualTo(double)
     }
 
+    @Test
+    fun `jpeg artwork is found when no png variant exists`() {
+        val directory = temporaryFolder.newFolder()
+        val jpeg = File(directory, "strip.jpg").apply { writeText("photo") }
+
+        assertThat(bestArtworkFile(directory, PassArtworkKind.STRIP)).isEqualTo(jpeg)
+    }
+
+    @Test
+    fun `png artwork wins over jpeg at the same density`() {
+        val directory = temporaryFolder.newFolder()
+        val png = File(directory, "strip.png").apply { writePng(48, 48) }
+        File(directory, "strip.jpg").writeText("photo")
+
+        assertThat(bestArtworkFile(directory, PassArtworkKind.STRIP)).isEqualTo(png)
+    }
+
     private fun File.writePng(width: Int, height: Int) {
         ImageIO.write(BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB), "png", this)
     }

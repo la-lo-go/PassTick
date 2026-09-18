@@ -1,6 +1,8 @@
 package org.ligi.passandroid.ui.state
 
 import android.net.Uri
+import org.ligi.passandroid.imports.ImportSource
+import org.ligi.passandroid.imports.NormalizedRect
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
@@ -33,6 +35,29 @@ data class PassLocationDraft(val name: String, val latitude: String, val longitu
 data class PassTimeSpanUiModel(val from: ZonedDateTime?, val to: ZonedDateTime?)
 data class PassArtworkUiModel(val kind: PassArtworkKind, val bytes: ByteArray)
 data class PassArtworkDraft(val kind: PassArtworkKind, val uri: Uri)
+data class PassBarcodeUiModel(
+    val format: PassBarCodeFormat?,
+    val message: String?,
+    val alternativeText: String?,
+)
+data class DetectedCodeUiModel(val format: PassBarCodeFormat, val message: String)
+
+data class ImportReviewUiState(
+    val draftId: String,
+    val source: ImportSource,
+    val title: String,
+    val accentColor: Int,
+    val suggestedAccentColor: Int,
+    val pageCount: Int,
+    val previewPng: ByteArray,
+    val displayPng: ByteArray = previewPng,
+    val detectedCodes: List<DetectedCodeUiModel>,
+    val selectedCodeIndices: Set<Int>,
+    val rotationDegrees: Int = 0,
+    val crop: NormalizedRect = NormalizedRect.Full,
+    val cropEditing: Boolean = false,
+    val isBusy: Boolean = false,
+)
 
 data class PassUiModel(
     val id: String,
@@ -56,8 +81,14 @@ data class PassUiModel(
     val preferredArtworkKind: PassArtworkKind? = null,
     val trashedAtEpochMillis: Long? = null,
     val notes: String = "",
+    val importSource: ImportSource? = null,
+    val hasDocument: Boolean = false,
+    val documentPageCount: Int = 0,
+    val barcodes: List<PassBarcodeUiModel> = emptyList(),
 ) {
     val isPinned: Boolean get() = isFavorite
+
+    val isDocumentPass: Boolean get() = importSource != null || hasDocument
 
     companion object {
         fun from(pass: PassSnapshot) = PassUiModel(
@@ -92,6 +123,10 @@ data class PassUiModel(
             preferredArtworkKind = pass.preferredArtworkKind,
             trashedAtEpochMillis = pass.trashedAtEpochMillis,
             notes = pass.notes,
+            importSource = pass.importSource,
+            hasDocument = pass.hasDocument,
+            documentPageCount = pass.documentPageCount,
+            barcodes = pass.barcodes.map { PassBarcodeUiModel(it.format, it.message, it.alternativeText) },
         )
     }
 
@@ -133,6 +168,7 @@ data class PassDraft(
     val calendarStart: String = "",
     val calendarEnd: String = "",
     val locations: List<PassLocationDraft> = emptyList(),
+    val notes: String = "",
 )
 
 const val PROTECTED_PASSES_CATEGORY_ID = "protected"
@@ -151,6 +187,10 @@ data class MainUiState(
     val selectedCategoryId: String? = null,
     val timeline: PassTimeline = PassTimeline.empty(),
     val systemAccentColor: Long? = null,
+    val importReview: ImportReviewUiState? = null,
+    val isPreparingImport: Boolean = false,
+    /** Passes imported in the last moments; the home list animates them into view. */
+    val recentlyImportedIds: Set<String> = emptySet(),
 )
 
 sealed interface AppAction {

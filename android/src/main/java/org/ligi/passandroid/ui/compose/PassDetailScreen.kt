@@ -15,10 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
@@ -51,6 +55,7 @@ import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -68,14 +73,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.navigation.PassDateField
 import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.repository.PassCategory
@@ -83,6 +92,7 @@ import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.reminder.NotificationAction
 import org.ligi.passandroid.repository.defaultPassDetailSectionOrder
+import org.ligi.passandroid.ui.state.PassBarcodeUiModel
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.displayArtwork
@@ -91,6 +101,7 @@ import org.ligi.passandroid.ui.barcode.PassCodePreview
 import org.threeten.bp.format.DateTimeFormatter
 import androidx.compose.ui.res.stringResource
 import org.ligi.passandroid.R
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -111,6 +122,7 @@ fun PassDetailScreen(
     calendarEventPresent: Boolean = false,
     passDetailSectionOrder: List<PassDetailSection> = defaultPassDetailSectionOrder,
     hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
+    documentPages: PassDocumentPages? = null,
     onAction: (PassDetailAction) -> Unit,
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
@@ -269,7 +281,7 @@ fun PassDetailScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.pass_detail_save_code)) },
                                 leadingIcon = { Icon(Icons.Default.QrCode, null) },
-                                enabled = pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank(),
+                                enabled = pass?.hasDisplayableCode() == true,
                                 onClick = { overflowOpen = false; onAction(PassDetailAction.SaveBarcodeImage) },
                             )
                             DropdownMenuItem(
@@ -283,7 +295,7 @@ fun PassDetailScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.pass_detail_configure_reminder)) },
                                 leadingIcon = { Icon(Icons.Default.Notifications, null) },
-                                enabled = pass?.calendarEvent != null,
+                                enabled = pass != null,
                                 onClick = {
                                     overflowOpen = false
                                     if (remindersGloballyEnabled) {
@@ -301,30 +313,26 @@ fun PassDetailScreen(
                                     tagMenuOpen = true
                                 },
                             )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(
-                                            if (pass?.notes.isNullOrBlank()) R.string.pass_detail_add_note
-                                            else R.string.pass_detail_edit_note,
-                                        ),
-                                    )
-                                },
-                                leadingIcon = { Icon(Icons.Default.EditNote, null) },
-                                onClick = {
-                                    overflowOpen = false
-                                    editNotesDialog = true
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_remove_note)) },
-                                leadingIcon = { Icon(Icons.Default.DeleteOutline, null) },
-                                enabled = !pass?.notes.isNullOrBlank(),
-                                onClick = {
-                                    overflowOpen = false
-                                    onAction(PassDetailAction.SetNotes(""))
-                                },
-                            )
+                            if (pass?.notes.isNullOrBlank()) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.pass_detail_add_note)) },
+                                    leadingIcon = { Icon(Icons.Default.EditNote, null) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        editNotesDialog = true
+                                    },
+                                )
+                            }
+                            if (!pass?.notes.isNullOrBlank()) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.pass_detail_remove_note)) },
+                                    leadingIcon = { Icon(Icons.Default.DeleteOutline, null) },
+                                    onClick = {
+                                        overflowOpen = false
+                                        onAction(PassDetailAction.SetNotes(""))
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -466,6 +474,7 @@ fun PassDetailScreen(
                         pass = pass,
                         sectionOrder = passDetailSectionOrder,
                         hiddenSections = hiddenPassDetailSections,
+                        documentPages = documentPages,
                         calendarEventPresent = calendarEventPresent,
                         onAction = onAction,
                         onBarcodeHoldChanged = { codeHeld = it },
@@ -485,6 +494,7 @@ internal fun PassDetailSectionList(
     pass: PassUiModel,
     sectionOrder: List<PassDetailSection>,
     hiddenSections: Set<PassDetailSection>,
+    documentPages: PassDocumentPages? = null,
     calendarEventPresent: Boolean,
     onAction: (PassDetailAction) -> Unit,
     onBarcodeHoldChanged: (Boolean) -> Unit,
@@ -505,19 +515,29 @@ internal fun PassDetailSectionList(
             .filterNot(hiddenSections::contains)
             .forEach { section ->
                 when (section) {
-                    PassDetailSection.ARTWORK -> if (artwork != null) {
+                    PassDetailSection.ARTWORK -> if (pass.isDocumentPass) {
+                        DocumentViewer(
+                            pass = pass,
+                            documentPages = documentPages,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else if (artwork != null) {
                         Box(Modifier.fillMaxWidth().height(160.dp)) {
                             PassArtwork(pass, listOf(artwork.kind), Modifier.fillMaxSize())
                         }
                     } else artworkFallback?.let { fallback ->
                         Box(Modifier.fillMaxWidth().height(160.dp)) { fallback() }
                     }
-                    PassDetailSection.BARCODE -> BarcodeCard(
-                        pass = pass,
-                        emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenSections,
-                        onHoldChanged = onBarcodeHoldChanged,
-                        onPin = onBarcodePin,
-                    )
+                    PassDetailSection.BARCODE -> {
+                        if (pass.hasDisplayableCode() || !pass.isDocumentPass) {
+                            BarcodeCard(
+                                pass = pass,
+                                emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenSections,
+                                onHoldChanged = onBarcodeHoldChanged,
+                                onPin = onBarcodePin,
+                            )
+                        }
+                    }
                     PassDetailSection.FIELDS -> if (visibleFields.isNotEmpty()) {
                         Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                             Column(Modifier.padding(vertical = 8.dp)) {
@@ -631,19 +651,130 @@ private fun BarcodeCard(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val format = pass.barcodeFormat
-            val message = pass.barcodeMessage
-            if (format != null && !message.isNullOrBlank()) {
-                BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val height = if (format.isQuadratic()) {
-                        (maxWidth * 0.78f).coerceIn(196.dp, if (emphasized) 300.dp else 264.dp)
-                    } else {
-                        (maxWidth / 2.6f).coerceIn(144.dp, if (emphasized) 240.dp else 208.dp)
-                    }
-                    PassCodePreview(format, message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
-                }
-            } else Text(stringResource(R.string.pass_detail_no_barcode), style = MaterialTheme.typography.titleMedium)
+            val codes = pass.displayableCodes()
+            when {
+                codes.isEmpty() -> Text(stringResource(R.string.pass_detail_no_barcode), style = MaterialTheme.typography.titleMedium)
+                codes.size == 1 -> SinglePassCode(codes.first(), emphasized, onHoldChanged, onPin)
+                else -> BarcodePager(codes, emphasized, onHoldChanged, onPin)
+            }
         }
+    }
+}
+
+private data class DisplayableCode(val format: PassBarCodeFormat, val message: String)
+
+private fun PassUiModel.displayableCodes(): List<DisplayableCode> {
+    val candidates = if (barcodes.isNotEmpty()) {
+        barcodes
+    } else {
+        listOf(PassBarcodeUiModel(barcodeFormat, barcodeMessage, barcodeAlternativeText))
+    }
+    return candidates.mapNotNull { barcode ->
+        val format = barcode.format ?: return@mapNotNull null
+        val message = barcode.message?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+        DisplayableCode(format, message)
+    }
+}
+
+private fun PassUiModel.hasDisplayableCode(): Boolean =
+    barcodes.any { it.format != null && !it.message.isNullOrBlank() } ||
+        (barcodeFormat != null && !barcodeMessage.isNullOrBlank())
+
+private fun codeHeight(format: PassBarCodeFormat, cardWidth: Dp, emphasized: Boolean): Dp =
+    if (format.isQuadratic()) {
+        (cardWidth * 0.78f).coerceIn(196.dp, if (emphasized) 300.dp else 264.dp)
+    } else {
+        (cardWidth / 2.6f).coerceIn(144.dp, if (emphasized) 240.dp else 208.dp)
+    }
+
+@Composable
+private fun SinglePassCode(
+    code: DisplayableCode,
+    emphasized: Boolean,
+    onHoldChanged: (Boolean) -> Unit,
+    onPin: () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val height = codeHeight(code.format, maxWidth, emphasized)
+        PassCodePreview(code.format, code.message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
+    }
+}
+
+// Matches the default IconButton touch target reserved on each side of the pager.
+private val BarcodePagerArrowWidth = 48.dp
+
+@Composable
+private fun BarcodePager(
+    codes: List<DisplayableCode>,
+    emphasized: Boolean,
+    onHoldChanged: (Boolean) -> Unit,
+    onPin: () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val showArrows = codes.size > 1
+        val pagerWidth = if (showArrows) maxWidth - BarcodePagerArrowWidth * 2 else maxWidth
+        val height = codes.maxOf { codeHeight(it.format, pagerWidth, emphasized) }
+        val pagerState = rememberPagerState(pageCount = { codes.size })
+        val scope = rememberCoroutineScope()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (showArrows) {
+                    BarcodePagerArrow(
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "Previous code",
+                        enabled = pagerState.currentPage > 0,
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0))
+                            }
+                        },
+                    )
+                }
+                HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).height(height)) { page ->
+                    val code = codes[page]
+                    PassCodePreview(code.format, code.message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
+                }
+                if (showArrows) {
+                    BarcodePagerArrow(
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Next code",
+                        enabled = pagerState.currentPage < codes.lastIndex,
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(codes.lastIndex))
+                            }
+                        },
+                    )
+                }
+            }
+            Surface(
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+                Text(
+                    text = stringResource(R.string.pass_detail_code_page, pagerState.currentPage + 1, codes.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BarcodePagerArrow(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+    ) {
+        Icon(icon, contentDescription)
     }
 }
 

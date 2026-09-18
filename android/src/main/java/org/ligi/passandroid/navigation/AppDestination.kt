@@ -19,6 +19,7 @@ sealed interface AppDestination : NavKey {
     @Serializable data object HomeCardLayoutSettings : AppDestination
     @Serializable data object Licenses : AppDestination
     @Serializable data object Timeline : AppDestination
+    @Serializable data object ImportReview : AppDestination
 }
 
 internal fun passCustomizationDestination(

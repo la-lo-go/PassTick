@@ -176,6 +176,7 @@ fun PassHomeScreen(
     onAction: (HomeAction) -> Unit,
     showTodayHero: Boolean = true,
     protectedPassesUnlocked: Boolean = false,
+    recentlyImportedIds: Set<String> = emptySet(),
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -526,6 +527,7 @@ fun PassHomeScreen(
                     if (todayExpanded) item(key = "today-feed") {
                         TicketFeed(
                             passes = todayPasses,
+                            recentlyImportedIds = recentlyImportedIds,
                             categories = state.categories,
                             columns = if (expanded) 2 else 1,
                             hero = true,
@@ -555,6 +557,7 @@ fun PassHomeScreen(
                     if (pinnedExpanded) item(key = "pinned-feed") {
                         TicketFeed(
                             passes = pinnedPasses,
+                            recentlyImportedIds = recentlyImportedIds,
                             categories = state.categories,
                             columns = if (expanded) 2 else 1,
                             hero = false,
@@ -597,6 +600,7 @@ fun PassHomeScreen(
                     if (otherExpanded || !showOtherPassesHeading) item(key = "pass-feed") {
                         TicketFeed(
                             passes = remainingPasses,
+                            recentlyImportedIds = recentlyImportedIds,
                             categories = state.categories,
                             columns = if (expanded) 2 else 1,
                             hero = false,

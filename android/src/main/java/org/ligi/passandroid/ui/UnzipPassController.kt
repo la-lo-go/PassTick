@@ -1,24 +1,30 @@
 package org.ligi.passandroid.repository.io
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
-import androidx.core.graphics.createBitmap
 import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.exception.ZipException
 import okio.buffer
 import okio.source
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import org.ligi.passandroid.R
 import org.ligi.passandroid.Tracker
-import org.ligi.passandroid.functions.createPassForImageImport
-import org.ligi.passandroid.functions.createPassForPDFImport
+import org.ligi.passandroid.functions.APP
 import org.ligi.passandroid.functions.readJSONSafely
 import org.ligi.passandroid.functions.safePassIdOrNull
+import org.ligi.passandroid.imports.DocumentImportProcessor
+import org.ligi.passandroid.imports.DetectedCode
+import org.ligi.passandroid.imports.ImportSource
 import org.ligi.passandroid.model.InputStreamWithSource
+import org.ligi.passandroid.model.PassBitmapDefinitions
 import org.ligi.passandroid.model.PassStore
+import org.ligi.passandroid.model.pass.BarCode
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassImpl
+import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.repository.DOCUMENT_FILE_NAME
+import org.ligi.passandroid.repository.THUMBNAIL_MAX_DIMENSION
+import org.threeten.bp.ZonedDateTime
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -112,16 +118,23 @@ object UnzipPassController : KoinComponent {
     }
 
     private fun importImagePass(spec: FileUnzipControllerSpec): Boolean {
-        val bitmap = BitmapFactory.decodeFile(spec.zipFileString)
+        val bitmap = DocumentImportProcessor.decodeNormalizedBitmap(File(spec.zipFileString)) ?: return false
         val resources = spec.context.resources
-
-        if (bitmap == null) return false
-
-        val imagePass = createPassForImageImport(resources)
+        val imagePass = createDocumentPass(
+            source = ImportSource.IMAGE,
+            title = DocumentImportProcessor.suggestTitle(
+                displayName = null,
+                fallbackLabel = resources.getString(R.string.import_title_photo),
+                now = ZonedDateTime.now(),
+            ),
+            pageCount = 1,
+            codes = DocumentImportProcessor.detectCodes(bitmap),
+            accentColor = DocumentImportProcessor.suggestAccentColor(bitmap),
+        )
         val pathForID = spec.passStore.getPathForID(imagePass.id)
         pathForID.mkdirs()
 
-        File(spec.zipFileString).copyTo(File(pathForID, "strip.png"))
+        writeArtwork(pathForID, bitmap, jpeg = true)
 
         spec.passStore.save(imagePass)
         spec.passStore.classifier.moveToTopic(imagePass, "new")
@@ -135,31 +148,71 @@ object UnzipPassController : KoinComponent {
             val readUtf8 = file.source().buffer().readUtf8(4)
             if (readUtf8 != "%PDF") return false
 
-            val open = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            val pdfRenderer = PdfRenderer(open)
-
-            val page = pdfRenderer.openPage(0)
-            val ratio = page.height.toFloat() / page.width
+            val pageCount = DocumentImportProcessor.pdfPageCount(file)
+            if (pageCount <= 0) return false
+            val pageZero = DocumentImportProcessor.renderPdfPage(
+                file,
+                0,
+                DocumentImportProcessor.MAX_DIMENSION,
+            ) ?: return false
 
             val resources = spec.context.resources
-            val widthPixels = resources.displayMetrics.widthPixels
-            val bitmap = createBitmap(widthPixels, (widthPixels * ratio).toInt(), Bitmap.Config.ARGB_8888)
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-            val imagePass = createPassForPDFImport(resources)
-            val pathForID = spec.passStore.getPathForID(imagePass.id)
+            val pdfPass = createDocumentPass(
+                source = ImportSource.PDF,
+                title = DocumentImportProcessor.suggestTitle(
+                    displayName = null,
+                    fallbackLabel = resources.getString(R.string.import_title_pdf),
+                    now = ZonedDateTime.now(),
+                ),
+                pageCount = pageCount,
+                codes = detectPdfCodes(file, pageZero, pageCount),
+                accentColor = DocumentImportProcessor.suggestAccentColor(pageZero),
+            )
+            val pathForID = spec.passStore.getPathForID(pdfPass.id)
             pathForID.mkdirs()
 
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, FileOutputStream(File(pathForID, "strip.png")))
+            writeArtwork(pathForID, pageZero, jpeg = false)
+            file.copyTo(File(pathForID, DOCUMENT_FILE_NAME), overwrite = true)
 
-            spec.passStore.save(imagePass)
-            spec.passStore.classifier.moveToTopic(imagePass, "new")
-            spec.onSuccessCallback?.call(imagePass.id)
+            spec.passStore.save(pdfPass)
+            spec.passStore.classifier.moveToTopic(pdfPass, "new")
+            spec.onSuccessCallback?.call(pdfPass.id)
             true
         } catch (e: Exception) {
             e.printStackTrace()
             false
         }
+    }
+
+    private fun detectPdfCodes(file: File, pageZero: android.graphics.Bitmap, pageCount: Int): List<DetectedCode> {
+        val found = LinkedHashMap<Pair<PassBarCodeFormat, String>, DetectedCode>()
+        DocumentImportProcessor.detectCodes(pageZero).forEach { found.putIfAbsent(it.format to it.message, it) }
+        for (index in 1 until minOf(pageCount, DocumentImportProcessor.MAX_DETECTION_PAGES)) {
+            val page = DocumentImportProcessor.renderPdfPage(
+                file,
+                index,
+                DocumentImportProcessor.DETECTION_WIDTH_PX,
+            ) ?: continue
+            DocumentImportProcessor.detectCodes(page).forEach { found.putIfAbsent(it.format to it.message, it) }
+        }
+        return found.values.toList()
+    }
+
+    private fun createDocumentPass(
+        source: ImportSource,
+        title: String,
+        pageCount: Int,
+        codes: List<DetectedCode>,
+        accentColor: Int,
+    ) = PassImpl(UUID.randomUUID().toString()).apply {
+        description = title
+        this.accentColor = accentColor
+        app = APP
+        type = PassType.EVENT
+        importSource = source
+        documentPageCount = pageCount
+        barCode = codes.firstOrNull()?.let { BarCode(it.format, it.message) }
+        barCodes = codes.drop(1).mapTo(mutableListOf()) { BarCode(it.format, it.message) }
     }
 
     private fun moveExtractedPass(spec: FileUnzipControllerSpec, path: File, uuid: String) {
@@ -175,6 +228,19 @@ object UnzipPassController : KoinComponent {
         } else {
             Timber.i("Pass with same ID exists")
         }
+    }
+
+    private fun writeArtwork(pathForID: File, bitmap: android.graphics.Bitmap, jpeg: Boolean) {
+        val extension = if (jpeg) {
+            PassImpl.FILETYPE_IMAGES_JPEG
+        } else {
+            PassImpl.FILETYPE_IMAGES
+        }
+        val bytes = if (jpeg) DocumentImportProcessor.encodeJpeg(bitmap) else DocumentImportProcessor.encodePng(bitmap)
+        File(pathForID, PassBitmapDefinitions.BITMAP_STRIP + extension).writeBytes(bytes)
+        val thumbnail = DocumentImportProcessor.scaleToMaxDimension(bitmap, THUMBNAIL_MAX_DIMENSION)
+        File(pathForID, PassBitmapDefinitions.BITMAP_THUMBNAIL + PassImpl.FILETYPE_IMAGES)
+            .writeBytes(DocumentImportProcessor.encodePng(thumbnail))
     }
 
     class InputStreamUnzipControllerSpec(internal val inputStreamWithSource: InputStreamWithSource, context: Context, passStore: PassStore,

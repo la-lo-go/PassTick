@@ -2,6 +2,7 @@ package org.ligi.passandroid.ui.state
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -11,12 +12,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.withContext
 import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.platform.PassImageExporter
 import org.ligi.passandroid.R
+import org.ligi.passandroid.imports.DocumentImportProcessor
+import org.ligi.passandroid.imports.ImportDraft
+import org.ligi.passandroid.imports.ImportEdits
+import org.ligi.passandroid.imports.ImportSource
+import org.ligi.passandroid.imports.NormalizedRect
+import org.ligi.passandroid.ui.compose.PassDocumentPages
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.repository.PassUpdate
 import org.ligi.passandroid.repository.PassRepository
@@ -56,6 +65,11 @@ class MainViewModel(
     private val message = MutableStateFlow<String?>(null)
     private val selectedCategoryId = MutableStateFlow<String?>(null)
     private val pendingDeletionIds = MutableStateFlow<Set<String>>(emptySet())
+    private val importReview = MutableStateFlow<ImportReviewUiState?>(null)
+    private val preparingImport = MutableStateFlow(false)
+    private val recentlyImportedIds = MutableStateFlow<Set<String>>(emptySet())
+    private var recentlyImportedClearJob: Job? = null
+    private var pendingImportDraft: ImportDraft? = null
     private val systemAccentColor = platformActions.systemAccentColor()
     private val categoryMoves = Channel<AppAction.MovePass>(Channel.UNLIMITED)
     private val passes = passRepository.observePasses()
@@ -101,6 +115,12 @@ class MainViewModel(
             timeline = timeline,
             systemAccentColor = systemAccentColor,
         )
+    }.combine(importReview) { currentState, review ->
+        currentState.copy(importReview = review)
+    }.combine(preparingImport) { currentState, preparing ->
+        currentState.copy(isPreparingImport = preparing)
+    }.combine(recentlyImportedIds) { currentState, importedIds ->
+        currentState.copy(recentlyImportedIds = importedIds)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     init {
@@ -182,13 +202,27 @@ class MainViewModel(
             launchOperation(strings.resolve(R.string.message_pass_imported)) {
                 val imported = passRepository.import(action.uri).getOrThrow()
                 addCalendarEventsAfterImport(listOf(imported))
+                highlightImported(listOf(imported.id))
             }
             true
         }
         is AppAction.ImportFiles -> {
-            launchOperation(strings.resolve(R.string.message_passes_imported)) {
-                val imported = action.uris.map { passRepository.import(it).getOrThrow() }
+            launchOperation(null) {
+                val results = action.uris.map { uri -> passRepository.import(uri) }
+                val imported = results.mapNotNull { it.getOrNull() }
+                val failedCount = results.count { it.isFailure }
                 addCalendarEventsAfterImport(imported)
+                highlightImported(imported.map(PassSnapshot::id))
+                message.value = when {
+                    failedCount == 0 -> strings.resolve(R.string.message_passes_imported)
+                    imported.isEmpty() -> results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
+                        ?: strings.resolve(R.string.message_operation_failed)
+                    else -> strings.resolve(
+                        R.string.message_passes_imported_summary,
+                        imported.size,
+                        failedCount,
+                    )
+                }
             }
             true
         }
@@ -221,6 +255,134 @@ class MainViewModel(
             true
         }
         else -> false
+    }
+
+    val documentPages = PassDocumentPages { passId, pageIndex, targetWidthPx ->
+        passRepository.renderDocumentPage(passId, pageIndex, targetWidthPx).getOrNull()
+    }
+
+    suspend fun prepareDocumentImport(uri: Uri, source: ImportSource): Result<Unit> {
+        discardPendingDraft()
+        preparingImport.value = true
+        return try {
+            passRepository.prepareDocumentImport(uri, source)
+                .onSuccess { draft ->
+                    pendingImportDraft = draft
+                    importReview.value = ImportReviewUiState(
+                        draftId = draft.id,
+                        source = draft.source,
+                        title = draft.suggestedTitle,
+                        accentColor = draft.suggestedAccentColor,
+                        suggestedAccentColor = draft.suggestedAccentColor,
+                        pageCount = draft.pageCount,
+                        previewPng = draft.previewPng,
+                        detectedCodes = draft.detectedCodes.map { DetectedCodeUiModel(it.format, it.message) },
+                        selectedCodeIndices = draft.detectedCodes.indices.toSet(),
+                    )
+                }
+                .onFailure { error ->
+                    message.value = error.message ?: strings.resolve(R.string.import_review_unreadable)
+                }
+                .map { }
+        } finally {
+            preparingImport.value = false
+        }
+    }
+
+    fun onImportReviewAction(action: ImportReviewAction) {
+        val review = importReview.value ?: return
+        when (action) {
+            is ImportReviewAction.SetTitle -> importReview.value = review.copy(title = action.title)
+            is ImportReviewAction.SetAccentColor -> importReview.value = review.copy(accentColor = action.color)
+            is ImportReviewAction.SelectCode -> importReview.value = review.withToggledCode(action.index)
+            ImportReviewAction.Rotate -> rotateImportPreview(review)
+            is ImportReviewAction.SetCrop -> importReview.value = review.copy(crop = action.crop)
+            is ImportReviewAction.SetCropEditing -> setImportReviewCropEditing(review, action.editing)
+            ImportReviewAction.Confirm -> confirmImportReview(review)
+            ImportReviewAction.Discard -> discardPendingDraft()
+        }
+    }
+
+    private fun ImportReviewUiState.withToggledCode(index: Int?): ImportReviewUiState {
+        if (index == null) return copy(selectedCodeIndices = emptySet())
+        val updated = if (index in selectedCodeIndices) {
+            selectedCodeIndices - index
+        } else {
+            selectedCodeIndices + index
+        }
+        return copy(selectedCodeIndices = updated)
+    }
+
+    private fun setImportReviewCropEditing(review: ImportReviewUiState, editing: Boolean) {
+        importReview.value = review.copy(cropEditing = editing)
+        if (editing) return
+        viewModelScope.launch {
+            val croppedPng = withContext(Dispatchers.Default) {
+                DocumentImportProcessor.decodePng(review.previewPng)
+                    ?.let { bitmap -> DocumentImportProcessor.crop(bitmap, review.crop) }
+                    ?.let(DocumentImportProcessor::encodePng)
+            } ?: return@launch
+            val latest = importReview.value ?: return@launch
+            if (!latest.cropEditing) importReview.value = latest.copy(displayPng = croppedPng)
+        }
+    }
+
+    private fun rotateImportPreview(review: ImportReviewUiState) {
+        if (review.isBusy) return
+        importReview.value = review.copy(isBusy = true)
+        viewModelScope.launch {
+            val rotatedPng = withContext(Dispatchers.Default) {
+                DocumentImportProcessor.decodePng(review.previewPng)
+                    ?.let { DocumentImportProcessor.rotate(it, 90) }
+                    ?.let(DocumentImportProcessor::encodePng)
+            }
+            val latest = importReview.value ?: return@launch
+            importReview.value = if (rotatedPng == null) {
+                latest.copy(isBusy = false)
+            } else {
+                latest.copy(
+                    previewPng = rotatedPng,
+                    displayPng = rotatedPng,
+                    rotationDegrees = (review.rotationDegrees + 90) % 360,
+                    crop = NormalizedRect.Full,
+                    isBusy = false,
+                )
+            }
+        }
+    }
+
+    private fun confirmImportReview(review: ImportReviewUiState) {
+        val draft = pendingImportDraft ?: return
+        if (review.isBusy) return
+        importReview.value = review.copy(isBusy = true)
+        viewModelScope.launch {
+            val edits = ImportEdits(
+                title = review.title,
+                accentColor = review.accentColor,
+                rotationDegrees = review.rotationDegrees,
+                crop = review.crop,
+                selectedCodeIndices = review.selectedCodeIndices,
+            )
+            passRepository.commitDocumentImport(draft, edits)
+                .onSuccess { imported ->
+                    pendingImportDraft = null
+                    importReview.value = null
+                    message.value = strings.resolve(R.string.message_pass_imported)
+                    addCalendarEventsAfterImport(listOf(imported))
+                    highlightImported(listOf(imported.id))
+                }
+                .onFailure { error ->
+                    importReview.value = review.copy(isBusy = false)
+                    message.value = error.message ?: strings.resolve(R.string.message_operation_failed)
+                }
+        }
+    }
+
+    private fun discardPendingDraft() {
+        val draft = pendingImportDraft ?: return
+        pendingImportDraft = null
+        importReview.value = null
+        viewModelScope.launch { passRepository.discardDocumentImport(draft.id) }
     }
 
     private fun handlePassPresentationAction(action: AppAction): Boolean = when (action) {
@@ -602,6 +764,7 @@ class MainViewModel(
 
     private suspend fun save(action: AppAction.SavePass) {
         passRepository.update(action.id, action.draft.toPassUpdate())
+        passRepository.setNotes(action.id, action.draft.notes)
     }
 
     private fun handlePassMetadataAction(action: AppAction): Boolean = when (action) {
@@ -660,6 +823,16 @@ class MainViewModel(
         }
     }
 
+    private fun highlightImported(ids: List<String>) {
+        if (ids.isEmpty()) return
+        recentlyImportedIds.value = recentlyImportedIds.value + ids
+        recentlyImportedClearJob?.cancel()
+        recentlyImportedClearJob = viewModelScope.launch {
+            delay(RECENT_IMPORT_HIGHLIGHT_MILLIS)
+            recentlyImportedIds.value = emptySet()
+        }
+    }
+
     private fun withPass(id: String, action: (PassUiModel) -> Unit) {
         runCatching { action(uiState.value.passes.firstOrNull { it.id == id } ?: error("Pass not found")) }
             .onFailure { message.value = it.message ?: "Operation failed" }
@@ -675,6 +848,8 @@ class MainViewModel(
         }
     }
 }
+
+private const val RECENT_IMPORT_HIGHLIGHT_MILLIS = 2_600L
 
 private fun PassSortOrder.snapshotComparator(): Comparator<PassSnapshot> {
     val ascendingByDate = Comparator<PassSnapshot> { left, right ->
