@@ -83,6 +83,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
     var barcodeFormat by remember(pass?.id) { mutableStateOf(pass?.barcodeFormat) }
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
+    var notes by remember(pass?.id) { mutableStateOf(pass?.notes.orEmpty()) }
     var fields by remember(pass?.id) { mutableStateOf(pass?.fields.orEmpty()) }
     var calendarStart by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.from) }
     var calendarEnd by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.to) }
@@ -117,6 +118,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
         calendarStart = calendarStart?.toString().orEmpty(),
         calendarEnd = calendarEnd?.toString().orEmpty(),
         locations = locations,
+        notes = notes,
     )
 
     fun saveAndClose() {
@@ -169,6 +171,13 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                 EditorSection(stringResource(R.string.edit_pass_pass)) {
                     OutlinedTextField(description, { description = it }, label = { Text(stringResource(R.string.edit_pass_description)) }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(creator, { creator = it }, label = { Text(stringResource(R.string.edit_pass_creator)) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        notes,
+                        { notes = it },
+                        label = { Text(stringResource(R.string.pass_detail_note)) },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Box {
                         OutlinedButton(onClick = { typeMenuOpen = true }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.edit_pass_type_value, passType.displayName()))
@@ -324,6 +333,7 @@ private fun PassUiModel.toEditableDraft(): PassDraft = PassDraft(
             longitude = if (addressOnly) "" else it.longitude.toString(),
         )
     },
+    notes = notes,
 )
 
 internal enum class PassDraftIssue(@StringRes val messageRes: Int) {
