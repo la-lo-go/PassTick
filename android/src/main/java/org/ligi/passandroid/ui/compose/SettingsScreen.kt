@@ -607,14 +607,17 @@ private fun ReminderSettings(settings: AppSettings, onAction: (SettingsAction) -
                         stringResource(R.string.settings_exact_reminders),
                         settings.notificationExactTiming,
                         supportingText = stringResource(R.string.settings_use_exact_alarms_when_android_allows_them),
+                        enabled = settings.remindersEnabled,
                     ) { onAction(SettingsAction.SetNotificationExactTiming(it)) }
                 },
             )
             add(
                 settingsItem {
-                    SettingSwitch(stringResource(R.string.settings_notification_actions), settings.notificationActionsEnabled) {
-                        onAction(SettingsAction.SetNotificationActionsEnabled(it))
-                    }
+                    SettingSwitch(
+                        stringResource(R.string.settings_notification_actions),
+                        settings.notificationActionsEnabled,
+                        enabled = settings.remindersEnabled,
+                    ) { onAction(SettingsAction.SetNotificationActionsEnabled(it)) }
                 },
             )
         },
@@ -635,23 +638,22 @@ private fun ReminderSetting(
     settings: AppSettings,
     onAction: (SettingsAction) -> Unit,
 ) {
-    val toggle = { onAction(SettingsAction.SetReminderMinutes(settings.reminderMinutes.toggle(minutes))) }
+    val enabled = settings.remindersEnabled
+    val toggle = {
+        onAction(SettingsAction.SetReminderMinutes(settings.reminderMinutes.toggle(minutes)))
+    }
     ListItem(
         trailingContent = {
             Checkbox(
                 checked = minutes in settings.reminderMinutes,
-                enabled = settings.remindersEnabled,
                 onCheckedChange = { toggle() },
+                enabled = enabled,
             )
         },
-        modifier = Modifier.clickable(enabled = settings.remindersEnabled, onClick = toggle),
+        modifier = Modifier.clickable(enabled = enabled, onClick = toggle),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     ) {
-        Text(
-            label,
-            color = if (settings.remindersEnabled) Color.Unspecified
-            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-        )
+        Text(label, color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
     }
 }
 
@@ -716,14 +718,15 @@ private fun SettingSwitch(
     label: String,
     checked: Boolean,
     supportingText: String? = null,
+    enabled: Boolean = true,
     onChange: (Boolean) -> Unit,
 ) {
     ListItem(
         supportingContent = supportingText?.let { text -> { Text(text) } },
-        trailingContent = { Switch(checked, onChange) },
-        modifier = Modifier.clickable { onChange(!checked) },
+        trailingContent = { Switch(checked, onCheckedChange = onChange, enabled = enabled) },
+        modifier = Modifier.clickable(enabled = enabled) { onChange(!checked) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     ) {
-        Text(label)
+        Text(label, color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
     }
 }
