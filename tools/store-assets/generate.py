@@ -48,23 +48,31 @@ FRAMED_SIZE = (1080, 1920)
 THEME_TILE_ORDER = (
     "theme-coral",
     "theme-coral-light",
-    "theme-ocean",
+    "theme-ocean-light",
     "theme-violet",
     "theme-amber",
-    "theme-forest",
+    "theme-forest-light",
 )
 
 # Sources in listing order with their framed headline.
 CAPTIONS = (
-    ("home-today", "Every pass in one place"),
+    ("hero", "Every pass in one place"),
     ("timeline", "Every date on one timeline"),
-    ("pass-detail", "Show the code. Scan. Go."),
     ("export-image", "Export passes as images"),
     ("themes", "Material You. Any color."),
     ("settings-privacy", "Private by design"),
     ("edit-pass", "Edit every detail"),
-    ("tags", "Organize with colored tags"),
+    ("import-detail", "Import any PDF or photo\nand easily find the codes"),
 )
+
+HERO_DAY = "hero-day"
+HERO_NIGHT = "hero-night"
+
+DEVICE_LEFT = 145
+DEVICE_TOP = 300
+DEVICE_WIDTH = 790
+DEVICE_BEZEL = 18
+DEVICE_RADIUS = 80
 
 FONT_CANDIDATES = (
     "C:/Windows/Fonts/arialbd.ttf",
@@ -171,16 +179,17 @@ def gradient_background(size: tuple[int, int]) -> Image.Image:
 
 def wrap_headline(draw: ImageDraw.ImageDraw, text: str, font, max_width: int) -> list[str]:
     lines: list[str] = []
-    current = ""
-    for word in text.split():
-        candidate = f"{current} {word}".strip()
-        if not current or draw.textlength(candidate, font=font) <= max_width:
-            current = candidate
-        else:
+    for paragraph in text.split("\n"):
+        current = ""
+        for word in paragraph.split():
+            candidate = f"{current} {word}".strip()
+            if not current or draw.textlength(candidate, font=font) <= max_width:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        if current:
             lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
     return lines
 
 
@@ -192,23 +201,39 @@ def paste_rounded(canvas: Image.Image, image: Image.Image, position: tuple[int, 
     canvas.paste(image, position, mask)
 
 
-def draw_device_frame(canvas: Image.Image, screenshot: Image.Image) -> None:
-    left, top, right, bottom = 145, 300, 935, 1880
-    bezel = 18
-    outer_radius = 80
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).rounded_rectangle(
-        (left + 6, top + 18, right + 6, bottom + 18), radius=outer_radius, fill=(0, 0, 0, 120)
-    )
-    canvas.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(26)))
-
-    draw = ImageDraw.Draw(canvas)
-    draw.rounded_rectangle((left, top, right, bottom), radius=outer_radius, fill=FRAME_BEZEL, outline=FRAME_EDGE, width=3)
-
-    inner_width = right - left - 2 * bezel
+def device_frame(
+    screenshot: Image.Image,
+    width: int,
+    bezel: int = DEVICE_BEZEL,
+    radius: int = DEVICE_RADIUS,
+) -> Image.Image:
+    inner_width = width - 2 * bezel
     scaled = screenshot.resize((inner_width, round(screenshot.height * inner_width / screenshot.width)), Image.LANCZOS)
-    inner_top = top + bezel + (bottom - top - 2 * bezel - scaled.height) // 2
-    paste_rounded(canvas, scaled, (left + bezel, inner_top), radius=64)
+    frame = Image.new("RGBA", (width, scaled.height + 2 * bezel), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    draw.rounded_rectangle(
+        (0, 0, width - 1, frame.height - 1), radius=radius, fill=FRAME_BEZEL, outline=FRAME_EDGE, width=3
+    )
+    paste_rounded(frame, scaled, (bezel, bezel), radius=max(8, radius - bezel))
+    return frame
+
+
+def rotate_device(device: Image.Image, degrees: float) -> Image.Image:
+    if not degrees:
+        return device
+    return device.rotate(degrees, resample=Image.BICUBIC, expand=True)
+
+
+def paste_device(canvas: Image.Image, device: Image.Image, position: tuple[int, int], shadow: bool = True) -> None:
+    if shadow:
+        shadow_layer = Image.new("RGBA", device.size, (0, 0, 0, 0))
+        shadow_layer.paste(Image.new("RGBA", device.size, (0, 0, 0, 120)), (0, 0), device.getchannel("A"))
+        canvas.alpha_composite(shadow_layer.filter(ImageFilter.GaussianBlur(26)), (position[0] + 6, position[1] + 18))
+    canvas.alpha_composite(device, position)
+
+
+def draw_device_frame(canvas: Image.Image, screenshot: Image.Image) -> None:
+    paste_device(canvas, device_frame(screenshot, DEVICE_WIDTH), (DEVICE_LEFT, DEVICE_TOP), shadow=False)
 
 
 def framed_screenshot(screenshot: Image.Image, headline: str) -> Image.Image:
@@ -230,7 +255,7 @@ def draw_headline(canvas: Image.Image, headline: str, first_line_y: int) -> None
         font = load_bold_font(size)
         lines = wrap_headline(draw, headline, font, 880)
     for index, line in enumerate(lines):
-        draw.text((540, first_line_y - (len(lines) - 1) * 36 + index * 72), line, font=font, fill=WORDMARK_FILL, anchor="mm")
+        draw.text((540, first_line_y + index * 72), line, font=font, fill=WORDMARK_FILL, anchor="mm")
 
 
 def material_you_collage(headline: str, size: tuple[int, int]) -> Image.Image:
@@ -262,17 +287,47 @@ def material_you_collage(headline: str, size: tuple[int, int]) -> Image.Image:
     return canvas.convert("RGB")
 
 
+def hero_devices(day: Image.Image, night: Image.Image) -> list[tuple[Image.Image, int, int]]:
+    """Returns the angled light and dark devices with positions relative to the hero group top."""
+    return [
+        (rotate_device(device_frame(day, 580, bezel=16, radius=72), 13), 452, 0),
+        (rotate_device(device_frame(night, 600, bezel=16, radius=72), -9), -52, 230),
+    ]
+
+
+def hero_screenshot(headline: str, size: tuple[int, int]) -> Image.Image:
+    day_file = SCREENSHOTS / f"{HERO_DAY}.webp"
+    night_file = SCREENSHOTS / f"{HERO_NIGHT}.webp"
+    missing = [path for path in (day_file, night_file) if not path.is_file()]
+    if missing:
+        raise SystemExit("Missing hero captures: " + ", ".join(str(path) for path in missing))
+
+    canvas = gradient_background(size)
+    draw_headline(canvas, headline, first_line_y=150)
+    day = normalize_clean(Image.open(day_file).convert("RGB"))
+    night = normalize_clean(Image.open(night_file).convert("RGB"))
+    devices = hero_devices(day, night)
+    group_height = max(offset_y + device.height for device, _, offset_y in devices)
+    group_top = max(330, size[1] - 120 - group_height)
+    for device, x, offset_y in devices:
+        paste_device(canvas, device, (x, group_top + offset_y), shadow=False)
+    return canvas.convert("RGB")
+
+
 def write_sets(target_set: str) -> None:
     framed_directory = STORE_ASSETS / "framed"
     clean_directory = STORE_ASSETS / "clean"
     FASTLANE_SCREENSHOTS.mkdir(parents=True, exist_ok=True)
-    for directory in (framed_directory, clean_directory):
+    for directory in (framed_directory, clean_directory, FASTLANE_SCREENSHOTS):
         directory.mkdir(parents=True, exist_ok=True)
         for stale in directory.glob("*.png"):
             stale.unlink()
 
     for index, (name, headline) in enumerate(CAPTIONS, start=1):
-        if name == "themes":
+        if name == "hero":
+            framed = hero_screenshot(headline, FRAMED_SIZE)
+            clean = hero_screenshot(headline, CLEAN_SIZE)
+        elif name == "themes":
             framed = material_you_collage(headline, FRAMED_SIZE)
             clean = material_you_collage(headline, CLEAN_SIZE)
         else:

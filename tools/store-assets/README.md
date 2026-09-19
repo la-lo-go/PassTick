@@ -4,7 +4,7 @@ The store listing uses two screenshot sets. The framed set has a navy background
 
 ## Capture the screens
 
-The instrumented test `StoreScreenshotTest` renders the showcase passes on a device and writes eight PNG files to the app external files directory. Set up and run it with:
+The instrumented test `StoreScreenshotTest` renders the showcase state on a device and writes thirteen PNG files to the app external files directory. The captures include the light pass detail and the dark home for the first listing image, the imported boarding-pass detail, and six Material You theme tiles. Set up and run it with:
 
 ```powershell
 ./tools/store-assets/Capture-Screenshots.ps1
@@ -20,5 +20,7 @@ python tools/store-assets/generate.py --set clean  # clean set into fastlane
 ```
 
 The generator imports new captures from `build/screenshots-raw` into `docs/assets/screenshots` as WebP sources, renders the icon and the feature graphic, and writes both sets to `build/store-assets`. The selected set goes to `fastlane/metadata/android/en-US/images/phoneScreenshots` for Play and F-Droid.
+
+The first listing image combines the light pass detail and the dark home captures in a fixed angled composition.
 
 Edit the `CAPTIONS` table in `generate.py` to change the listing order or the headlines.

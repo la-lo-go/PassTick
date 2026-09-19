@@ -3,6 +3,8 @@
 .kotlin
 build
 .idea
+__pycache__
+*.pyc
 #assets
 bin
 gen
