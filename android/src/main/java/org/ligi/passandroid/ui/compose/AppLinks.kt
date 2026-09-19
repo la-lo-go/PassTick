@@ -1,6 +1,7 @@
 package org.ligi.passandroid.ui.compose
 
 import android.net.Uri
+import org.ligi.passandroid.BuildConfig
 
 internal const val PROJECT_REPOSITORY_URL = "https://github.com/la-lo-go/PassTick"
 internal const val PRIVACY_POLICY_URL = "https://github.com/la-lo-go/PassTick/blob/main/privacy_policy.txt"
@@ -17,7 +18,7 @@ private val BUG_REPORT_TEMPLATE = """
     ### What I expected
 
     ### Device details
-    - PassTick version:
+    - PassTick version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})
     - Android version:
 """.trimIndent()
 

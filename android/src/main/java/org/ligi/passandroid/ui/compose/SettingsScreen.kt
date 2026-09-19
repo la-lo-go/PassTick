@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -87,6 +88,7 @@ import org.ligi.passandroid.ui.theme.accentSeedColors
 import org.ligi.passandroid.ui.theme.brandAccentColor
 import org.ligi.passandroid.ui.theme.generateAccentColorScheme
 import androidx.compose.ui.res.stringResource
+import org.ligi.passandroid.BuildConfig
 import org.ligi.passandroid.R
 
 @Composable
@@ -461,6 +463,14 @@ private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
     SettingsGroup(
         title = stringResource(R.string.settings_about),
         entries = listOf(
+            settingsItem {
+                ListItem(
+                    leadingContent = { Icon(Icons.Default.Info, null) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                ) {
+                    Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+                }
+            },
             settingsItem {
                 PassListSetting(Icons.Default.PrivacyTip, "Privacy policy") {
                     onAction(SettingsAction.OpenPrivacyPolicy)

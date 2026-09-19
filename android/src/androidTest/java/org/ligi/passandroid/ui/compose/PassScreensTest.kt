@@ -29,12 +29,14 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import org.junit.Rule
 import org.junit.Test
+import org.ligi.passandroid.BuildConfig
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.defaultPassCategories
@@ -225,8 +227,19 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = {}) }
         }
 
-        composeRule.onNodeWithTag("settings_list").performScrollToIndex(6)
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Report a bug"))
         composeRule.onNodeWithText("Report a bug").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsAboutShowsAppVersion() {
+        val versionLabel = "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = {}) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText(versionLabel))
+        composeRule.onNodeWithText(versionLabel).assertIsDisplayed()
     }
 
     @Test
@@ -236,7 +249,7 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
         }
 
-        composeRule.onNodeWithTag("settings_list").performScrollToIndex(6)
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Report a bug"))
         composeRule.onNodeWithText("Report a bug").performClick()
         composeRule.onNodeWithText("GitHub issue").assertIsDisplayed().performClick()
 
