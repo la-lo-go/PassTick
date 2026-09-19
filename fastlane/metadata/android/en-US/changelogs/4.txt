@@ -1,0 +1,3 @@
+- Import passes from photos and PDF files, with a review step before they are added.
+- Edit pass notes in the pass editor. Notes are part of search and image export.
+- Reminder options are now disabled while reminders are off.
