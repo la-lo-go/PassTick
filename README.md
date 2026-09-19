@@ -8,14 +8,14 @@ This repository is an independent modernization of the original [PassAndroid pro
 
 <table width="100%">
   <tr>
-    <td width="33%" align="center"><img src="docs/assets/screenshots/hero-night.webp" width="240" alt="Home screen with the Today section, pinned passes, and tags"><br><strong>Today, pinned and tagged passes on one screen</strong></td>
-    <td width="33%" align="center"><img src="docs/assets/screenshots/hero-day.webp" width="240" alt="Pass detail with artwork, fields, and a QR code"><br><strong>Every pass detail, with its code ready to scan</strong></td>
-    <td width="33%" align="center"><img src="docs/assets/screenshots/import-detail.webp" width="240" alt="A PDF boarding pass imported with every detected code ready to scan"><br><strong>Any PDF or photo becomes a pass with all codes found</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/hero-night.webp" width="240" alt="Home screen with the Today section, pinned passes, and tags"><br><strong>Home and tags</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/hero-day.webp" width="240" alt="Pass detail with artwork, fields, and a QR code"><br><strong>Pass details</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/import-detail.webp" width="240" alt="A PDF boarding pass imported with every detected code ready to scan"><br><strong>PDF and photo import</strong></td>
   </tr>
   <tr>
-    <td width="33%" align="center"><img src="docs/assets/screenshots/timeline.webp" width="240" alt="Calendar timeline with the today event selected and upcoming events marked"><br><strong>One timeline for every event date and time zone</strong></td>
-    <td width="33%" align="center"><img src="docs/assets/screenshots/export-image.webp" width="240" alt="Export a pass as an image with aspect ratio and content options"><br><strong>Export a pass, its code, or a selection as an image</strong></td>
-    <td width="33%" align="center"><img src="docs/assets/screenshots/edit-pass.webp" width="240" alt="Edit every field of a local pass"><br><strong>Create and edit local passes, field by field</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/timeline.webp" width="240" alt="Calendar timeline with the today event selected and upcoming events marked"><br><strong>Timeline and calendar</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/export-image.webp" width="240" alt="Export a pass as an image with aspect ratio and content options"><br><strong>Image export</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/edit-pass.webp" width="240" alt="Edit every field of a local pass"><br><strong>Pass editor</strong></td>
   </tr>
 </table>
 
