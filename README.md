@@ -10,8 +10,8 @@ This repository is an independent modernization of the original [PassAndroid pro
 
 <table width="100%">
   <tr>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/home-today.webp" width="100%" alt="PassTick home screen with the Today section and passes tagged Travel and Work"></td>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/pass-detail.webp" width="100%" alt="A train pass with travel artwork and a QR code"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/hero-night.webp" width="100%" alt="PassTick home screen with the Today section and tagged passes"></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/hero-day.webp" width="100%" alt="A light pass detail with artwork, fields, and a QR code"></td>
   </tr>
   <tr>
     <td width="50%" align="center"><strong>Today</strong></td>
