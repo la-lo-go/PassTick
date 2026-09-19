@@ -2,124 +2,81 @@
   <img src="docs/assets/passtick-wordmark.svg" width="390" alt="PassTick">
 </p>
 
-PassTick is a modern, private and offline-first wallet for Apple Wallet passes on Android.
+PassTick is a private, offline-first wallet for Apple Wallet passes on Android. It keeps boarding passes, tickets, and loyalty cards in one place, and turns any PDF or photo into a scannable pass.
 
 This repository is an independent modernization of the original [PassAndroid project](https://github.com/ligi/PassAndroid) by ligi and its contributors. It preserves the complete project history, original copyright, and GNU GPL version 3 license.
 
-## PassTick in use
-
 <table width="100%">
   <tr>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/hero-night.webp" width="100%" alt="PassTick home screen with the Today section and tagged passes"></td>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/hero-day.webp" width="100%" alt="A light pass detail with artwork, fields, and a QR code"></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/hero-night.webp" width="240" alt="Home screen with the Today section, pinned passes, and tags"><br><strong>Today, pinned and tagged passes on one screen</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/hero-day.webp" width="240" alt="Pass detail with artwork, fields, and a QR code"><br><strong>Every pass detail, with its code ready to scan</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/import-detail.webp" width="240" alt="A PDF boarding pass imported with every detected code ready to scan"><br><strong>Any PDF or photo becomes a pass with all codes found</strong></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><strong>Today</strong></td>
-    <td width="50%" align="center"><strong>Pass details</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/timeline.webp" width="240" alt="Calendar timeline with the today event selected and upcoming events marked"><br><strong>One timeline for every event date and time zone</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/export-image.webp" width="240" alt="Export a pass as an image with aspect ratio and content options"><br><strong>Export a pass, its code, or a selection as an image</strong></td>
+    <td width="33%" align="center"><img src="docs/assets/screenshots/edit-pass.webp" width="240" alt="Edit every field of a local pass"><br><strong>Create and edit local passes, field by field</strong></td>
   </tr>
 </table>
 
-<table width="100%">
-  <tr>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/timeline.webp" width="100%" alt="Calendar timeline with the today event selected and upcoming event days marked"></td>
-    <td width="50%" align="center"><img src="docs/assets/screenshots/export-image.webp" width="100%" alt="Export a pass as an image with aspect ratio and content options"></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center"><strong>Timeline</strong></td>
-    <td width="50%" align="center"><strong>Image export</strong></td>
-  </tr>
-</table>
+## Highlights
 
+- **Turn any PDF or photo into a pass.** Pick a PDF, an image, or use the camera. PassTick finds every barcode on every page and suggests a name and color from the document.
+- **One document, many codes.** QR, Aztec, PDF417, Data Matrix, Code 39/128, ITF, EAN-8/13. Codes are detected on up to 40 PDF pages, in any orientation, and on inverted colors.
+- **Works with what you already have.** `.pkpass`, `.esPass`, images, PDFs, share sheet, "open with", and multi-file import.
+- **Everything stays on your device.** No account, no analytics, no network services.
+- **Material You, your way.** Dynamic color from your wallpaper, light and dark themes, and an AMOLED black background.
+- **One time model for everything.** The Today section, timeline, calendar, and reminders come from the same time-zone-aware events.
 
 ## Features
 
-### Pass files
+### Import and capture
 
-- Import Apple Wallet (`.pkpass`) and esPass (`.esPass`) files from Android document providers or compatible applications.
-- Import images and PDF files as local passes.
-- Import several files in one operation.
-- Create and edit local passes.
-- Store all pass data in app-private storage.
-- Read common pass fields, dates, locations, images, colors, and barcode formats.
-- Keep compatibility with the original PassAndroid pass data.
-
-### Pass display
-
-- Show passes with a Jetpack Compose and Material 3 interface.
-- Display QR codes, Aztec codes, PDF417 codes, and supported one-dimensional barcodes.
-- Open the code directly from a pass, widget, deep link, or notification.
-- Increase screen brightness when a code is open.
-- Control the device flashlight from the code view.
-- Open pass locations with an installed map application.
-- Select another embedded pass image when more than one suitable image is available.
-- Choose which sections appear in the full pass view.
-- Change the order of full pass sections.
+- Open or share `.pkpass` and `.esPass` files, or import several files in one operation.
+- Add PDFs, screenshots, and photos as passes, or capture a pass with the camera.
+- Detect every barcode in a document automatically: across PDF pages, in four rotations, and with inverted colors.
+- Review before saving: suggested title and accent color, rotate, crop, and select the codes to keep.
+- Read the original PDF page by page inside the pass, with zoom.
 
 ### Home and organization
 
-- Search passes by their visible data.
-- Sort passes by newest, oldest, event date, or manual order.
-- Reorder passes manually with drag and drop.
-- Show passes for today before pinned passes.
-- Pin passes to the top of the home screen.
-- Archive and restore passes.
-- Move deleted passes to Trash and undo the action.
-- Permanently delete a pass only after confirmation.
-- Create, edit, reorder, and delete tags with custom names, colors, and icons.
-- Assign several tags to one pass.
-- Filter the home screen by tags, pinned passes, archived passes, protected passes, or all passes.
-- Customize the content and order of home cards.
+- Show passes for today, pinned passes, and recent imports on the home screen.
+- Search, sort by newest, oldest, event date, or manual order, and reorder with drag and drop.
+- Create tags with custom names, colors, and icons, and filter by tag, pinned, archived, protected, or all passes.
+- Archive passes, move deleted passes to Trash with undo, and delete permanently only after confirmation.
+- Choose which sections appear on home cards and in the pass view, and their order.
 
-### Timeline and calendar
+### Codes and actions
 
-- Build the Today section, timeline, calendar data, and reminders from the same time-zone-aware event model.
-- Show upcoming and active events in chronological order.
-- Open a pass from its timeline event.
-- Add dated passes to a writable Android calendar.
-- Detect when the event already exists in the calendar.
-- Optionally offer calendar insertion after import.
+- Show all supported barcode formats, and swipe between several codes on one pass.
+- Open the code from the pass, the widget, a deep link, or a notification, with increased brightness and an optional flashlight.
+- Open pass locations in an installed map app.
+- Add an event to a writable calendar and detect when it is already there.
 
-### Contextual reminders
+### Timeline and reminders
 
-- Send reminders before an event, during its access period, and while it is active.
-- Update one notification as the event changes phase.
-- Remove the notification when the event ends.
-- Set global reminder times.
-- Disable reminders for one pass, use the defaults, set a custom lead time, or notify at the event time.
-- Use exact alarms when Android grants special access and use an inexact alarm otherwise.
-- Restore scheduled reminders after a restart, app replacement, time change, or time-zone change.
-- Open the pass or its code from a notification.
-- Show a Directions action when the pass has a location.
-- Show a Snooze action when snoozing is enabled.
-- Configure notification actions globally and for each pass.
-- Limit sensitive lock-screen content for protected passes.
+- Build the Today section, timeline, calendar, and reminders from one time-zone-aware event model.
+- Send reminders before, during, and after an event, with global defaults or a per-pass lead time and exact-at-event option.
+- Use notification actions to open the pass, open the code, get directions, or snooze.
 
-### Privacy and protection
+### Appearance
 
-- Protect one pass or lock all passes with the device credential or supported biometric authentication.
-- Keep protected passes in a separate home section.
-- Blur protected home cards.
-- Show or hide the lock indicator for protected passes.
-- Block screenshots and screen recording while protected content is visible.
-- Hide sensitive pass details in public lock-screen notifications.
-- Process passes locally without analytics or network-dependent pass services.
+- Use Material You dynamic color, or pick a manual accent color and color style.
+- Switch between light, dark, and system themes, with an optional AMOLED black background.
+- Use a responsive list-detail layout on larger displays.
+
+### Privacy
+
+- Process every pass locally. There is no account, no analytics, and no network-dependent pass service.
+- Keep pass data and imported documents in app-private storage, and use `content://` URIs and the Storage Access Framework at the app boundaries.
+- Protect passes with the device credential or biometrics, and optionally blur protected cards and block screenshots.
+- Hide sensitive details in lock-screen notifications.
 
 ### Export and sharing
 
-- Export and share the original pass file.
-- Export a complete pass, its code, or a custom selection as an image.
-- Share exported images through Android.
+- Share the original pass file.
+- Export a pass, its code, or a custom selection as an image.
 - Print a pass with the Android print framework.
-- Use `content://` URIs and the Storage Access Framework at app boundaries.
-
-### Appearance and system integration
-
-- Use light, dark, or system theme mode.
-- Use an optional AMOLED black background.
-- Apply the saved theme during a cold start.
-- Use automatic screen brightness behavior where applicable.
-- Provide a home-screen widget for quick pass access.
-- Use a responsive list-detail layout on larger displays.
 
 ## Technical design
 
