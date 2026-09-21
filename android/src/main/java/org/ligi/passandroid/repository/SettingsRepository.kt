@@ -175,6 +175,8 @@ data class AppSettings(
     val blockScreenshots: Boolean = false,
     val trashEnabled: Boolean = true,
     val imageExportOptions: PassImageExportOptions = PassImageExportOptions(),
+    /** The pass pinned to the code widget and the Quick Settings tile. Null means automatic. */
+    val codePassId: String? = null,
 ) {
     val notificationPolicySettings: NotificationPolicySettings get() = NotificationPolicySettings(
         accessWindowMinutes = notificationAccessWindowMinutes,
@@ -223,6 +225,7 @@ interface SettingsRepository {
     suspend fun setBlockScreenshots(value: Boolean)
     suspend fun setTrashEnabled(value: Boolean)
     suspend fun setImageExportOptions(value: PassImageExportOptions)
+    suspend fun setCodePassId(value: String?)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
@@ -296,6 +299,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 } ?: PassImageOrientation.PORTRAIT,
                 content = decodePassImageContent(preferences[IMAGE_EXPORT_CONTENT]),
             ),
+            codePassId = preferences[CODE_PASS_ID],
         )
     }
 
@@ -468,6 +472,16 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         }
     }
 
+    override suspend fun setCodePassId(value: String?) {
+        context.settingsDataStore.edit { preferences ->
+            if (value == null) {
+                preferences.remove(CODE_PASS_ID)
+            } else {
+                preferences[CODE_PASS_ID] = value
+            }
+        }
+    }
+
     private suspend fun <T> update(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
         context.settingsDataStore.edit { it[key] = value }
     }
@@ -512,6 +526,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val IMAGE_EXPORT_ASPECT_RATIO = stringPreferencesKey("image_export_aspect_ratio")
         val IMAGE_EXPORT_ORIENTATION = stringPreferencesKey("image_export_orientation")
         val IMAGE_EXPORT_CONTENT = stringSetPreferencesKey("image_export_content")
+        val CODE_PASS_ID = stringPreferencesKey("code_pass_id")
     }
 }
 

@@ -47,6 +47,8 @@ import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.reminder.buildPassReminders
 import org.ligi.passandroid.reminder.PassReminderOverride
 import org.ligi.passandroid.widget.WidgetSnapshotPublisher
+import org.ligi.passandroid.widget.WidgetRefresher
+import org.ligi.passandroid.shortcuts.ShortcutsPublisher
 
 class MainViewModel(
     private val passRepository: PassRepository,
@@ -54,6 +56,8 @@ class MainViewModel(
     private val platformActions: PlatformActions,
     private val reminderScheduler: ReminderScheduler = ReminderScheduler.None,
     private val widgetPublisher: WidgetSnapshotPublisher? = null,
+    private val shortcutsPublisher: ShortcutsPublisher? = null,
+    private val widgetRefresher: WidgetRefresher? = null,
     private val strings: StringResolver = StringResolver { _, _ -> "" },
 ) : ViewModel() {
     private var reminderActionOverrides: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>>? = null
@@ -114,6 +118,7 @@ class MainViewModel(
             },
             timeline = timeline,
             systemAccentColor = systemAccentColor,
+            codePassPickerRows = codePassPickerRows(collections.passes, settings),
         )
     }.combine(importReview) { currentState, review ->
         currentState.copy(importReview = review)
@@ -169,6 +174,18 @@ class MainViewModel(
                             currentPasses.filterNot(PassSnapshot::isTrashed),
                             widgetExcludedIds,
                             settings.lockAllPasses,
+                            settings.homeCardSectionOrder,
+                            settings.hiddenHomeCardSections,
+                            settings.categories,
+                        )
+                    }
+                    runCatching {
+                        shortcutsPublisher?.publish(
+                            currentPasses.filterNot(PassSnapshot::isTrashed),
+                            settings.lockAllPasses,
+                            settings.homeCardSectionOrder,
+                            settings.hiddenHomeCardSections,
+                            settings.categories,
                         )
                     }
                 }
@@ -190,6 +207,7 @@ class MainViewModel(
         if (handlePassMutationAction(action)) return
         if (handleCategoryAction(action)) return
         if (handleHomeAction(action)) return
+        if (handleCodeSettingsAction(action)) return
         if (handleAppearanceSettingsAction(action)) return
         if (handlePassListSettingsAction(action)) return
         if (handlePrivacySettingsAction(action)) return
@@ -568,6 +586,23 @@ class MainViewModel(
         else -> false
     }
 
+    private fun handleCodeSettingsAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetAutomaticBrightness -> {
+            viewModelScope.launch {
+                settingsRepository.setAutomaticBrightness(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodePassId -> {
+            viewModelScope.launch {
+                settingsRepository.setCodePassId(action.value)
+                runCatching { widgetRefresher?.refresh() }
+            }
+            true
+        }
+        else -> false
+    }
+
     private fun handleAppearanceSettingsAction(action: AppAction): Boolean = when (action) {
         is AppAction.SetTheme -> {
             viewModelScope.launch { settingsRepository.setThemeMode(action.value) }
@@ -599,12 +634,6 @@ class MainViewModel(
         is AppAction.SetColorStyle -> {
             viewModelScope.launch {
                 settingsRepository.setColorStyle(action.value)
-            }
-            true
-        }
-        is AppAction.SetAutomaticBrightness -> {
-            viewModelScope.launch {
-                settingsRepository.setAutomaticBrightness(action.value)
             }
             true
         }

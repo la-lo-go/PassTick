@@ -1,5 +1,7 @@
 package org.ligi.passandroid.widget
 
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassType
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -7,10 +9,17 @@ import java.time.ZoneId
 data class WidgetPass(
     val id: String,
     val title: String,
+    /** First visible line of the home card layout. Null in snapshots written before this field. */
+    val primaryLine: String? = null,
+    val issuer: String?,
+    val type: PassType,
+    val isPinned: Boolean,
     val startsAtEpochMillis: Long?,
     val endsAtEpochMillis: Long?,
     val location: String?,
     val supportingText: String?,
+    val barcodeFormat: PassBarCodeFormat?,
+    val barcodeMessage: String?,
 )
 
 data class PassWidgetSnapshot(

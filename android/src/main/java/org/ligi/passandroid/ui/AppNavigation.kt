@@ -44,6 +44,7 @@ import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.ImportReviewScreen
 import org.ligi.passandroid.ui.compose.LicensesScreen
+import org.ligi.passandroid.ui.compose.PassCodePickerScreen
 import org.ligi.passandroid.ui.compose.PassCustomizationScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
@@ -62,6 +63,7 @@ import org.ligi.passandroid.ui.state.EditPassAction
 import org.ligi.passandroid.ui.state.HomeCardLayoutSettingsAction
 import org.ligi.passandroid.ui.state.MainUiState
 import org.ligi.passandroid.ui.state.MainViewModel
+import org.ligi.passandroid.ui.state.resolvePassCardTitle
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.PassDetailAction
@@ -351,6 +353,16 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
             entry<AppDestination.Settings> {
                 SettingsScreen(
                     settings = state.settings,
+                    codePassLabel = state.settings.codePassId?.let { id ->
+                        state.passes.firstOrNull { it.id == id }?.let { pass ->
+                            resolvePassCardTitle(
+                                pass,
+                                state.settings.homeCardSectionOrder,
+                                state.settings.hiddenHomeCardSections,
+                                state.settings.categories,
+                            )
+                        }
+                    },
                     systemAccentColor = state.systemAccentColor,
                     scrollToNotifications = dependencies.scrollSettingsToNotifications,
                     onNotificationScrollConsumed = { dependencies.onSettingsScrollConsumed() },
@@ -406,6 +418,13 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     }
                 }
             }
+            entry<AppDestination.PassCodeSettings> {
+                PassCodePickerScreen(
+                    rows = state.codePassPickerRows,
+                    onPick = { dependencies.viewModel.onAction(AppAction.SetCodePassId(it)) },
+                    onBack = { dependencies.onBack() },
+                )
+            }
             entry<AppDestination.Licenses> {
                 LicensesScreen(onBack = { dependencies.onBack() })
             }
@@ -439,6 +458,10 @@ private fun handleNavigationSettingsAction(
     }
     SettingsAction.OpenHomeCardSettings -> {
         dependencies.backStack.add(AppDestination.HomeCardLayoutSettings)
+        true
+    }
+    SettingsAction.OpenPassCodeSettings -> {
+        dependencies.backStack.add(AppDestination.PassCodeSettings)
         true
     }
     SettingsAction.OpenPrivacyPolicy -> {

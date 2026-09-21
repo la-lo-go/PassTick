@@ -60,6 +60,7 @@ class DataStoreSettingsRepositoryTest {
                 content = PassImageContent(artwork = false, barcode = false),
             )
             repository.setImageExportOptions(imageExportOptions)
+            repository.setCodePassId("pass-1")
 
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
@@ -79,6 +80,7 @@ class DataStoreSettingsRepositoryTest {
                     it.blurProtectedPassCards && it.separateProtectedPasses && it.blockScreenshots &&
                     !it.trashEnabled &&
                     it.imageExportOptions == imageExportOptions &&
+                    it.codePassId == "pass-1" &&
                     it.passDetailSectionOrder == listOf(
                         PassDetailSection.BARCODE,
                         PassDetailSection.ARTWORK,
@@ -128,6 +130,7 @@ class DataStoreSettingsRepositoryTest {
                     blockScreenshots = true,
                     trashEnabled = false,
                     imageExportOptions = imageExportOptions,
+                    codePassId = "pass-1",
                 ),
             )
         }
@@ -187,6 +190,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setBlockScreenshots(false)
             repository.setTrashEnabled(true)
             repository.setImageExportOptions(PassImageExportOptions())
+            repository.setCodePassId(null)
         }
     }
 }

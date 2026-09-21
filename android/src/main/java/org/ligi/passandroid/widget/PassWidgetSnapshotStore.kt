@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassType
 import java.io.File
 import java.io.OutputStreamWriter
 
@@ -44,10 +46,16 @@ class PassWidgetSnapshotStore(
                 put(JSONObject().apply {
                     put("id", pass.id)
                     put("title", pass.title)
+                    put("primaryLine", pass.primaryLine)
+                    put("issuer", pass.issuer)
+                    put("type", pass.type.name)
+                    put("isPinned", pass.isPinned)
                     put("startsAt", pass.startsAtEpochMillis)
                     put("endsAt", pass.endsAtEpochMillis)
                     put("location", pass.location)
                     put("supportingText", pass.supportingText)
+                    put("barcodeFormat", pass.barcodeFormat?.name)
+                    put("barcodeMessage", pass.barcodeMessage)
                 })
             }
         })
@@ -64,10 +72,16 @@ class PassWidgetSnapshotStore(
                     WidgetPass(
                         id = id,
                         title = pass.optString("title").ifBlank { "Pass" },
+                        primaryLine = pass.optionalString("primaryLine"),
+                        issuer = pass.optionalString("issuer"),
+                        type = pass.optionalEnum("type", PassType.GENERIC),
+                        isPinned = pass.optBoolean("isPinned"),
                         startsAtEpochMillis = pass.optionalLong("startsAt"),
                         endsAtEpochMillis = pass.optionalLong("endsAt"),
                         location = pass.optionalString("location"),
                         supportingText = pass.optionalString("supportingText"),
+                        barcodeFormat = pass.optionalEnumOrNull<PassBarCodeFormat>("barcodeFormat"),
+                        barcodeMessage = pass.optionalString("barcodeMessage"),
                     ),
                 )
             }
@@ -84,8 +98,14 @@ class PassWidgetSnapshotStore(
     private fun JSONObject.optionalLong(key: String): Long? =
         takeUnless { isNull(key) }?.optLong(key)
 
+    private inline fun <reified T : Enum<T>> JSONObject.optionalEnum(key: String, default: T): T =
+        optionalEnumOrNull<T>(key) ?: default
+
+    private inline fun <reified T : Enum<T>> JSONObject.optionalEnumOrNull(key: String): T? =
+        optionalString(key)?.let { value -> runCatching { enumValueOf<T>(value) }.getOrNull() }
+
     private companion object {
         const val FILE_NAME = "pass-widget-snapshot-v1.json"
-        const val FORMAT_VERSION = 2
+        const val FORMAT_VERSION = 3
     }
 }

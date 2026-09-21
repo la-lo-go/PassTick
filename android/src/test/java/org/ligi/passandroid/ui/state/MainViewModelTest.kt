@@ -207,7 +207,7 @@ class MainViewModelTest {
             repository,
             FakeSettingsRepository(),
             FakePlatformActions(),
-            widgetPublisher = { passes, _, _ -> published += passes },
+            widgetPublisher = { passes, _, _, _, _, _ -> published += passes },
         )
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
         advanceUntilIdle()
@@ -792,6 +792,9 @@ private class FakeSettingsRepository : SettingsRepository {
     }
     override suspend fun setImageExportOptions(value: PassImageExportOptions) {
         settings.value = settings.value.copy(imageExportOptions = value)
+    }
+    override suspend fun setCodePassId(value: String?) {
+        settings.value = settings.value.copy(codePassId = value)
     }
 }
 

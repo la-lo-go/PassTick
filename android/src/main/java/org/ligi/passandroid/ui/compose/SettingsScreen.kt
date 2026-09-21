@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -109,6 +110,7 @@ internal fun ReminderChoice(label: String, selected: Boolean, enabled: Boolean =
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
+    codePassLabel: String? = null,
     systemAccentColor: Long? = null,
     scrollToNotifications: Boolean = false,
     onNotificationScrollConsumed: () -> Unit = {},
@@ -132,7 +134,7 @@ fun SettingsScreen(
                 item { AppearanceSettings(settings, systemAccentColor, onAction) }
                 item { HomeSettings(settings, onAction) }
                 item { PassListSettings(onAction) }
-                item { CodeSettings(settings, onAction) }
+                item { CodeSettings(settings, codePassLabel, onAction) }
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
                 item { ReminderSettings(settings, onAction) }
@@ -353,7 +355,7 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
 }
 
 @Composable
-private fun CodeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+private fun CodeSettings(settings: AppSettings, codePassLabel: String?, onAction: (SettingsAction) -> Unit) {
     SettingsGroup(
         title = stringResource(R.string.settings_pass_codes),
         entries = listOf(
@@ -363,6 +365,14 @@ private fun CodeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
                     settings.automaticBrightness,
                     supportingText = stringResource(R.string.settings_use_max_brightness_for_codes_support),
                 ) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
+            },
+            settingsItem {
+                PassListSetting(
+                    icon = Icons.Default.QrCode,
+                    title = stringResource(R.string.settings_pass_code_source),
+                    supportingText = codePassLabel
+                        ?: stringResource(R.string.code_widget_automatic_subtitle),
+                ) { onAction(SettingsAction.OpenPassCodeSettings) }
             },
         ),
     )
@@ -396,10 +406,15 @@ private fun PassListSettings(onAction: (SettingsAction) -> Unit) {
 private fun PassListSetting(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
+    supportingText: String? = null,
     onClick: () -> Unit,
 ) {
+    val supporting: (@Composable () -> Unit)? = supportingText
+        ?.takeIf(String::isNotBlank)
+        ?.let { text -> { Text(text) } }
     ListItem(
         leadingContent = { Icon(icon, null) },
+        supportingContent = supporting,
         modifier = Modifier.clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     ) { Text(title) }
