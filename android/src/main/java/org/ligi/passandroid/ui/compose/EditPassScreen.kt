@@ -1,6 +1,9 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,7 +65,10 @@ import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.navigation.PassDateField
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.repository.PassArtworkKind
 import org.ligi.passandroid.ui.state.EditPassAction
+import org.ligi.passandroid.ui.state.PassArtworkDraft
+import org.ligi.passandroid.ui.state.PassArtworkUiModel
 import org.ligi.passandroid.ui.state.PassDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
@@ -79,11 +85,20 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
     var description by remember(pass?.id) { mutableStateOf(pass?.description.orEmpty()) }
     var creator by remember(pass?.id) { mutableStateOf(pass?.creator.orEmpty()) }
     var passType by remember(pass?.id) { mutableStateOf(pass?.type ?: PassType.EVENT) }
-    var accentColor by remember(pass?.id) { mutableIntStateOf(pass?.accentColor ?: 0xFF3D73E9.toInt()) }
+    var accentColor by remember(pass?.id) { mutableIntStateOf(pass?.accentColor ?: DEFAULT_PASS_ACCENT_COLOR) }
     var barcodeFormat by remember(pass?.id) { mutableStateOf(pass?.barcodeFormat) }
     var barcodeMessage by remember(pass?.id) { mutableStateOf(pass?.barcodeMessage.orEmpty()) }
     var alternativeText by remember(pass?.id) { mutableStateOf(pass?.barcodeAlternativeText.orEmpty()) }
     var notes by remember(pass?.id) { mutableStateOf(pass?.notes.orEmpty()) }
+    var artworkUpdates by remember(pass?.id) { mutableStateOf<List<PassArtworkDraft>>(emptyList()) }
+    var pendingArtworkKind by remember { mutableStateOf<PassArtworkKind?>(null) }
+    val artworkPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val kind = pendingArtworkKind
+        pendingArtworkKind = null
+        if (uri != null && kind != null) {
+            artworkUpdates = artworkUpdates.filterNot { it.kind == kind } + PassArtworkDraft(kind, uri)
+        }
+    }
     var fields by remember(pass?.id) { mutableStateOf(pass?.fields.orEmpty()) }
     var calendarStart by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.from) }
     var calendarEnd by remember(pass?.id) { mutableStateOf(pass?.calendarTimeSpan?.to) }
@@ -119,6 +134,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
         calendarEnd = calendarEnd?.toString().orEmpty(),
         locations = locations,
         notes = notes,
+        artworkUpdates = artworkUpdates,
     )
 
     fun saveAndClose() {
@@ -126,7 +142,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
         val issue = validatePassDraft(draft)
         if (issue == null) {
             val initialDraft = pass?.toEditableDraft()
-            if (draft == initialDraft) {
+            if (initialDraft != null && draft == initialDraft) {
                 onAction(EditPassAction.Back)
             } else {
                 onAction(EditPassAction.Save(draft))
@@ -144,7 +160,13 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.pass_detail_edit_pass)) },
+                title = {
+                    Text(
+                        stringResource(
+                            if (pass == null) R.string.edit_pass_new_pass else R.string.pass_detail_edit_pass,
+                        ),
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = ::saveAndClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.edit_pass_save_and_go_back)) }
                 },
@@ -306,7 +328,25 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                 }
             }
             item {
-                Button(onClick = ::saveAndClose, enabled = pass != null, modifier = Modifier.fillMaxWidth()) {
+                EditorSection(stringResource(R.string.edit_pass_images), initiallyExpanded = false) {
+                    PassArtworkKind.entries.forEach { kind ->
+                        ArtworkEditorRow(
+                            kind = kind,
+                            artwork = pass?.artwork?.firstOrNull { it.kind == kind },
+                            replacementPending = artworkUpdates.any { it.kind == kind },
+                            accentColor = accentColor,
+                            onReplace = {
+                                pendingArtworkKind = kind
+                                artworkPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+            item {
+                Button(onClick = ::saveAndClose, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.edit_pass_save_and_close))
                 }
             }
@@ -335,6 +375,50 @@ private fun PassUiModel.toEditableDraft(): PassDraft = PassDraft(
     },
     notes = notes,
 )
+
+private val DEFAULT_PASS_ACCENT_COLOR = 0xFF3D73E9.toInt()
+
+@Composable
+private fun ArtworkEditorRow(
+    kind: PassArtworkKind,
+    artwork: PassArtworkUiModel?,
+    replacementPending: Boolean,
+    accentColor: Int,
+    onReplace: () -> Unit,
+) {
+    val label = kind.name.lowercase().replaceFirstChar(Char::uppercase)
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(56.dp)) {
+                artwork?.let {
+                    AdaptivePassArtwork(
+                        bytes = it.bytes,
+                        kind = kind,
+                        accentColor = accentColor,
+                        contentDescription = label,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+            Text(
+                text = if (replacementPending) {
+                    stringResource(R.string.edit_pass_image_replaced, label)
+                } else {
+                    label
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(onClick = onReplace) {
+                Text(stringResource(R.string.edit_pass_replace_image))
+            }
+        }
+    }
+}
 
 internal enum class PassDraftIssue(@StringRes val messageRes: Int) {
     DESCRIPTION_MISSING(R.string.edit_pass_validation_description),

@@ -416,6 +416,30 @@ class PassScreensTest {
     }
 
     @Test
+    fun createEditorShowsNewPassTitleAndImageReplacement() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass = null, onAction = {}) }
+        }
+
+        composeRule.onNodeWithText("New pass").assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
+        composeRule.onNodeWithText("Images").assertIsDisplayed()
+    }
+
+    @Test
+    fun createEditorRejectsAnEmptyDescription() {
+        val actions = mutableListOf<EditPassAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass = null, onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(6)
+        composeRule.onNodeWithText("Save and close").performClick()
+
+        assertThat(actions).isEmpty()
+    }
+
+    @Test
     fun unchangedEditorClosesWithoutSaving() {
         val actions = mutableListOf<EditPassAction>()
         composeRule.setContent {

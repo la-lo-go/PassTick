@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -41,6 +42,7 @@ internal fun ImportSourceSheet(
     onPickPhoto: () -> Unit,
     onPickPdf: () -> Unit,
     onTakePhoto: () -> Unit,
+    onCreateManually: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(
@@ -63,6 +65,12 @@ internal fun ImportSourceSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            ImportSourceRow(
+                icon = Icons.Default.Add,
+                title = stringResource(R.string.import_sheet_create),
+                onDismiss = onDismiss,
+                onClick = onCreateManually,
             )
             ImportSourceRow(
                 icon = Icons.Default.Description,

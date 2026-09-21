@@ -20,8 +20,12 @@ import org.ligi.passandroid.imports.ImportEdits
 import org.ligi.passandroid.imports.ImportSource
 import org.ligi.passandroid.model.PassStore
 import org.ligi.passandroid.model.PassBitmapDefinitions
+import org.ligi.passandroid.model.pass.BarCode
 import org.ligi.passandroid.model.pass.Pass
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import org.ligi.passandroid.model.pass.PassField
+import org.ligi.passandroid.model.pass.PassImpl
+import org.ligi.passandroid.model.pass.PassLocation
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.io.PassExporter
 import org.ligi.passandroid.repository.io.UnzipPassController
@@ -37,6 +41,7 @@ const val DEFAULT_PASS_CATEGORY_ID = "new"
 val TRASH_RETENTION: Duration = Duration.ofDays(7)
 
 internal const val DOCUMENT_FILE_NAME = "source.pdf"
+private const val MAIN_JSON_FILE_NAME = "main.json"
 private const val IMPORT_CACHE_DIR = "import"
 private const val PAGE_ZERO_FILE_NAME = "page0.png"
 internal const val THUMBNAIL_MAX_DIMENSION = 384
@@ -134,6 +139,8 @@ interface PassRepository {
     suspend fun create(update: PassUpdate): PassSnapshot
 
     suspend fun update(id: String, update: PassUpdate)
+
+    suspend fun duplicate(id: String): PassSnapshot
 
     suspend fun moveToCategory(id: String, categoryId: String)
 
@@ -389,6 +396,68 @@ class FilePassRepository(
         passStore.notifyChange()
     }
 
+    override suspend fun duplicate(id: String): PassSnapshot = withContext(ioDispatcher) {
+        val source = passStore.getPassbookForId(id) as? PassImpl ?: error("Pass not found")
+        val copy = copyOf(source, UUID.randomUUID().toString())
+        val sourceDirectory = passStore.getPathForID(source.id)
+        val targetDirectory = passStore.getPathForID(copy.id).apply { mkdirs() }
+        sourceDirectory.listFiles().orEmpty()
+            .filter { it.isFile && it.name != MAIN_JSON_FILE_NAME }
+            .forEach { it.copyTo(File(targetDirectory, it.name), overwrite = true) }
+        passStore.save(copy)
+        favoriteStore.setFavorite(copy.id, favoriteStore.isFavorite(source.id))
+        protectionStore.setProtected(copy.id, protectionStore.isProtected(source.id))
+        metadataStore.setTags(copy.id, metadataStore.tags(source.id))
+        metadataStore.setNotes(copy.id, metadataStore.notes(source.id))
+        metadataStore.setArchived(copy.id, metadataStore.isArchived(source.id))
+        metadataStore.setPreferredArtwork(copy.id, metadataStore.preferredArtwork(source.id))
+        // moveToTopic notifies observers, so the copy appears without an extra notifyChange.
+        passStore.classifier.moveToTopic(copy, context.getString(R.string.topic_new))
+        copy.toSnapshot(
+            passStore.getPathForID(copy.id),
+            context.getString(R.string.topic_new),
+            protectionStore.isProtected(copy.id),
+            favoriteStore.isFavorite(copy.id),
+            metadataStore.tags(copy.id),
+            metadataStore.isArchived(copy.id),
+            metadataStore.preferredArtwork(copy.id),
+            null,
+            metadataStore.notes(copy.id),
+        )
+    }
+
+    private fun copyOf(source: PassImpl, newId: String): PassImpl = PassImpl(newId).apply {
+        accentColor = source.accentColor
+        creator = source.creator
+        type = source.type
+        description = source.description
+        app = source.app
+        importSource = source.importSource
+        documentPageCount = source.documentPageCount
+        serial = source.serial
+        passIdent = source.passIdent
+        authToken = source.authToken
+        webServiceURL = source.webServiceURL
+        barCode = source.barCode?.let { code ->
+            BarCode(code.format, code.message).apply { alternativeText = code.alternativeText }
+        }
+        barCodes = source.barCodes.mapTo(mutableListOf()) { code ->
+            BarCode(code.format, code.message).apply { alternativeText = code.alternativeText }
+        }
+        fields = source.fields.mapTo(mutableListOf()) { field ->
+            PassField(field.key, field.label, field.value, field.hide, field.hint)
+        }
+        locations = source.locations.map { location ->
+            PassLocation().apply {
+                name = location.name
+                lat = location.lat
+                lon = location.lon
+            }
+        }
+        calendarTimespan = source.calendarTimespan?.let { PassImpl.TimeSpan(it.from, it.to, it.repeat) }
+        validTimespans = source.validTimespans.map { PassImpl.TimeSpan(it.from, it.to, it.repeat) }
+    }
+
     override suspend fun moveToCategory(id: String, categoryId: String) = withContext(ioDispatcher) {
         val targetCategoryId = categoryId.trim()
         require(targetCategoryId.isNotEmpty()) { "Category cannot be empty" }
@@ -461,14 +530,25 @@ class FilePassRepository(
 
     private fun writeArtwork(id: String, updates: List<PassArtworkUpdate>) {
         updates.forEach { artwork ->
-            val target = File(passStore.getPathForID(id), artwork.kind.fileName + org.ligi.passandroid.model.pass.PassImpl.FILETYPE_IMAGES)
-            val bitmap = context.contentResolver.openInputStream(artwork.uri)?.use(android.graphics.BitmapFactory::decodeStream)
+            val directory = passStore.getPathForID(id)
+            val decoded = DocumentImportProcessor.decodeNormalizedBitmap(context, artwork.uri)
                 ?: error("Cannot decode the selected image")
-            target.outputStream().use { output ->
-                check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output))
+            val bitmap = if (artwork.kind == PassArtworkKind.THUMBNAIL) {
+                DocumentImportProcessor.scaleToMaxDimension(decoded, THUMBNAIL_MAX_DIMENSION)
+            } else {
+                decoded
             }
+            // A stale density variant outranks the replacement in bestArtworkFile.
+            staleArtworkFiles(directory, artwork.kind).forEach { it.delete() }
+            File(directory, artwork.kind.fileName + PassImpl.FILETYPE_IMAGES)
+                .writeBytes(DocumentImportProcessor.encodePng(bitmap))
         }
     }
+
+    private fun staleArtworkFiles(directory: File, kind: PassArtworkKind): List<File> =
+        listOf("@3x", "@2x", "").flatMap { suffix ->
+            ARTWORK_EXTENSIONS.map { extension -> File(directory, kind.fileName + suffix + extension) }
+        }.filter { it.isFile }
 
     override suspend fun delete(id: String) = withContext(ioDispatcher) {
         passStore.deletePassWithId(id).also { deleted ->

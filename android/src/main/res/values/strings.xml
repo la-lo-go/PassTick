@@ -16,6 +16,7 @@
     <string name="import_sheet_photo">Photo</string>
     <string name="import_sheet_pdf">PDF</string>
     <string name="import_sheet_camera">Camera</string>
+    <string name="import_sheet_create">Create a pass manually</string>
     <string name="import_title_photo">Photo</string>
     <string name="import_title_pdf">PDF</string>
     <string name="import_review_title">Review pass</string>
@@ -67,6 +68,7 @@
     <string name="pass_detail_back">Back</string>
     <string name="pass_detail_pass_actions">Pass actions</string>
     <string name="pass_detail_edit_pass">Edit pass</string>
+    <string name="pass_detail_duplicate">Duplicate</string>
     <string name="pass_detail_share_pass">Share pass</string>
     <string name="pass_detail_in_calendar">In calendar</string>
     <string name="edit_pass_discard_changes">Discard changes</string>
@@ -83,6 +85,10 @@
     <string name="edit_pass_value">Value</string>
     <string name="edit_pass_add_field">Add field</string>
     <string name="edit_pass_save_and_close">Save and close</string>
+    <string name="edit_pass_new_pass">New pass</string>
+    <string name="edit_pass_images">Images</string>
+    <string name="edit_pass_replace_image">Replace</string>
+    <string name="edit_pass_image_replaced">%1$s (new image selected)</string>
     <string name="edit_pass_save_and_go_back">Save and go back</string>
     <string name="edit_pass_editor_actions">Editor actions</string>
     <string name="edit_pass_delete_location">Delete location</string>
@@ -318,6 +324,8 @@
     <string name="reminder_open_code">Open code</string>
     <string name="reminder_directions">Directions</string>
     <string name="message_pass_imported">Pass imported</string>
+    <string name="message_pass_created">Pass created</string>
+    <string name="message_pass_duplicated">Pass duplicated</string>
     <string name="message_passes_imported">Passes imported</string>
     <string name="message_pass_exported">Pass exported</string>
     <string name="message_pass_ready_to_share">Pass ready to share</string>

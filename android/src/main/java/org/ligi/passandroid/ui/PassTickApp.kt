@@ -528,6 +528,7 @@ fun PassTickApp(
             )
             is PassDetailAction.SetTags -> viewModel.onAction(AppAction.SetPassTags(passId, action.tagIds))
             is PassDetailAction.SetNotes -> viewModel.onAction(AppAction.SetPassNotes(passId, action.text))
+            PassDetailAction.Duplicate -> viewModel.onAction(AppAction.DuplicatePass(passId))
             is PassDetailAction.SetProtected -> setProtectedWithAuthentication(passId, action.isProtected)
             is PassDetailAction.SetArchived -> viewModel.onAction(
                 AppAction.SetPassArchived(passId, action.isArchived, announce = false),
@@ -690,6 +691,7 @@ fun PassTickApp(
                     },
                     onPickPdf = { pdfLauncher.launch(arrayOf("application/pdf")) },
                     onTakePhoto = ::launchCamera,
+                    onCreateManually = { backStack.add(AppDestination.CreatePass) },
                 )
             }
             }

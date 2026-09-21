@@ -3,6 +3,7 @@ package org.ligi.passandroid.repository
 import androidx.core.content.FileProvider
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.exifinterface.media.ExifInterface
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import net.lingala.zip4j.ZipFile
@@ -77,6 +78,109 @@ class ContentUriExchangeTest {
             val saved = File(passDirectory, "logo.png")
             assertThat(saved).exists()
             assertThat(BitmapFactory.decodeFile(saved.path)).isNotNull
+        }
+    }
+
+    @Test
+    fun replacementAppliesExifRotation() {
+        runBlocking {
+            val source = sharedFile("rotated.jpg")
+            writeJpegWithOrientation(source, width = 6, height = 4, orientation = ExifInterface.ORIENTATION_ROTATE_90)
+
+            val directory = replaceArtwork("artwork-exif", PassArtworkKind.LOGO, source)
+
+            val decoded = BitmapFactory.decodeFile(File(directory, "logo.png").path)
+            assertThat(decoded.width).isEqualTo(4)
+            assertThat(decoded.height).isEqualTo(6)
+        }
+    }
+
+    @Test
+    fun replacementScalesDownLargeSources() {
+        runBlocking {
+            val source = sharedFile("large.png")
+            writePng(source, width = 4096, height = 2048)
+
+            val directory = replaceArtwork("artwork-large", PassArtworkKind.LOGO, source)
+
+            val decoded = BitmapFactory.decodeFile(File(directory, "logo.png").path)
+            assertThat(maxOf(decoded.width, decoded.height)).isLessThanOrEqualTo(2048)
+        }
+    }
+
+    @Test
+    fun replacementDropsStaleDensityVariants() {
+        runBlocking {
+            val source = sharedFile("replacement.png")
+            writePng(source, width = 4, height = 4)
+
+            val directory = replaceArtwork("artwork-stale", PassArtworkKind.LOGO, source) { passDirectory ->
+                writePng(File(passDirectory, "logo@3x.png"), width = 600, height = 600)
+            }
+
+            assertThat(File(directory, "logo@3x.png")).doesNotExist()
+            assertThat(File(directory, "logo.png")).exists()
+        }
+    }
+
+    @Test
+    fun replacementCapsThumbnails() {
+        runBlocking {
+            val source = sharedFile("thumbnail-source.png")
+            writePng(source, width = 1000, height = 800)
+
+            val directory = replaceArtwork("artwork-thumbnail", PassArtworkKind.THUMBNAIL, source)
+
+            val decoded = BitmapFactory.decodeFile(File(directory, "thumbnail.png").path)
+            assertThat(maxOf(decoded.width, decoded.height)).isLessThanOrEqualTo(384)
+        }
+    }
+
+    private suspend fun replaceArtwork(
+        directoryName: String,
+        kind: PassArtworkKind,
+        source: File,
+        beforeUpdate: (File) -> Unit = {},
+    ): File {
+        val passDirectory = File(context.cacheDir, directoryName).apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        beforeUpdate(passDirectory)
+        val pass = PassImpl(directoryName)
+        val passStore = FixedPassListPassStore(listOf(pass)).apply { pathForId = passDirectory }
+        FilePassRepository(context, passStore, TestApp.tracker).update(
+            pass.id,
+            PassUpdate(
+                description = "Pass",
+                creator = "Issuer",
+                type = PassType.EVENT,
+                accentColor = 0,
+                barcodeFormat = null,
+                barcodeMessage = "",
+                barcodeAlternativeText = "",
+                fields = emptyList(),
+                artworkUpdates = listOf(PassArtworkUpdate(kind, contentUri(source))),
+            ),
+        )
+        return passDirectory
+    }
+
+    private fun writePng(target: File, width: Int, height: Int) {
+        target.parentFile?.mkdirs()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        target.outputStream().use { output -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, output) }
+        bitmap.recycle()
+    }
+
+    private fun writeJpegWithOrientation(target: File, width: Int, height: Int, orientation: Int) {
+        target.parentFile?.mkdirs()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        target.outputStream().use { output -> bitmap.compress(Bitmap.CompressFormat.JPEG, 100, output) }
+        bitmap.recycle()
+        ExifInterface(target.absolutePath).apply {
+            setAttribute(ExifInterface.TAG_ORIENTATION, orientation.toString())
+            saveAttributes()
         }
     }
 

@@ -217,6 +217,7 @@ sealed interface AppAction {
     data class SetPassArchived(val id: String, val isArchived: Boolean, val announce: Boolean = true) : AppAction
     data class SetPreferredArtwork(val id: String, val kind: PassArtworkKind?) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction
+    data class DuplicatePass(val id: String) : AppAction
     data class MovePass(val id: String, val categoryId: String, val announce: Boolean = true) : AppAction
     data class SelectCategory(val categoryId: String?) : AppAction
     data class SaveCategory(val category: PassCategory) : AppAction

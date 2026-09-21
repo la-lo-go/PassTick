@@ -188,6 +188,7 @@ class MainViewModel(
         if (handleImportExportAction(action)) return
         if (handlePassPresentationAction(action)) return
         if (handlePassMutationAction(action)) return
+        if (handleTrashAction(action)) return
         if (handleCategoryAction(action)) return
         if (handleHomeAction(action)) return
         if (handleAppearanceSettingsAction(action)) return
@@ -259,6 +260,22 @@ class MainViewModel(
 
     val documentPages = PassDocumentPages { passId, pageIndex, targetWidthPx ->
         passRepository.renderDocumentPage(passId, pageIndex, targetWidthPx).getOrNull()
+    }
+
+    suspend fun createPass(draft: PassDraft): Result<PassSnapshot> {
+        busy.value = true
+        return try {
+            val created = passRepository.create(draft.toPassUpdate())
+            passRepository.setNotes(created.id, draft.notes)
+            message.value = strings.resolve(R.string.message_pass_created)
+            highlightImported(listOf(created.id))
+            Result.success(created)
+        } catch (error: Throwable) {
+            message.value = error.message ?: strings.resolve(R.string.message_operation_failed)
+            Result.failure(error)
+        } finally {
+            busy.value = false
+        }
     }
 
     suspend fun prepareDocumentImport(uri: Uri, source: ImportSource): Result<Unit> {
@@ -408,12 +425,35 @@ class MainViewModel(
     }
 
     private fun handlePassMutationAction(action: AppAction): Boolean = when (action) {
-        is AppAction.DeletePass, is AppAction.DeleteForever -> {
-            val id = when (action) {
-                is AppAction.DeletePass -> action.id
-                is AppAction.DeleteForever -> action.id
+        is AppAction.SetPassProtected -> {
+            launchOperation(
+                if (action.isProtected) strings.resolve(R.string.message_pass_protected)
+                else strings.resolve(R.string.message_protection_removed),
+            ) {
+                passRepository.setProtected(action.id, action.isProtected)
             }
-            deletePass(id)
+            true
+        }
+        is AppAction.SavePass -> {
+            launchOperation(strings.resolve(R.string.message_pass_saved)) { save(action) }
+            true
+        }
+        is AppAction.DuplicatePass -> {
+            launchOperation(strings.resolve(R.string.message_pass_duplicated)) {
+                highlightImported(listOf(passRepository.duplicate(action.id).id))
+            }
+            true
+        }
+        else -> false
+    }
+
+    private fun handleTrashAction(action: AppAction): Boolean = when (action) {
+        is AppAction.DeletePass -> {
+            deletePass(action.id)
+            true
+        }
+        is AppAction.DeleteForever -> {
+            deletePass(action.id)
             true
         }
         is AppAction.TrashPass -> {
@@ -442,19 +482,6 @@ class MainViewModel(
             pendingDeletionIds.update { pendingIds ->
                 if (action.pending) pendingIds + action.id else pendingIds - action.id
             }
-            true
-        }
-        is AppAction.SetPassProtected -> {
-            launchOperation(
-                if (action.isProtected) strings.resolve(R.string.message_pass_protected)
-                else strings.resolve(R.string.message_protection_removed),
-            ) {
-                passRepository.setProtected(action.id, action.isProtected)
-            }
-            true
-        }
-        is AppAction.SavePass -> {
-            launchOperation(strings.resolve(R.string.message_pass_saved)) { save(action) }
             true
         }
         else -> false

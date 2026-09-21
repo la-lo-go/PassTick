@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.assertj.core.api.Assertions.assertThat
@@ -546,6 +547,41 @@ class MainViewModelTest {
         assertThat(settings.settings.value.reminderExcludedPassIds).contains("pass-1")
     }
 
+    @Test
+    fun `duplicating a pass copies it and highlights the copy`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.DuplicatePass("pass-1"))
+        // The highlight clears after a delay, so stop at the current virtual time.
+        runCurrent()
+
+        assertThat(repository.duplicatedIds).containsExactly("pass-1")
+        assertThat(viewModel.uiState.value.passes.map { it.id }).contains("pass-1-copy")
+        assertThat(viewModel.uiState.value.recentlyImportedIds).contains("pass-1-copy")
+    }
+
+    @Test
+    fun `creating a pass stores the draft and highlights the new pass`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        val result = viewModel.createPass(createdDraft())
+        // The highlight clears after a delay, so stop at the current virtual time.
+        runCurrent()
+
+        assertThat(result.isSuccess).isTrue()
+        assertThat(repository.created).hasSize(1)
+        assertThat(repository.created.single().description).isEqualTo("Loyalty card")
+        assertThat(viewModel.uiState.value.passes.single { it.id == "created" }.notes)
+            .isEqualTo("member since 2020")
+        assertThat(viewModel.uiState.value.recentlyImportedIds).contains("created")
+    }
+
 }
 
 private fun snapshot(id: String, description: String, categoryId: String = "new") = PassSnapshot(
@@ -561,6 +597,18 @@ private fun snapshot(id: String, description: String, categoryId: String = "new"
     locations = emptyList(),
     calendarTimeSpan = null,
     categoryId = categoryId,
+)
+
+private fun createdDraft() = PassDraft(
+    description = "Loyalty card",
+    creator = "Issuer",
+    type = PassType.LOYALTY,
+    accentColor = 0,
+    barcodeFormat = null,
+    barcodeMessage = "",
+    barcodeAlternativeText = "",
+    fields = emptyList(),
+    notes = "member since 2020",
 )
 
 private fun documentDraft() = ImportDraft(
@@ -580,6 +628,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val updates = mutableListOf<Pair<String, PassUpdate>>()
     val exports = mutableListOf<Pair<String, Uri>>()
     val created = mutableListOf<PassUpdate>()
+    val duplicatedIds = mutableListOf<String>()
     val moved = mutableListOf<Pair<String, String>>()
     val protectionChanges = mutableListOf<Pair<String, Boolean>>()
     val moveDelayMillis = mutableMapOf<String, Long>()
@@ -610,6 +659,11 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
         return snapshot("created", update.description).also { passes.value += it }
     }
     override suspend fun update(id: String, update: PassUpdate) { updates += id to update }
+    override suspend fun duplicate(id: String): PassSnapshot {
+        duplicatedIds += id
+        val source = passes.value.first { it.id == id }
+        return source.copy(id = "$id-copy").also { passes.value += it }
+    }
     override suspend fun moveToCategory(id: String, categoryId: String) {
         delay(moveDelayMillis[categoryId] ?: 0)
         moved += id to categoryId

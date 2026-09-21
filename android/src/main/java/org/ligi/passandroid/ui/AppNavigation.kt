@@ -305,6 +305,22 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     )
                 }
             }
+            entry<AppDestination.CreatePass> {
+                EditPassScreen(
+                    pass = null,
+                    onAction = { action ->
+                        when (action) {
+                            EditPassAction.Back -> dependencies.onBack()
+                            is EditPassAction.Save -> dependencies.coroutineScope.launch {
+                                dependencies.viewModel.createPass(action.draft).onSuccess { created ->
+                                    backStack.removeAll { it == AppDestination.CreatePass }
+                                    backStack.add(AppDestination.PassDetail(created.id))
+                                }
+                            }
+                        }
+                    },
+                )
+            }
             entry<AppDestination.PassCustomization> { destination ->
                 PassCustomizationScreen(
                     pass = state.passes.firstOrNull { it.id == destination.passId },
