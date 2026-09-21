@@ -397,6 +397,7 @@ class StoreScreenshotTest {
             timeSpan = daysFromNow(2, 23, 0) to daysFromNow(3, 0, 15),
             artworkBytes = artworkBytes('O', 0xFF1F4E79.toInt(), 0xFF8AB6E0.toInt()),
             tagIds = setOf("travel"),
+            protected = true,
         ),
         pass(
             id = "bistro-verde",
