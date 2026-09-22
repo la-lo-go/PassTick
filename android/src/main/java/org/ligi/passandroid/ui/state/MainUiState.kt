@@ -229,6 +229,7 @@ sealed interface AppAction {
     data class SetPassPinned(val id: String, val isPinned: Boolean) : AppAction
     data class SetPassTags(val id: String, val tagIds: Set<String>) : AppAction
     data class SetPassNotes(val id: String, val text: String) : AppAction
+    data class RecordPassUse(val id: String) : AppAction
     data class SetPassArchived(val id: String, val isArchived: Boolean, val announce: Boolean = true) : AppAction
     data class SetPreferredArtwork(val id: String, val kind: PassArtworkKind?) : AppAction
     data class SavePass(val id: String, val draft: PassDraft) : AppAction

@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -102,6 +103,7 @@ internal class AppNavigationDependencies(
     val onSettingsScrollConsumed: () -> Unit,
     val coroutineScope: CoroutineScope,
     val snackbarHostState: SnackbarHostState,
+    val homeListState: LazyListState,
 )
 
 @Composable
@@ -118,6 +120,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     showTodayHero = state.settings.highlightTodayPasses,
                     protectedPassesUnlocked = dependencies.protectedPassesUnlocked,
                     recentlyImportedIds = state.recentlyImportedIds,
+                    listState = dependencies.homeListState,
                     onAction = dependencies.onHomeAction,
                 )
             }
@@ -130,6 +133,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                             showTodayHero = state.settings.highlightTodayPasses,
                             protectedPassesUnlocked = dependencies.protectedPassesUnlocked,
                             recentlyImportedIds = state.recentlyImportedIds,
+                            listState = dependencies.homeListState,
                             onAction = { action ->
                                 if (action is HomeAction.OpenPass) {
                                     dependencies.onOpenPass(action.id, true)

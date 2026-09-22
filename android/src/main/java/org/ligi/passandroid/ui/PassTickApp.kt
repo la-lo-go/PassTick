@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
@@ -147,6 +148,8 @@ fun PassTickApp(
     val requestedDocumentImport by documentImportRequest.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val backStack = rememberNavBackStack(AppDestination.PassList)
+    // Hoisted so the home scroll position survives navigation and configuration changes.
+    val homeListState = rememberLazyListState()
     fun popBackStack() {
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
@@ -457,6 +460,7 @@ fun PassTickApp(
                 setProtectedWithAuthentication(action.id, !pass.isProtected)
             }
             is HomeAction.SelectCategory -> viewModel.onAction(AppAction.SelectCategory(action.categoryId))
+            is HomeAction.RecordUse -> viewModel.onAction(AppAction.RecordPassUse(action.id))
             is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
             is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.orderedVisibleIds))
             is HomeAction.Archive -> {
@@ -552,6 +556,7 @@ fun PassTickApp(
             )
             is PassDetailAction.SetTags -> viewModel.onAction(AppAction.SetPassTags(passId, action.tagIds))
             is PassDetailAction.SetNotes -> viewModel.onAction(AppAction.SetPassNotes(passId, action.text))
+            PassDetailAction.RecordUse -> viewModel.onAction(AppAction.RecordPassUse(passId))
             PassDetailAction.Duplicate -> viewModel.onAction(AppAction.DuplicatePass(passId))
             is PassDetailAction.SetProtected -> setProtectedWithAuthentication(passId, action.isProtected)
             is PassDetailAction.SetArchived -> viewModel.onAction(
@@ -704,6 +709,7 @@ fun PassTickApp(
                     onSettingsScrollConsumed = { scrollSettingsToNotifications = false },
                     coroutineScope = coroutineScope,
                     snackbarHostState = snackbarHostState,
+                    homeListState = homeListState,
                 ),
             )
             if (showImportSourceSheet) {

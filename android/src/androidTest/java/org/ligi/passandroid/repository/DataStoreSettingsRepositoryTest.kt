@@ -30,6 +30,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setCodeKeepScreenOn(false)
             repository.setSortOrder(PassSortOrder.TYPE)
             repository.setPassOrder(listOf("pass-3", "pass-1"))
+            repository.setSelectedCategoryId("archive")
             val categories = defaultPassCategories + PassCategory("personal", "Personal", 0xFF006C4C)
             repository.setCategories(categories)
             repository.setHighlightTodayPasses(false)
@@ -72,6 +73,7 @@ class DataStoreSettingsRepositoryTest {
                     it.codeSizeStep == 2 && it.codeWhiteSurround && it.codeExtraQuietZone &&
                     it.codeRotateQuarterTurn && !it.codeKeepScreenOn &&
                     it.sortOrder == PassSortOrder.TYPE && it.passOrder == listOf("pass-3", "pass-1") &&
+                    it.selectedCategoryId == "archive" &&
                     it.categories == categories &&
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
                     it.remindersEnabled && it.reminderMinutes == setOf(15, 30) &&
@@ -110,6 +112,7 @@ class DataStoreSettingsRepositoryTest {
                     codeKeepScreenOn = false,
                     sortOrder = PassSortOrder.TYPE,
                     passOrder = listOf("pass-3", "pass-1"),
+                    selectedCategoryId = "archive",
                     categories = categories,
                     highlightTodayPasses = false,
                     automaticallyMarkPast = true,
@@ -181,6 +184,7 @@ class DataStoreSettingsRepositoryTest {
             repository.setCodeKeepScreenOn(true)
             repository.setSortOrder(PassSortOrder.DATE_DESC)
             repository.setPassOrder(emptyList())
+            repository.setSelectedCategoryId(null)
             repository.setCategories(defaultPassCategories)
             repository.setHighlightTodayPasses(true)
             repository.setAutomaticallyMarkPast(false)

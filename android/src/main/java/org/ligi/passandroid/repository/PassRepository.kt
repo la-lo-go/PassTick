@@ -112,6 +112,7 @@ data class PassSnapshot(
     val preferredArtworkKind: PassArtworkKind? = null,
     val trashedAtEpochMillis: Long? = null,
     val notes: String = "",
+    val useCount: Int = 0,
     val importSource: ImportSource? = null,
     val hasDocument: Boolean = false,
     val documentPageCount: Int = 0,
@@ -167,6 +168,8 @@ interface PassRepository {
     suspend fun setTags(id: String, tagIds: Set<String>)
 
     suspend fun setNotes(id: String, notes: String)
+
+    suspend fun recordUse(id: String)
 
     suspend fun setArchived(id: String, isArchived: Boolean)
 
@@ -431,6 +434,7 @@ class FilePassRepository(
         metadataStore.setNotes(copy.id, metadataStore.notes(source.id))
         metadataStore.setArchived(copy.id, metadataStore.isArchived(source.id))
         metadataStore.setPreferredArtwork(copy.id, metadataStore.preferredArtwork(source.id))
+        metadataStore.setUseCount(copy.id, metadataStore.useCount(source.id))
         // moveToTopic notifies observers, so the copy appears without an extra notifyChange.
         passStore.classifier.moveToTopic(copy, context.getString(R.string.topic_new))
         copy.toSnapshot(
@@ -443,6 +447,7 @@ class FilePassRepository(
             metadataStore.preferredArtwork(copy.id),
             null,
             metadataStore.notes(copy.id),
+            metadataStore.useCount(copy.id),
         )
     }
 
@@ -506,6 +511,12 @@ class FilePassRepository(
     override suspend fun setNotes(id: String, notes: String) = withContext(ioDispatcher) {
         checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
         metadataStore.setNotes(id, notes)
+        passStore.notifyChange()
+    }
+
+    override suspend fun recordUse(id: String) = withContext(ioDispatcher) {
+        checkNotNull(passStore.getPassbookForId(id)) { "Pass not found" }
+        metadataStore.incrementUseCount(id)
         passStore.notifyChange()
     }
 
@@ -693,6 +704,7 @@ class FilePassRepository(
                         metadataStore.setPreferredArtwork(id, archivedMetadata.preferredArtwork(id))
                         metadataStore.setTrashedAt(id, archivedMetadata.trashedAt(id))
                         metadataStore.setNotes(id, archivedMetadata.notes(id))
+                        metadataStore.setUseCount(id, archivedMetadata.useCount(id))
                         favoriteStore.setFavorite(id, archivedPinned.isFavorite(id))
                         protectionStore.setProtected(id, archivedProtection.isProtected(id))
                         archivedTopics[id]?.let { topic -> passStore.classifier.moveToTopic(pass, topic) }
@@ -770,6 +782,7 @@ class FilePassRepository(
             metadataStore.preferredArtwork(pass.id),
             trashedAt,
             metadataStore.notes(pass.id),
+            metadataStore.useCount(pass.id),
         )
     }
 
@@ -786,6 +799,7 @@ private fun Pass.toSnapshot(
     preferredArtworkKind: PassArtworkKind? = null,
     trashedAtEpochMillis: Long? = null,
     notes: String = "",
+    useCount: Int = 0,
 ) = PassSnapshot(
     id = id,
     description = description.orEmpty(),
@@ -813,6 +827,7 @@ private fun Pass.toSnapshot(
     preferredArtworkKind = preferredArtworkKind,
     trashedAtEpochMillis = trashedAtEpochMillis,
     notes = notes,
+    useCount = useCount,
     importSource = importSource ?: inferredImportSource(path),
     hasDocument = File(path, DOCUMENT_FILE_NAME).isFile,
     documentPageCount = documentPageCount,

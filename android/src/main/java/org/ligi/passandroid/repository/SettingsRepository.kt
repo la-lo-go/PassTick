@@ -155,6 +155,8 @@ data class AppSettings(
     val codeKeepScreenOn: Boolean = true,
     val sortOrder: PassSortOrder = PassSortOrder.DATE_DESC,
     val passOrder: List<String> = emptyList(),
+    /** Home filter selected by the user. Survives process death; validated against the live categories. */
+    val selectedCategoryId: String? = null,
     val categories: List<PassCategory> = defaultPassCategories,
     val highlightTodayPasses: Boolean = true,
     val automaticallyMarkPast: Boolean = false,
@@ -206,6 +208,7 @@ interface SettingsRepository {
     suspend fun setCodeKeepScreenOn(value: Boolean)
     suspend fun setSortOrder(value: PassSortOrder)
     suspend fun setPassOrder(value: List<String>)
+    suspend fun setSelectedCategoryId(value: String?)
     suspend fun setCategories(value: List<PassCategory>)
     suspend fun setHighlightTodayPasses(value: Boolean)
     suspend fun setAutomaticallyMarkPast(value: Boolean)
@@ -263,6 +266,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             sortOrder = preferences[SORT]?.let { runCatching { PassSortOrder.valueOf(it) }.getOrNull() }
                 ?: PassSortOrder.DATE_DESC,
             passOrder = preferences[PASS_ORDER]?.let(::decodePassOrder).orEmpty(),
+            selectedCategoryId = preferences[SELECTED_CATEGORY_ID],
             categories = categoriesFrom(preferences[CATEGORIES], preferences[DEFAULT_TAGS_INITIALIZED] == true),
             highlightTodayPasses = preferences[HIGHLIGHT_TODAY] ?: true,
             automaticallyMarkPast = preferences[AUTO_MARK_PAST] ?: false,
@@ -395,6 +399,15 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setCodeKeepScreenOn(value: Boolean) = update(CODE_KEEP_SCREEN_ON, value)
     override suspend fun setSortOrder(value: PassSortOrder) = update(SORT, value.name)
     override suspend fun setPassOrder(value: List<String>) = update(PASS_ORDER, encodePassOrder(value))
+    override suspend fun setSelectedCategoryId(value: String?) {
+        context.settingsDataStore.edit { preferences ->
+            if (value == null) {
+                preferences.remove(SELECTED_CATEGORY_ID)
+            } else {
+                preferences[SELECTED_CATEGORY_ID] = value
+            }
+        }
+    }
     override suspend fun setCategories(value: List<PassCategory>) {
         context.settingsDataStore.edit {
             it[CATEGORIES] = encodeCategories(normalizeCategories(value))
@@ -508,6 +521,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val CODE_KEEP_SCREEN_ON = booleanPreferencesKey("code_keep_screen_on")
         val SORT = stringPreferencesKey("sort_order")
         val PASS_ORDER = stringPreferencesKey("pass_order")
+        val SELECTED_CATEGORY_ID = stringPreferencesKey("selected_category_id")
         val CATEGORIES = stringPreferencesKey("categories")
         val DEFAULT_TAGS_INITIALIZED = booleanPreferencesKey("default_tags_initialized")
         val HIGHLIGHT_TODAY = booleanPreferencesKey("highlight_today_passes")

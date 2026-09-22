@@ -69,6 +69,7 @@ class PassArchiveTest {
             createdPassIds += listOf(withArtwork.id, plain.id)
             repository.setTags(withArtwork.id, setOf("travel"))
             repository.setNotes(withArtwork.id, "window seat")
+            repository.recordUse(withArtwork.id)
             repository.setFavorite(withArtwork.id, true)
             repository.setProtected(withArtwork.id, true)
             repository.trashPass(plain.id)
@@ -87,6 +88,7 @@ class PassArchiveTest {
             val restored = restoredRepository.observePasses().first().single { it.id == withArtwork.id }
             assertThat(restored.tagIds).containsExactly("travel")
             assertThat(restored.notes).isEqualTo("window seat")
+            assertThat(restored.useCount).isEqualTo(1)
             assertThat(restored.isFavorite).isTrue
             assertThat(restored.isProtected).isTrue
         }

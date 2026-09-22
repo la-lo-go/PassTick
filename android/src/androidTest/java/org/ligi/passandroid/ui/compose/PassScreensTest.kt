@@ -749,6 +749,19 @@ class PassScreensTest {
     }
 
     @Test
+    fun homeSortSelectorOffersMostUsed() {
+        val actions = mutableListOf<HomeAction>()
+        val state = sampleState().copy(settings = AppSettings(sortOrder = PassSortOrder.TYPE))
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, actions::add) }
+        }
+
+        composeRule.onNodeWithText("Most used").performClick()
+
+        assertThat(actions).containsExactly(HomeAction.SetSortOrder(PassSortOrder.MOST_USED))
+    }
+
+    @Test
     fun passWithoutArtworkUsesTheCardArtworkPlaceholder() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }

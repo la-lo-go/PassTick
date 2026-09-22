@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -124,6 +126,7 @@ import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.displayArtwork
+import org.ligi.passandroid.ui.state.hasDisplayableCode
 import org.ligi.passandroid.ui.state.occursToday
 import org.ligi.passandroid.ui.state.resolvePassCardTextLines
 import org.ligi.passandroid.ui.state.resolvePassCardTitle
@@ -136,6 +139,7 @@ import org.ligi.passandroid.R
 
 sealed interface HomeAction {
     data class OpenPass(val id: String) : HomeAction
+    data class RecordUse(val id: String) : HomeAction
     data class SelectCategory(val categoryId: String?) : HomeAction
     data class SetSortOrder(val order: PassSortOrder) : HomeAction
     data class ReorderPass(val orderedVisibleIds: List<String>) : HomeAction
@@ -179,6 +183,7 @@ fun PassHomeScreen(
     showTodayHero: Boolean = true,
     protectedPassesUnlocked: Boolean = false,
     recentlyImportedIds: Set<String> = emptySet(),
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -210,6 +215,10 @@ fun PassHomeScreen(
     }
     var previewContent by remember { mutableStateOf<PassUiModel?>(null) }
     LaunchedEffect(previewPass) { if (previewPass != null) previewContent = previewPass }
+    // One count per displayed preview; the pass id key stops recomposition from counting again.
+    LaunchedEffect(previewPass?.id) {
+        previewPass?.takeIf { it.hasDisplayableCode() }?.let { onAction(HomeAction.RecordUse(it.id)) }
+    }
     val categoryPasses = remember(
         state.passes,
         state.categories,
@@ -475,6 +484,7 @@ fun PassHomeScreen(
         BoxWithConstraints(Modifier.fillMaxSize().padding(scaffoldPadding)) {
             val expanded = maxWidth >= 840.dp
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -798,7 +808,8 @@ private fun HomeSortSelector(selectedSort: PassSortOrder, onSort: (PassSortOrder
                     checked = option.matches(selectedSort),
                     onCheckedChange = { onSort(option.nextOrder(selectedSort)) },
                     modifier = Modifier.weight(1f).height(40.dp).semantics { role = Role.RadioButton },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    // A fifth option must fit the same row; the default padding would clip labels.
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     shapes = when (index) {
                         0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                         options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
@@ -838,6 +849,7 @@ private fun homeSortOptions(selectedSort: PassSortOrder, showManual: Boolean) = 
     add(HomeSortOption(PassSortOrder.DATE_DESC, if (selectedSort == PassSortOrder.DATE_ASC) stringResource(R.string.home_oldest) else stringResource(R.string.home_newest)))
     add(HomeSortOption(PassSortOrder.DATE_DIFF, stringResource(R.string.home_nearest)))
     add(HomeSortOption(PassSortOrder.TYPE, stringResource(R.string.home_type)))
+    add(HomeSortOption(PassSortOrder.MOST_USED, stringResource(R.string.home_most_used)))
 }
 
 @Composable

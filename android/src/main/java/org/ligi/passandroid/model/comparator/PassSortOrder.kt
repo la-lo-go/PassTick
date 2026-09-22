@@ -8,7 +8,8 @@ enum class PassSortOrder constructor(val int: Int) {
     DATE_ASC(-1),
     TYPE(1),
     DATE_DIFF(2),
-    MANUAL(3);
+    MANUAL(3),
+    MOST_USED(4);
 
     fun toComparator(): Comparator<Pass> = when (this) {
         TYPE -> PassByTypeFirstAndTimeSecondComparator()
@@ -16,5 +17,7 @@ enum class PassSortOrder constructor(val int: Int) {
         DATE_DIFF -> PassTemporalDistanceComparator()
         DATE_ASC -> DirectionAwarePassByTimeComparator(DirectionAwarePassByTimeComparator.DIRECTION_ASC)
         MANUAL -> compareBy(Pass::id)
+        // The use counter lives in the pass snapshot metadata, which this legacy Pass comparator cannot read.
+        MOST_USED -> compareBy(Pass::id)
     }
 }

@@ -142,6 +142,10 @@ fun PassDetailScreen(
     LaunchedEffect(initialCodeExpanded) {
         if (initialCodeExpanded) onInitialCodeShown()
     }
+    // One count per displayed pass; the pass id key stops recomposition from counting again.
+    LaunchedEffect(pass?.id) {
+        if (pass != null && pass.hasDisplayableCode()) onAction(PassDetailAction.RecordUse)
+    }
     if (codeExpanded && pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
         ExpandedPassCodeDialog(
             format = pass.barcodeFormat,

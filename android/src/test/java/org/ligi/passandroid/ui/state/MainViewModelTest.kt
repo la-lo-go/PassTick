@@ -502,6 +502,22 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `seeds the selected category from settings and persists a new selection`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository(AppSettings(selectedCategoryId = "archive"))
+        val viewModel = MainViewModel(FakePassRepository(emptyList()), settings, FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo("archive")
+
+        viewModel.onAction(AppAction.SelectCategory("new"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo("new")
+        assertThat(settings.settings.value.selectedCategoryId).isEqualTo("new")
+    }
+
+    @Test
     fun `serializes a silent move and its undo without an extra message`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Train", "new"))).apply {
             moveDelayMillis["archive"] = 100
@@ -550,6 +566,40 @@ class MainViewModelTest {
 
         assertThat(settings.settings.value.passOrder).containsExactly("three", "hidden", "one")
         assertThat(settings.settings.value.sortOrder).isEqualTo(PassSortOrder.MANUAL)
+    }
+
+    @Test
+    fun `orders most used passes by descending use count then id`() = runTest(dispatcher) {
+        val settings = FakeSettingsRepository(AppSettings(sortOrder = PassSortOrder.MOST_USED))
+        val repository = FakePassRepository(
+            listOf(
+                snapshot("pass-a", "A", useCount = 1),
+                snapshot("pass-b", "B", useCount = 3),
+                snapshot("pass-c", "C", useCount = 1),
+                snapshot("pass-d", "D"),
+            ),
+        )
+        val viewModel = MainViewModel(repository, settings, FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.passes.map(PassUiModel::id))
+            .containsExactly("pass-b", "pass-a", "pass-c", "pass-d")
+    }
+
+    @Test
+    fun `recording a pass use increments it through the repository`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.RecordPassUse("pass-1"))
+        advanceUntilIdle()
+
+        assertThat(repository.recordedUseIds).containsExactly("pass-1")
+        assertThat(repository.observePasses().first().single().useCount).isEqualTo(1)
+        assertThat(viewModel.uiState.value.message).isNull()
     }
 
     @Test
@@ -771,6 +821,7 @@ private fun snapshot(
     calendarTimeSpan: PassTimeSpanSnapshot? = null,
     isArchived: Boolean = false,
     trashedAtEpochMillis: Long? = null,
+    useCount: Int = 0,
 ) = PassSnapshot(
     id = id,
     description = description,
@@ -786,6 +837,7 @@ private fun snapshot(
     categoryId = categoryId,
     isArchived = isArchived,
     trashedAtEpochMillis = trashedAtEpochMillis,
+    useCount = useCount,
 )
 
 private fun span(from: String, to: String) = PassTimeSpanSnapshot(ZonedDateTime.parse(from), ZonedDateTime.parse(to))
@@ -836,6 +888,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val moved = mutableListOf<Pair<String, String>>()
     val protectionChanges = mutableListOf<Pair<String, Boolean>>()
     val archiveChanges = mutableListOf<Pair<String, Boolean>>()
+    val recordedUseIds = mutableListOf<String>()
     val moveDelayMillis = mutableMapOf<String, Long>()
     val purgedRetentions = mutableListOf<Long>()
     var preparedDraft: ImportDraft? = null
@@ -886,6 +939,10 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     }
     override suspend fun setNotes(id: String, notes: String) {
         passes.value = passes.value.map { if (it.id == id) it.copy(notes = notes.trim()) else it }
+    }
+    override suspend fun recordUse(id: String) {
+        recordedUseIds += id
+        passes.value = passes.value.map { if (it.id == id) it.copy(useCount = it.useCount + 1) else it }
     }
     override suspend fun setArchived(id: String, isArchived: Boolean) {
         archiveChanges += id to isArchived
@@ -977,6 +1034,9 @@ private class FakeSettingsRepository(initial: AppSettings = AppSettings()) : Set
     }
     override suspend fun setPassOrder(value: List<String>) {
         settings.value = settings.value.copy(passOrder = value)
+    }
+    override suspend fun setSelectedCategoryId(value: String?) {
+        settings.value = settings.value.copy(selectedCategoryId = value)
     }
     override suspend fun setCategories(value: List<PassCategory>) {
         settings.value = settings.value.copy(categories = value)

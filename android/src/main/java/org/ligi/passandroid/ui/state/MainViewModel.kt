@@ -126,6 +126,10 @@ class MainViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     init {
+        // Seed once: later settings emissions must not overwrite a selection made in this session.
+        viewModelScope.launch {
+            selectedCategoryId.value = settingsRepository.settings.first().selectedCategoryId
+        }
         // Trash has no background scheduler; expiry is enforced on every app open.
         viewModelScope.launch {
             runCatching { passRepository.purgeExpiredTrash(TRASH_RETENTION) }
@@ -538,6 +542,7 @@ class MainViewModel(
     private fun handleCategoryAction(action: AppAction): Boolean = when (action) {
         is AppAction.SelectCategory -> {
             selectedCategoryId.value = action.categoryId
+            viewModelScope.launch { settingsRepository.setSelectedCategoryId(action.categoryId) }
             true
         }
         is AppAction.SaveCategory -> {
@@ -893,6 +898,11 @@ class MainViewModel(
             launchOperation(strings.resolve(R.string.message_notes_updated)) { passRepository.setNotes(action.id, action.text) }
             true
         }
+        is AppAction.RecordPassUse -> {
+            // A display hook must stay silent and must not flash the busy indicator.
+            viewModelScope.launch { runCatching { passRepository.recordUse(action.id) } }
+            true
+        }
         is AppAction.SetPassArchived -> {
             launchOperation(
                 if (action.announce) {
@@ -971,6 +981,7 @@ private fun PassSortOrder.snapshotComparator(): Comparator<PassSnapshot> {
             compareNullable(left.sortDate(), right.sortDate()) { first, second -> second.compareTo(first) }
         }
         PassSortOrder.TYPE -> compareBy<PassSnapshot> { it.type }.then(ascendingByDate)
+        PassSortOrder.MOST_USED -> compareByDescending<PassSnapshot> { it.useCount }.thenBy(PassSnapshot::id)
         PassSortOrder.DATE_DIFF -> Comparator { left, right ->
             val now = LocalDateTime.now()
             val leftDistance = left.sortDate()?.let { Duration.between(now, it.toLocalDateTime()).abs() }

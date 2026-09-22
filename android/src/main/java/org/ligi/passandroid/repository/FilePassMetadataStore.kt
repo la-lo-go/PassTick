@@ -14,6 +14,7 @@ class FilePassMetadataStore(private val backingFile: File) {
     private val preferredArtworkByPass = loadPreferredArtwork(backingFile)
     private val trashedAtByPass = loadTrashedAt(backingFile)
     private val notesByPass = loadNotes(backingFile)
+    private val useCountByPass = loadUseCount(backingFile)
 
     @Synchronized fun tags(passId: String): Set<String> = tagsByPass[passId].orEmpty()
 
@@ -24,7 +25,7 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = tagsByPass.toMutableMap().apply {
             if (normalized.isEmpty()) remove(passId) else put(passId, normalized)
         }
-        persist(updated, archivedPassIds, preferredArtworkByPass, trashedAtByPass, notesByPass)
+        persist(updated, archivedPassIds, preferredArtworkByPass, trashedAtByPass, notesByPass, useCountByPass)
         tagsByPass.clear()
         tagsByPass.putAll(updated)
     }
@@ -37,7 +38,7 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = archivedPassIds.toMutableSet().apply {
             if (archived) add(passId) else remove(passId)
         }
-        persist(tagsByPass, updated, preferredArtworkByPass, trashedAtByPass, notesByPass)
+        persist(tagsByPass, updated, preferredArtworkByPass, trashedAtByPass, notesByPass, useCountByPass)
         archivedPassIds.clear()
         archivedPassIds.addAll(updated)
     }
@@ -50,7 +51,7 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = preferredArtworkByPass.toMutableMap().apply {
             if (kind == null) remove(passId) else put(passId, kind)
         }
-        persist(tagsByPass, archivedPassIds, updated, trashedAtByPass, notesByPass)
+        persist(tagsByPass, archivedPassIds, updated, trashedAtByPass, notesByPass, useCountByPass)
         preferredArtworkByPass.clear()
         preferredArtworkByPass.putAll(updated)
     }
@@ -63,7 +64,7 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = trashedAtByPass.toMutableMap().apply {
             if (epochMillis == null) remove(passId) else put(passId, epochMillis)
         }
-        persist(tagsByPass, archivedPassIds, preferredArtworkByPass, updated, notesByPass)
+        persist(tagsByPass, archivedPassIds, preferredArtworkByPass, updated, notesByPass, useCountByPass)
         trashedAtByPass.clear()
         trashedAtByPass.putAll(updated)
     }
@@ -77,10 +78,26 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updated = notesByPass.toMutableMap().apply {
             if (normalized.isEmpty()) remove(passId) else put(passId, normalized)
         }
-        persist(tagsByPass, archivedPassIds, preferredArtworkByPass, trashedAtByPass, updated)
+        persist(tagsByPass, archivedPassIds, preferredArtworkByPass, trashedAtByPass, updated, useCountByPass)
         notesByPass.clear()
         notesByPass.putAll(updated)
     }
+
+    @Synchronized fun useCount(passId: String): Int = useCountByPass[passId] ?: 0
+
+    @Synchronized fun setUseCount(passId: String, count: Int) {
+        require(passId.isNotBlank()) { "Pass ID cannot be empty" }
+        val normalized = count.coerceAtLeast(0)
+        if (normalized == useCount(passId)) return
+        val updated = useCountByPass.toMutableMap().apply {
+            if (normalized == 0) remove(passId) else put(passId, normalized)
+        }
+        persist(tagsByPass, archivedPassIds, preferredArtworkByPass, trashedAtByPass, notesByPass, updated)
+        useCountByPass.clear()
+        useCountByPass.putAll(updated)
+    }
+
+    @Synchronized fun incrementUseCount(passId: String) = setUseCount(passId, useCount(passId) + 1)
 
     @Synchronized fun remove(passId: String) {
         val updatedTags = tagsByPass.toMutableMap().apply { remove(passId) }
@@ -88,15 +105,17 @@ class FilePassMetadataStore(private val backingFile: File) {
         val updatedArtwork = preferredArtworkByPass.toMutableMap().apply { remove(passId) }
         val updatedTrashedAt = trashedAtByPass.toMutableMap().apply { remove(passId) }
         val updatedNotes = notesByPass.toMutableMap().apply { remove(passId) }
+        val updatedUseCount = useCountByPass.toMutableMap().apply { remove(passId) }
         val changed = listOf(
             updatedTags != tagsByPass,
             updatedArchived != archivedPassIds,
             updatedArtwork != preferredArtworkByPass,
             updatedTrashedAt != trashedAtByPass,
             updatedNotes != notesByPass,
+            updatedUseCount != useCountByPass,
         ).any()
         if (!changed) return
-        persist(updatedTags, updatedArchived, updatedArtwork, updatedTrashedAt, updatedNotes)
+        persist(updatedTags, updatedArchived, updatedArtwork, updatedTrashedAt, updatedNotes, updatedUseCount)
         tagsByPass.clear()
         tagsByPass.putAll(updatedTags)
         archivedPassIds.clear()
@@ -107,6 +126,8 @@ class FilePassMetadataStore(private val backingFile: File) {
         trashedAtByPass.putAll(updatedTrashedAt)
         notesByPass.clear()
         notesByPass.putAll(updatedNotes)
+        useCountByPass.clear()
+        useCountByPass.putAll(updatedUseCount)
     }
 
     private fun persist(
@@ -115,6 +136,7 @@ class FilePassMetadataStore(private val backingFile: File) {
         preferredArtwork: Map<String, PassArtworkKind>,
         trashedAt: Map<String, Long>,
         notes: Map<String, String>,
+        useCount: Map<String, Int>,
     ) {
         val parent = requireNotNull(backingFile.absoluteFile.parentFile) { "Metadata file needs a parent directory" }
         check(parent.isDirectory || (!parent.exists() && parent.mkdirs())) { "Cannot create metadata directory" }
@@ -128,6 +150,8 @@ class FilePassMetadataStore(private val backingFile: File) {
                 trashedAt.toSortedMap().forEach { (id, millis) -> put(id, millis) }
             }).put("notes", JSONObject().apply {
                 notes.toSortedMap().forEach { (id, value) -> put(id, value) }
+            }).put("useCount", JSONObject().apply {
+                useCount.toSortedMap().forEach { (id, count) -> put(id, count) }
             })
             temporary.writeText(json.toString())
             try {
@@ -176,6 +200,13 @@ class FilePassMetadataStore(private val backingFile: File) {
             val values = JSONObject(file.readText()).optJSONObject("notes") ?: return@runCatching mutableMapOf()
             buildMap {
                 values.keys().forEach { id -> values.optString(id).takeIf(String::isNotEmpty)?.let { put(id, it) } }
+            }.toMutableMap()
+        }.getOrDefault(mutableMapOf())
+
+        fun loadUseCount(file: File): MutableMap<String, Int> = runCatching {
+            val values = JSONObject(file.readText()).optJSONObject("useCount") ?: return@runCatching mutableMapOf()
+            buildMap {
+                values.keys().forEach { id -> values.optInt(id, 0).takeIf { it > 0 }?.let { put(id, it) } }
             }.toMutableMap()
         }.getOrDefault(mutableMapOf())
     }

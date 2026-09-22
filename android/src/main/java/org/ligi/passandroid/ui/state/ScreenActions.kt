@@ -32,6 +32,7 @@ sealed interface PassDetailAction {
     data class MoveToCategory(val categoryId: String) : PassDetailAction
     data class SetTags(val tagIds: Set<String>) : PassDetailAction
     data class SetNotes(val text: String) : PassDetailAction
+    data object RecordUse : PassDetailAction
     data object Duplicate : PassDetailAction
     data class SetProtected(val isProtected: Boolean) : PassDetailAction
     data class SetArchived(val isArchived: Boolean) : PassDetailAction

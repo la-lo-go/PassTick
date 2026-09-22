@@ -168,7 +168,109 @@ class FilePassMetadataStoreTest {
                 buildList { json.keys().forEach { key -> add(key) } }
             }
 
-            assertThat(keys).containsExactlyInAnyOrder("tags", "archived", "preferredArtwork", "trashedAt", "notes")
+            assertThat(keys).containsExactlyInAnyOrder(
+                "tags",
+                "archived",
+                "preferredArtwork",
+                "trashedAt",
+                "notes",
+                "useCount",
+            )
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `stores use counts across reopen and increments them per pass`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).apply {
+                assertThat(useCount("pass-1")).isZero()
+                incrementUseCount("pass-1")
+                incrementUseCount("pass-1")
+                incrementUseCount("pass-2")
+            }
+
+            FilePassMetadataStore(file).apply {
+                assertThat(useCount("pass-1")).isEqualTo(2)
+                assertThat(useCount("pass-2")).isEqualTo(1)
+                assertThat(useCount("pass-3")).isZero()
+
+                incrementUseCount("pass-1")
+
+                assertThat(useCount("pass-1")).isEqualTo(3)
+            }
+
+            assertThat(FilePassMetadataStore(file).useCount("pass-1")).isEqualTo(3)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `setUseCount stores the value, skips an unchanged write, and removes at zero`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            val store = FilePassMetadataStore(file)
+            store.setUseCount("pass-1", 4)
+
+            assertThat(store.useCount("pass-1")).isEqualTo(4)
+            assertThat(FilePassMetadataStore(file).useCount("pass-1")).isEqualTo(4)
+
+            // A deleted backing file stays deleted while the set value is unchanged.
+            file.delete()
+            store.setUseCount("pass-1", 4)
+            assertThat(file).doesNotExist()
+
+            store.setUseCount("pass-1", 5)
+            assertThat(FilePassMetadataStore(file).useCount("pass-1")).isEqualTo(5)
+
+            store.setUseCount("pass-1", 0)
+            assertThat(store.useCount("pass-1")).isZero()
+            assertThat(FilePassMetadataStore(file).useCount("pass-1")).isZero()
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `a legacy file without useCount loads zero and gains the key on write`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile()
+        try {
+            file.writeText("{\"notes\":{\"pass-1\":\"window seat\"}}")
+
+            FilePassMetadataStore(file).apply {
+                assertThat(useCount("pass-1")).isZero()
+                assertThat(notes("pass-1")).isEqualTo("window seat")
+                incrementUseCount("pass-1")
+            }
+
+            FilePassMetadataStore(file).apply {
+                assertThat(useCount("pass-1")).isEqualTo(1)
+                assertThat(notes("pass-1")).isEqualTo("window seat")
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `remove clears the use count without touching other passes`() {
+        val file = Files.createTempFile("pass-metadata", ".json").toFile().apply { delete() }
+        try {
+            FilePassMetadataStore(file).apply {
+                incrementUseCount("pass-1")
+                incrementUseCount("pass-1")
+                incrementUseCount("pass-2")
+            }
+
+            FilePassMetadataStore(file).apply {
+                remove("pass-1")
+
+                assertThat(useCount("pass-1")).isZero()
+                assertThat(useCount("pass-2")).isEqualTo(1)
+            }
         } finally {
             file.delete()
         }
@@ -185,6 +287,7 @@ class FilePassMetadataStoreTest {
                 assertThat(isArchived("pass-1")).isFalse()
                 assertThat(preferredArtwork("pass-1")).isNull()
                 assertThat(trashedAt("pass-1")).isNull()
+                assertThat(useCount("pass-1")).isZero()
             }
         } finally {
             file.delete()
@@ -203,6 +306,7 @@ class FilePassMetadataStoreTest {
                 assertThat(isArchived("pass-1")).isFalse()
                 assertThat(preferredArtwork("pass-1")).isNull()
                 assertThat(trashedAt("pass-1")).isNull()
+                assertThat(useCount("pass-1")).isZero()
             }
         } finally {
             file.delete()

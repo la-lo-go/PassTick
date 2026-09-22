@@ -124,6 +124,8 @@ class PassCreateDuplicateTest {
             createdPassIds += source.id
             repository.setTags(source.id, setOf("travel"))
             repository.setNotes(source.id, "window seat")
+            repository.recordUse(source.id)
+            repository.recordUse(source.id)
 
             val copy = repository.duplicate(source.id)
             createdPassIds += copy.id
@@ -134,6 +136,7 @@ class PassCreateDuplicateTest {
             assertThat(copy.fields).hasSize(1)
             assertThat(copy.tagIds).containsExactly("travel")
             assertThat(copy.notes).isEqualTo("window seat")
+            assertThat(copy.useCount).isEqualTo(2)
             assertThat(File(passDirectory(copy.id), "main.json")).exists()
             assertThat(File(passDirectory(copy.id), "logo.png")).exists()
         }
