@@ -35,11 +35,16 @@ class BarCode(val format: PassBarCodeFormat?, val message: String? = UUID.random
     companion object {
 
         fun getFormatFromString(format: String): PassBarCodeFormat {
+            val normalized = format.uppercase(Locale.ENGLISH).replace('-', '_')
             return when {
-                format.contains("417") -> PassBarCodeFormat.PDF_417
-                format.uppercase(Locale.ENGLISH).contains("AZTEC") -> return PassBarCodeFormat.AZTEC
-                format.uppercase(Locale.ENGLISH).contains("128") -> return PassBarCodeFormat.CODE_128
-                format.uppercase(Locale.ENGLISH).contains("39") -> return PassBarCodeFormat.CODE_39
+                normalized.contains("417") -> PassBarCodeFormat.PDF_417
+                normalized.contains("AZTEC") -> PassBarCodeFormat.AZTEC
+                normalized.contains("CODABAR") -> PassBarCodeFormat.CODABAR
+                normalized.contains("93") -> PassBarCodeFormat.CODE_93
+                normalized.contains("128") -> PassBarCodeFormat.CODE_128
+                normalized.contains("39") -> PassBarCodeFormat.CODE_39
+                normalized.contains("UPC_E") || normalized.contains("UPCE") -> PassBarCodeFormat.UPC_E
+                normalized.contains("UPC_A") || normalized.contains("UPCA") -> PassBarCodeFormat.UPC_A
 
                 else -> PassBarCodeFormat.QR_CODE
 

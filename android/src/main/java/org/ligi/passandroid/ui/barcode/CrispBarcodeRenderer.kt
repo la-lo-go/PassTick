@@ -123,11 +123,15 @@ object CrispBarcodeRenderer {
 private data class QuietZone(val horizontal: Int, val vertical: Int)
 
 private fun PassBarCodeFormat.isLinear() = when (this) {
+    PassBarCodeFormat.CODABAR,
     PassBarCodeFormat.CODE_39,
+    PassBarCodeFormat.CODE_93,
     PassBarCodeFormat.CODE_128,
     PassBarCodeFormat.EAN_8,
     PassBarCodeFormat.EAN_13,
     PassBarCodeFormat.ITF,
+    PassBarCodeFormat.UPC_A,
+    PassBarCodeFormat.UPC_E,
     -> true
 
     else -> false
@@ -138,10 +142,14 @@ private fun PassBarCodeFormat.quietZonePixels() = when (this) {
     PassBarCodeFormat.AZTEC -> QuietZone(horizontal = 2, vertical = 2)
     PassBarCodeFormat.DATA_MATRIX -> QuietZone(horizontal = 1, vertical = 1)
     PassBarCodeFormat.PDF_417 -> QuietZone(horizontal = 2, vertical = 8)
+    PassBarCodeFormat.CODABAR,
     PassBarCodeFormat.CODE_39,
+    PassBarCodeFormat.CODE_93,
     PassBarCodeFormat.CODE_128,
     PassBarCodeFormat.EAN_8,
     PassBarCodeFormat.EAN_13,
     PassBarCodeFormat.ITF,
+    PassBarCodeFormat.UPC_A,
+    PassBarCodeFormat.UPC_E,
     -> QuietZone(horizontal = 10, vertical = 0)
 }

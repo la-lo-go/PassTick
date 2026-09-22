@@ -168,5 +168,77 @@
       "locations": [{ "name": "Central Parcel Locker", "lat": 39.4699, "lon": -0.3763 }],
       "serial": "GP-12345678901234"
     }
+  },
+  {
+    "fileName": "loyalty-codabar.espass",
+    "pass": {
+      "id": "test-loyalty-codabar",
+      "accentColor": "#ff6d4c41",
+      "creator": "Harbor Fitness",
+      "type": "LOYALTY",
+      "barCode": { "format": "CODABAR", "message": "A1234567890B", "alternativeText": "Member 1234 5678 90" },
+      "description": "Gym Membership",
+      "validTimespans": [],
+      "fields": [
+        { "key": "member", "label": "Member", "value": "Alex Morgan", "hide": false, "hint": "primaryFields" },
+        { "key": "plan", "label": "Plan", "value": "Annual", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [{ "name": "Harbor Fitness", "lat": 53.5511, "lon": 9.9937 }],
+      "serial": "HF-1234567890"
+    }
+  },
+  {
+    "fileName": "locker-code93.espass",
+    "pass": {
+      "id": "test-locker-code93",
+      "accentColor": "#ff00695c",
+      "creator": "Blue Locker",
+      "type": "GENERIC",
+      "barCode": { "format": "CODE_93", "message": "TEST93", "alternativeText": "TEST 93" },
+      "description": "Locker Access",
+      "validTimespans": [{ "to": "2026-09-12T22:00:00+02:00" }],
+      "fields": [
+        { "key": "locker", "label": "Locker", "value": "C-07", "hide": false, "hint": "primaryFields" },
+        { "key": "pin", "label": "PIN", "value": "4471", "hide": true, "hint": "backFields" }
+      ],
+      "locations": [{ "name": "Blue Locker Station", "lat": 52.5208, "lon": 13.4095 }],
+      "serial": "BL-TEST93"
+    }
+  },
+  {
+    "fileName": "grocery-upca.espass",
+    "pass": {
+      "id": "test-grocery-upca",
+      "accentColor": "#ff2e7d32",
+      "creator": "Green Grocer",
+      "type": "COUPON",
+      "barCode": { "format": "UPC_A", "message": "036000291452", "alternativeText": "0 36000 29145 2" },
+      "description": "Weekly Discount",
+      "validTimespans": [{ "to": "2026-09-13T21:00:00+02:00" }],
+      "fields": [
+        { "key": "offer", "label": "Offer", "value": "10% off fruit", "hide": false, "hint": "primaryFields" },
+        { "key": "minimum", "label": "Minimum spend", "value": "15 EUR", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [],
+      "serial": "GG-036000291452"
+    }
+  },
+  {
+    "fileName": "kiosk-upce.espass",
+    "pass": {
+      "id": "test-kiosk-upce",
+      "accentColor": "#ff5e35b1",
+      "creator": "Metro Kiosk",
+      "type": "LOYALTY",
+      "barCode": { "format": "UPC_E", "message": "01234565", "alternativeText": "01234565" },
+      "description": "Kiosk Rewards",
+      "validTimespans": [],
+      "fields": [
+        { "key": "card", "label": "Card", "value": "01234565", "hide": false, "hint": "primaryFields" },
+        { "key": "points", "label": "Points", "value": "120", "hide": false, "hint": "secondaryFields" }
+      ],
+      "locations": [],
+      "serial": "MK-01234565"
+    }
   }
 ]

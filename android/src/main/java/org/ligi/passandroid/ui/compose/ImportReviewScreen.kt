@@ -592,13 +592,17 @@ private fun CodeSection(state: ImportReviewUiState, onAction: (ImportReviewActio
 private fun PassBarCodeFormat.codeTypeLabel(): String = when (this) {
     PassBarCodeFormat.QR_CODE -> "QR code"
     PassBarCodeFormat.AZTEC -> "Aztec"
+    PassBarCodeFormat.CODABAR -> "Codabar"
     PassBarCodeFormat.CODE_39 -> "Code 39"
+    PassBarCodeFormat.CODE_93 -> "Code 93"
     PassBarCodeFormat.CODE_128 -> "Code 128"
     PassBarCodeFormat.DATA_MATRIX -> "Data Matrix"
     PassBarCodeFormat.EAN_8 -> "EAN-8"
     PassBarCodeFormat.EAN_13 -> "EAN-13"
     PassBarCodeFormat.ITF -> "ITF"
     PassBarCodeFormat.PDF_417 -> "PDF417"
+    PassBarCodeFormat.UPC_A -> "UPC-A"
+    PassBarCodeFormat.UPC_E -> "UPC-E"
 }
 
 private fun truncateCodeMessage(message: String): String =
