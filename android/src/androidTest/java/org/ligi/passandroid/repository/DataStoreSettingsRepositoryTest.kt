@@ -23,6 +23,11 @@ class DataStoreSettingsRepositoryTest {
             repository.setAccentColor(0xFF006C4CL)
             repository.setColorStyle(ColorStyle.VIBRANT)
             repository.setAutomaticBrightness(false)
+            repository.setCodeSizeStep(2)
+            repository.setCodeWhiteSurround(true)
+            repository.setCodeExtraQuietZone(true)
+            repository.setCodeRotateQuarterTurn(true)
+            repository.setCodeKeepScreenOn(false)
             repository.setSortOrder(PassSortOrder.TYPE)
             repository.setPassOrder(listOf("pass-3", "pass-1"))
             val categories = defaultPassCategories + PassCategory("personal", "Personal", 0xFF006C4C)
@@ -64,6 +69,8 @@ class DataStoreSettingsRepositoryTest {
             val restored = repository.settings.first {
                 it.themeMode == ThemeMode.DARK && it.amoledBlackBackground && !it.automaticBrightness &&
                     !it.dynamicColors && it.accentColor == 0xFF006C4CL && it.colorStyle == ColorStyle.VIBRANT &&
+                    it.codeSizeStep == 2 && it.codeWhiteSurround && it.codeExtraQuietZone &&
+                    it.codeRotateQuarterTurn && !it.codeKeepScreenOn &&
                     it.sortOrder == PassSortOrder.TYPE && it.passOrder == listOf("pass-3", "pass-1") &&
                     it.categories == categories &&
                     !it.highlightTodayPasses && it.automaticallyMarkPast && it.offerCalendarAfterImport &&
@@ -96,6 +103,11 @@ class DataStoreSettingsRepositoryTest {
                     accentColor = 0xFF006C4CL,
                     colorStyle = ColorStyle.VIBRANT,
                     automaticBrightness = false,
+                    codeSizeStep = 2,
+                    codeWhiteSurround = true,
+                    codeExtraQuietZone = true,
+                    codeRotateQuarterTurn = true,
+                    codeKeepScreenOn = false,
                     sortOrder = PassSortOrder.TYPE,
                     passOrder = listOf("pass-3", "pass-1"),
                     categories = categories,
@@ -162,6 +174,11 @@ class DataStoreSettingsRepositoryTest {
             repository.setAccentColor(null)
             repository.setColorStyle(ColorStyle.TONAL_SPOT)
             repository.setAutomaticBrightness(true)
+            repository.setCodeSizeStep(1)
+            repository.setCodeWhiteSurround(false)
+            repository.setCodeExtraQuietZone(false)
+            repository.setCodeRotateQuarterTurn(false)
+            repository.setCodeKeepScreenOn(true)
             repository.setSortOrder(PassSortOrder.DATE_DESC)
             repository.setPassOrder(emptyList())
             repository.setCategories(defaultPassCategories)

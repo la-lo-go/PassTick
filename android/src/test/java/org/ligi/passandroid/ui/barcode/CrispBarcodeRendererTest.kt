@@ -9,23 +9,7 @@ class CrispBarcodeRendererTest {
     fun `uses whole pixel modules within the requested bounds`() {
         val bounds = 720 to 420
 
-        val messages = mapOf(
-            PassBarCodeFormat.QR_CODE to "PASS-1234-EXAMPLE",
-            PassBarCodeFormat.AZTEC to "PASS-1234-EXAMPLE",
-            PassBarCodeFormat.PDF_417 to "PASS-1234-EXAMPLE",
-            PassBarCodeFormat.CODABAR to "A1234567890B",
-            PassBarCodeFormat.CODE_128 to "PASS-1234-EXAMPLE",
-            PassBarCodeFormat.CODE_39 to "PASS-1234",
-            PassBarCodeFormat.CODE_93 to "TEST93",
-            PassBarCodeFormat.DATA_MATRIX to "PASS-1234-EXAMPLE",
-            PassBarCodeFormat.EAN_8 to "96385074",
-            PassBarCodeFormat.EAN_13 to "5901234123457",
-            PassBarCodeFormat.ITF to "12345678901234",
-            PassBarCodeFormat.UPC_A to "036000291452",
-            PassBarCodeFormat.UPC_E to "01234565",
-        )
-
-        messages.forEach { (format, message) ->
+        sampleMessages.forEach { (format, message) ->
             val rendered = CrispBarcodeRenderer.renderMatrix(
                 data = message,
                 format = format,
@@ -39,6 +23,64 @@ class CrispBarcodeRendererTest {
             assertThat(rendered.pixels.height).isLessThanOrEqualTo(bounds.second)
             assertTransitionsAlignToModules(rendered)
         }
+    }
+
+    @Test
+    fun `extra quiet zone keeps module alignment`() {
+        sampleMessages.forEach { (format, message) ->
+            val rendered = CrispBarcodeRenderer.renderMatrix(
+                data = message,
+                format = format,
+                maxWidthPx = 720,
+                maxHeightPx = 420,
+                extraQuietZone = true,
+            )
+
+            assertThat(rendered).describedAs(format.name).isNotNull
+            assertThat(rendered!!.pixels.width).isLessThanOrEqualTo(720)
+            assertThat(rendered.pixels.height).isLessThanOrEqualTo(420)
+            assertTransitionsAlignToModules(rendered)
+        }
+    }
+
+    @Test
+    fun `extra quiet zone adds a vertical zone to linear formats`() {
+        val rendered = CrispBarcodeRenderer.renderMatrix(
+            "PASS-1234-EXAMPLE",
+            PassBarCodeFormat.CODE_128,
+            720,
+            420,
+            extraQuietZone = true,
+        )
+
+        assertThat(rendered).isNotNull
+        assertThat(firstInkRow(rendered!!)).isGreaterThan(0)
+        assertThat(lastInkRow(rendered)).isLessThan(rendered.pixels.height - 1)
+    }
+
+    @Test
+    fun `linear formats have no vertical zone by default`() {
+        val rendered = CrispBarcodeRenderer.renderMatrix("PASS-1234-EXAMPLE", PassBarCodeFormat.CODE_128, 720, 420)
+
+        assertThat(rendered).isNotNull
+        assertThat(rendered!!.pixels.height).isEqualTo(420)
+        assertThat(firstInkRow(rendered)).isZero()
+        assertThat(lastInkRow(rendered)).isEqualTo(419)
+    }
+
+    @Test
+    fun `a smaller target reduces the module scale`() {
+        val message = "PASS-1234-EXAMPLE-LONGER-PAYLOAD"
+
+        val small = CrispBarcodeRenderer.renderMatrix(message, PassBarCodeFormat.QR_CODE, 612, 612)
+        val normal = CrispBarcodeRenderer.renderMatrix(message, PassBarCodeFormat.QR_CODE, 720, 720)
+        val large = CrispBarcodeRenderer.renderMatrix(message, PassBarCodeFormat.QR_CODE, 900, 900)
+
+        assertThat(small).isNotNull
+        assertThat(normal).isNotNull
+        assertThat(large).isNotNull
+        assertThat(small!!.moduleScale).isLessThan(normal!!.moduleScale)
+        assertThat(normal.moduleScale).isLessThan(large!!.moduleScale)
     }
 
     @Test
@@ -94,4 +136,30 @@ class CrispBarcodeRendererTest {
             }
         }
     }
+
+    private fun firstInkRow(rendered: RenderedBarcodeMatrix): Int =
+        (0 until rendered.pixels.height).first { y ->
+            (0 until rendered.pixels.width).any { x -> rendered.pixels[x, y] }
+        }
+
+    private fun lastInkRow(rendered: RenderedBarcodeMatrix): Int =
+        (rendered.pixels.height - 1 downTo 0).first { y ->
+            (0 until rendered.pixels.width).any { x -> rendered.pixels[x, y] }
+        }
+
+    private val sampleMessages = mapOf(
+        PassBarCodeFormat.QR_CODE to "PASS-1234-EXAMPLE",
+        PassBarCodeFormat.AZTEC to "PASS-1234-EXAMPLE",
+        PassBarCodeFormat.PDF_417 to "PASS-1234-EXAMPLE",
+        PassBarCodeFormat.CODABAR to "A1234567890B",
+        PassBarCodeFormat.CODE_128 to "PASS-1234-EXAMPLE",
+        PassBarCodeFormat.CODE_39 to "PASS-1234",
+        PassBarCodeFormat.CODE_93 to "TEST93",
+        PassBarCodeFormat.DATA_MATRIX to "PASS-1234-EXAMPLE",
+        PassBarCodeFormat.EAN_8 to "96385074",
+        PassBarCodeFormat.EAN_13 to "5901234123457",
+        PassBarCodeFormat.ITF to "12345678901234",
+        PassBarCodeFormat.UPC_A to "036000291452",
+        PassBarCodeFormat.UPC_E to "01234565",
+    )
 }

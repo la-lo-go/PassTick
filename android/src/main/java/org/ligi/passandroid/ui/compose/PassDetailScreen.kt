@@ -97,8 +97,11 @@ import org.ligi.passandroid.ui.state.PassBarcodeUiModel
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.displayArtwork
+import org.ligi.passandroid.ui.state.hasDisplayableCode
+import org.ligi.passandroid.ui.barcode.CodeViewOptions
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
+import org.ligi.passandroid.ui.barcode.codeSizeStepFactor
 import org.threeten.bp.format.DateTimeFormatter
 import androidx.compose.ui.res.stringResource
 import org.ligi.passandroid.R
@@ -120,6 +123,7 @@ fun PassDetailScreen(
     flashlightAvailable: Boolean = false,
     flashlightEnabled: Boolean = false,
     enhanceCodeBrightness: Boolean = true,
+    codeViewOptions: CodeViewOptions = CodeViewOptions(),
     calendarEventPresent: Boolean = false,
     passDetailSectionOrder: List<PassDetailSection> = defaultPassDetailSectionOrder,
     hiddenPassDetailSections: Set<PassDetailSection> = emptySet(),
@@ -143,6 +147,7 @@ fun PassDetailScreen(
             format = pass.barcodeFormat,
             message = pass.barcodeMessage,
             alternativeText = pass.barcodeAlternativeText,
+            options = codeViewOptions,
             enhanceBrightness = enhanceCodeBrightness,
             onDismiss = {
                 codeHeld = false
@@ -484,6 +489,7 @@ fun PassDetailScreen(
                         hiddenSections = hiddenPassDetailSections,
                         documentPages = documentPages,
                         calendarEventPresent = calendarEventPresent,
+                        codeViewOptions = codeViewOptions,
                         onAction = onAction,
                         onBarcodeHoldChanged = { codeHeld = it },
                         onBarcodePin = { codePinned = true },
@@ -504,6 +510,7 @@ internal fun PassDetailSectionList(
     hiddenSections: Set<PassDetailSection>,
     documentPages: PassDocumentPages? = null,
     calendarEventPresent: Boolean,
+    codeViewOptions: CodeViewOptions = CodeViewOptions(),
     onAction: (PassDetailAction) -> Unit,
     onBarcodeHoldChanged: (Boolean) -> Unit,
     onBarcodePin: () -> Unit,
@@ -541,6 +548,7 @@ internal fun PassDetailSectionList(
                             BarcodeCard(
                                 pass = pass,
                                 emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenSections,
+                                codeViewOptions = codeViewOptions,
                                 onHoldChanged = onBarcodeHoldChanged,
                                 onPin = onBarcodePin,
                             )
@@ -652,6 +660,7 @@ private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>
 private fun BarcodeCard(
     pass: PassUiModel,
     emphasized: Boolean,
+    codeViewOptions: CodeViewOptions,
     onHoldChanged: (Boolean) -> Unit,
     onPin: () -> Unit,
 ) {
@@ -663,8 +672,8 @@ private fun BarcodeCard(
             val codes = pass.displayableCodes()
             when {
                 codes.isEmpty() -> Text(stringResource(R.string.pass_detail_no_barcode), style = MaterialTheme.typography.titleMedium)
-                codes.size == 1 -> SinglePassCode(codes.first(), emphasized, onHoldChanged, onPin)
-                else -> BarcodePager(codes, emphasized, onHoldChanged, onPin)
+                codes.size == 1 -> SinglePassCode(codes.first(), emphasized, codeViewOptions, onHoldChanged, onPin)
+                else -> BarcodePager(codes, emphasized, codeViewOptions, onHoldChanged, onPin)
             }
         }
     }
@@ -685,27 +694,26 @@ private fun PassUiModel.displayableCodes(): List<DisplayableCode> {
     }
 }
 
-private fun PassUiModel.hasDisplayableCode(): Boolean =
-    barcodes.any { it.format != null && !it.message.isNullOrBlank() } ||
-        (barcodeFormat != null && !barcodeMessage.isNullOrBlank())
-
-private fun codeHeight(format: PassBarCodeFormat, cardWidth: Dp, emphasized: Boolean): Dp =
-    if (format.isQuadratic()) {
+private fun codeHeight(format: PassBarCodeFormat, cardWidth: Dp, emphasized: Boolean, sizeStep: Int): Dp {
+    val base = if (format.isQuadratic()) {
         (cardWidth * 0.78f).coerceIn(196.dp, if (emphasized) 300.dp else 264.dp)
     } else {
         (cardWidth / 2.6f).coerceIn(144.dp, if (emphasized) 240.dp else 208.dp)
     }
+    return base * codeSizeStepFactor(sizeStep)
+}
 
 @Composable
 private fun SinglePassCode(
     code: DisplayableCode,
     emphasized: Boolean,
+    options: CodeViewOptions,
     onHoldChanged: (Boolean) -> Unit,
     onPin: () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        val height = codeHeight(code.format, maxWidth, emphasized)
-        PassCodePreview(code.format, code.message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
+        val height = codeHeight(code.format, maxWidth, emphasized, options.sizeStep)
+        PassCodePreview(code.format, code.message, options, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
     }
 }
 
@@ -716,13 +724,14 @@ private val BarcodePagerArrowWidth = 48.dp
 private fun BarcodePager(
     codes: List<DisplayableCode>,
     emphasized: Boolean,
+    options: CodeViewOptions,
     onHoldChanged: (Boolean) -> Unit,
     onPin: () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val showArrows = codes.size > 1
         val pagerWidth = if (showArrows) maxWidth - BarcodePagerArrowWidth * 2 else maxWidth
-        val height = codes.maxOf { codeHeight(it.format, pagerWidth, emphasized) }
+        val height = codes.maxOf { codeHeight(it.format, pagerWidth, emphasized, options.sizeStep) }
         val pagerState = rememberPagerState(pageCount = { codes.size })
         val scope = rememberCoroutineScope()
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -741,7 +750,7 @@ private fun BarcodePager(
                 }
                 HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).height(height)) { page ->
                     val code = codes[page]
-                    PassCodePreview(code.format, code.message, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
+                    PassCodePreview(code.format, code.message, options, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
                 }
                 if (showArrows) {
                     BarcodePagerArrow(

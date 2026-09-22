@@ -25,11 +25,12 @@ object CrispBarcodeRenderer {
         format: PassBarCodeFormat,
         maxWidthPx: Int,
         maxHeightPx: Int,
+        extraQuietZone: Boolean = false,
     ): RenderedBarcodeMatrix? {
         if (!hasRenderableInput(data, format) || !hasRenderableBounds(maxWidthPx, maxHeightPx)) return null
 
         val source = encodeSource(data, format) ?: return null
-        val quietZone = format.quietZonePixels()
+        val quietZone = format.quietZonePixels(extraQuietZone)
         val contentWidth = source.width + quietZone.horizontal * 2
         val contentHeight = source.height + quietZone.vertical * 2
         val isLinear = format.isLinear()
@@ -37,14 +38,27 @@ object CrispBarcodeRenderer {
         if (scale < 1) return null
 
         val outputWidth = contentWidth * scale
-        val outputHeight = if (isLinear) maxHeightPx else contentHeight * scale
+        // Linear bars fill the available height. A vertical zone needs module-aligned row bounds,
+        // so the bar region and both zones stay integer module multiples.
+        val barRegion = if (isLinear) linearBarRegion(maxHeightPx, quietZone.vertical, scale) else null
+        val outputHeight = if (isLinear) barRegion?.outputHeight ?: maxHeightPx else contentHeight * scale
         val output = BitMatrix(outputWidth, outputHeight)
         val left = quietZone.horizontal * scale
-        val top = if (isLinear) 0 else quietZone.vertical * scale
+        val top = if (isLinear) barRegion?.top ?: 0 else quietZone.vertical * scale
+        val barHeight = if (isLinear) outputHeight - top * 2 else scale
 
-        paintModules(source, output, scale, isLinear, left, top, outputHeight)
+        paintModules(source, output, scale, isLinear, left, top, barHeight)
 
         return RenderedBarcodeMatrix(output, scale)
+    }
+
+    private data class LinearBarRegion(val outputHeight: Int, val top: Int)
+
+    private fun linearBarRegion(maxHeightPx: Int, verticalModules: Int, scale: Int): LinearBarRegion? {
+        if (verticalModules == 0) return null
+        val rows = maxHeightPx / scale
+        if (rows <= verticalModules * 2) return null
+        return LinearBarRegion(outputHeight = rows * scale, top = verticalModules * scale)
     }
 
     private fun hasRenderableInput(data: String, format: PassBarCodeFormat): Boolean =
@@ -88,14 +102,14 @@ object CrispBarcodeRenderer {
         isLinear: Boolean,
         left: Int,
         top: Int,
-        outputHeight: Int,
+        barHeight: Int,
     ) {
         for (sourceY in 0 until source.height) {
             for (sourceX in 0 until source.width) {
                 if (!source[sourceX, sourceY]) continue
                 val outputX = left + sourceX * scale
-                val outputY = if (isLinear) 0 else top + sourceY * scale
-                val outputBarHeight = if (isLinear) outputHeight else scale
+                val outputY = if (isLinear) top else top + sourceY * scale
+                val outputBarHeight = if (isLinear) barHeight else scale
                 output.setRegion(outputX, outputY, scale, outputBarHeight)
             }
         }
@@ -106,8 +120,9 @@ object CrispBarcodeRenderer {
         format: PassBarCodeFormat,
         maxWidthPx: Int,
         maxHeightPx: Int,
+        extraQuietZone: Boolean = false,
     ): Bitmap? {
-        val rendered = renderMatrix(data, format, maxWidthPx, maxHeightPx) ?: return null
+        val rendered = renderMatrix(data, format, maxWidthPx, maxHeightPx, extraQuietZone) ?: return null
         val matrix = rendered.pixels
         val colors = IntArray(matrix.width * matrix.height)
         var index = 0
@@ -137,7 +152,19 @@ private fun PassBarCodeFormat.isLinear() = when (this) {
     else -> false
 }
 
-private fun PassBarCodeFormat.quietZonePixels() = when (this) {
+// One extra module pair. Linear formats gain a vertical zone because their base vertical zone is 0.
+private const val ExtraQuietZoneModules = 4
+
+private fun PassBarCodeFormat.quietZonePixels(extraQuietZone: Boolean): QuietZone {
+    val base = baseQuietZonePixels()
+    if (!extraQuietZone) return base
+    return QuietZone(
+        horizontal = base.horizontal + ExtraQuietZoneModules,
+        vertical = base.vertical + ExtraQuietZoneModules,
+    )
+}
+
+private fun PassBarCodeFormat.baseQuietZonePixels() = when (this) {
     PassBarCodeFormat.QR_CODE -> QuietZone(horizontal = 4, vertical = 4)
     PassBarCodeFormat.AZTEC -> QuietZone(horizontal = 2, vertical = 2)
     PassBarCodeFormat.DATA_MATRIX -> QuietZone(horizontal = 1, vertical = 1)

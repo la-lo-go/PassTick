@@ -167,6 +167,23 @@ class PassScreensTest {
     }
 
     @Test
+    fun settingsExposeCodeViewOptions() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Extra quiet zone"))
+        composeRule.onNodeWithText("Extra quiet zone").assertIsDisplayed()
+        composeRule.onNodeWithText("White surround in full screen").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Rotate the code a quarter turn").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Keep the screen on").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Large").performScrollTo().performClick()
+
+        assertThat(actions).containsExactly(SettingsAction.SetCodeSizeStep(2))
+    }
+
+    @Test
     fun accentColorRowCapturesSelectionAction() {
         val actions = mutableListOf<SettingsAction>()
         composeRule.setContent {
@@ -217,12 +234,12 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = {}) }
         }
 
-        composeRule.onNodeWithTag("settings_list").performScrollToIndex(3)
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Privacy"))
         composeRule.onNodeWithText("Privacy").assertIsDisplayed()
-        composeRule.onNodeWithText("Protect the app").assertIsDisplayed()
-        composeRule.onNodeWithText("Show a lock icon on protected passes").assertIsDisplayed()
-        composeRule.onNodeWithText("Blur protected pass information").assertIsDisplayed()
-        composeRule.onNodeWithText("Keep all protected passes in a locked section").assertIsDisplayed()
+        composeRule.onNodeWithText("Protect the app").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Show a lock icon on protected passes").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Blur protected pass information").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Keep all protected passes in a locked section").performScrollTo().assertIsDisplayed()
     }
 
     @Test

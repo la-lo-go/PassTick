@@ -37,6 +37,7 @@ import org.ligi.passandroid.platform.PassAuthenticator
 import org.ligi.passandroid.reminder.reminderNotificationsAvailable
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.ui.adaptive.AdaptivePassListDetailShell
+import org.ligi.passandroid.ui.barcode.CodeViewOptions
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.ExportImageScreen
@@ -197,6 +198,13 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                                 flashlightAvailable = dependencies.flashlightAvailable,
                                 flashlightEnabled = dependencies.flashlightEnabled,
                                 enhanceCodeBrightness = state.settings.automaticBrightness,
+                                codeViewOptions = CodeViewOptions(
+                                    sizeStep = state.settings.codeSizeStep,
+                                    whiteSurround = state.settings.codeWhiteSurround,
+                                    extraQuietZone = state.settings.codeExtraQuietZone,
+                                    rotateQuarterTurn = state.settings.codeRotateQuarterTurn,
+                                    keepScreenOn = state.settings.codeKeepScreenOn,
+                                ),
                                 calendarEventPresent = calendarEventPresent,
                                 passDetailSectionOrder = state.settings.passDetailSectionOrder,
                                 hiddenPassDetailSections = state.settings.hiddenPassDetailSections,
@@ -540,6 +548,33 @@ private fun handleAppearanceSettingsAction(
     }
     is SettingsAction.SetTrashEnabled -> {
         dependencies.viewModel.onAction(AppAction.SetTrashEnabled(action.value))
+        true
+    }
+    else -> handleCodeViewSettingsAction(dependencies, action)
+}
+
+private fun handleCodeViewSettingsAction(
+    dependencies: AppNavigationDependencies,
+    action: SettingsAction,
+): Boolean = when (action) {
+    is SettingsAction.SetCodeSizeStep -> {
+        dependencies.viewModel.onAction(AppAction.SetCodeSizeStep(action.value))
+        true
+    }
+    is SettingsAction.SetCodeWhiteSurround -> {
+        dependencies.viewModel.onAction(AppAction.SetCodeWhiteSurround(action.value))
+        true
+    }
+    is SettingsAction.SetCodeExtraQuietZone -> {
+        dependencies.viewModel.onAction(AppAction.SetCodeExtraQuietZone(action.value))
+        true
+    }
+    is SettingsAction.SetCodeRotateQuarterTurn -> {
+        dependencies.viewModel.onAction(AppAction.SetCodeRotateQuarterTurn(action.value))
+        true
+    }
+    is SettingsAction.SetCodeKeepScreenOn -> {
+        dependencies.viewModel.onAction(AppAction.SetCodeKeepScreenOn(action.value))
         true
     }
     else -> false

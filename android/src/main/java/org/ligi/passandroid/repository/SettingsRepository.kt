@@ -148,6 +148,11 @@ data class AppSettings(
     val accentColor: Long? = null,
     val colorStyle: ColorStyle = ColorStyle.TONAL_SPOT,
     val automaticBrightness: Boolean = true,
+    val codeSizeStep: Int = 1,
+    val codeWhiteSurround: Boolean = false,
+    val codeExtraQuietZone: Boolean = false,
+    val codeRotateQuarterTurn: Boolean = false,
+    val codeKeepScreenOn: Boolean = true,
     val sortOrder: PassSortOrder = PassSortOrder.DATE_DESC,
     val passOrder: List<String> = emptyList(),
     val categories: List<PassCategory> = defaultPassCategories,
@@ -194,6 +199,11 @@ interface SettingsRepository {
     suspend fun setAccentColor(value: Long?)
     suspend fun setColorStyle(value: ColorStyle)
     suspend fun setAutomaticBrightness(value: Boolean)
+    suspend fun setCodeSizeStep(value: Int)
+    suspend fun setCodeWhiteSurround(value: Boolean)
+    suspend fun setCodeExtraQuietZone(value: Boolean)
+    suspend fun setCodeRotateQuarterTurn(value: Boolean)
+    suspend fun setCodeKeepScreenOn(value: Boolean)
     suspend fun setSortOrder(value: PassSortOrder)
     suspend fun setPassOrder(value: List<String>)
     suspend fun setCategories(value: List<PassCategory>)
@@ -245,6 +255,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
                 runCatching { ColorStyle.valueOf(value) }.getOrNull()
             } ?: ColorStyle.TONAL_SPOT,
             automaticBrightness = preferences[AUTOMATIC_BRIGHTNESS] ?: true,
+            codeSizeStep = (preferences[CODE_SIZE_STEP] ?: 1).coerceIn(0, 2),
+            codeWhiteSurround = preferences[CODE_WHITE_SURROUND] ?: false,
+            codeExtraQuietZone = preferences[CODE_EXTRA_QUIET_ZONE] ?: false,
+            codeRotateQuarterTurn = preferences[CODE_ROTATE_QUARTER_TURN] ?: false,
+            codeKeepScreenOn = preferences[CODE_KEEP_SCREEN_ON] ?: true,
             sortOrder = preferences[SORT]?.let { runCatching { PassSortOrder.valueOf(it) }.getOrNull() }
                 ?: PassSortOrder.DATE_DESC,
             passOrder = preferences[PASS_ORDER]?.let(::decodePassOrder).orEmpty(),
@@ -373,6 +388,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     }
 
     override suspend fun setAutomaticBrightness(value: Boolean) = update(AUTOMATIC_BRIGHTNESS, value)
+    override suspend fun setCodeSizeStep(value: Int) = update(CODE_SIZE_STEP, value.coerceIn(0, 2))
+    override suspend fun setCodeWhiteSurround(value: Boolean) = update(CODE_WHITE_SURROUND, value)
+    override suspend fun setCodeExtraQuietZone(value: Boolean) = update(CODE_EXTRA_QUIET_ZONE, value)
+    override suspend fun setCodeRotateQuarterTurn(value: Boolean) = update(CODE_ROTATE_QUARTER_TURN, value)
+    override suspend fun setCodeKeepScreenOn(value: Boolean) = update(CODE_KEEP_SCREEN_ON, value)
     override suspend fun setSortOrder(value: PassSortOrder) = update(SORT, value.name)
     override suspend fun setPassOrder(value: List<String>) = update(PASS_ORDER, encodePassOrder(value))
     override suspend fun setCategories(value: List<PassCategory>) {
@@ -481,6 +501,11 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val COLOR_STYLE = stringPreferencesKey("color_style")
         val AMOLED_BLACK_BACKGROUND = booleanPreferencesKey("amoled_black_background")
         val AUTOMATIC_BRIGHTNESS = booleanPreferencesKey("automatic_brightness")
+        val CODE_SIZE_STEP = intPreferencesKey("code_size_step")
+        val CODE_WHITE_SURROUND = booleanPreferencesKey("code_white_surround")
+        val CODE_EXTRA_QUIET_ZONE = booleanPreferencesKey("code_extra_quiet_zone")
+        val CODE_ROTATE_QUARTER_TURN = booleanPreferencesKey("code_rotate_quarter_turn")
+        val CODE_KEEP_SCREEN_ON = booleanPreferencesKey("code_keep_screen_on")
         val SORT = stringPreferencesKey("sort_order")
         val PASS_ORDER = stringPreferencesKey("pass_order")
         val CATEGORIES = stringPreferencesKey("categories")

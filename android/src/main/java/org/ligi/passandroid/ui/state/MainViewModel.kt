@@ -691,6 +691,40 @@ class MainViewModel(
             }
             true
         }
+        else -> handleCodeViewSettingsAction(action)
+    }
+
+    private fun handleCodeViewSettingsAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetCodeSizeStep -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeSizeStep(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeWhiteSurround -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeWhiteSurround(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeExtraQuietZone -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeExtraQuietZone(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeRotateQuarterTurn -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeRotateQuarterTurn(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeKeepScreenOn -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeKeepScreenOn(action.value)
+            }
+            true
+        }
         else -> false
     }
 

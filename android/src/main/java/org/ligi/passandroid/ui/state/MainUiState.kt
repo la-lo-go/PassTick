@@ -152,6 +152,11 @@ fun PassUiModel.displayArtwork(defaultKinds: List<PassArtworkKind>): PassArtwork
     preferredArtworkKind?.let { selected -> artwork.firstOrNull { it.kind == selected } }
         ?: defaultKinds.firstNotNullOfOrNull { kind -> artwork.firstOrNull { it.kind == kind } }
 
+/** True when the pass can render at least one code, on any code surface. */
+fun PassUiModel.hasDisplayableCode(): Boolean =
+    barcodes.any { it.format != null && !it.message.isNullOrBlank() } ||
+        (barcodeFormat != null && !barcodeMessage.isNullOrBlank())
+
 /** Expired means the validity end is in the past. The Expired filter and badge share this rule. */
 fun PassUiModel.isExpired(now: ZonedDateTime = ZonedDateTime.now()): Boolean =
     expiresAt?.isBefore(now) == true
@@ -239,6 +244,11 @@ sealed interface AppAction {
     data class SetAccentColor(val value: Long?) : AppAction
     data class SetColorStyle(val value: ColorStyle) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction
+    data class SetCodeSizeStep(val value: Int) : AppAction
+    data class SetCodeWhiteSurround(val value: Boolean) : AppAction
+    data class SetCodeExtraQuietZone(val value: Boolean) : AppAction
+    data class SetCodeRotateQuarterTurn(val value: Boolean) : AppAction
+    data class SetCodeKeepScreenOn(val value: Boolean) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
     data class ReorderPass(val orderedVisibleIds: List<String>) : AppAction
     data class SetHighlightTodayPasses(val value: Boolean) : AppAction

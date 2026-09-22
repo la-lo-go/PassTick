@@ -366,17 +366,71 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
 private fun CodeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     SettingsGroup(
         title = stringResource(R.string.settings_pass_codes),
-        entries = listOf(
-            settingsItem {
-                SettingSwitch(
-                    stringResource(R.string.settings_use_max_brightness_for_codes),
-                    settings.automaticBrightness,
-                    supportingText = stringResource(R.string.settings_use_max_brightness_for_codes_support),
-                ) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
-            },
-        ),
+        entries = buildList {
+            add(
+                settingsItem {
+                    SettingSwitch(
+                        stringResource(R.string.settings_use_max_brightness_for_codes),
+                        settings.automaticBrightness,
+                        supportingText = stringResource(R.string.settings_use_max_brightness_for_codes_support),
+                    ) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
+                },
+            )
+            add(settingsHeader(stringResource(R.string.settings_code_size)))
+            codeSizeOptions.forEach { (step, label) ->
+                add(
+                    settingsItem {
+                        ReminderChoice(stringResource(label), settings.codeSizeStep == step) {
+                            onAction(SettingsAction.SetCodeSizeStep(step))
+                        }
+                    },
+                )
+            }
+            add(
+                settingsItem {
+                    SettingSwitch(
+                        stringResource(R.string.settings_code_extra_quiet_zone),
+                        settings.codeExtraQuietZone,
+                        supportingText = stringResource(R.string.settings_code_extra_quiet_zone_support),
+                    ) { onAction(SettingsAction.SetCodeExtraQuietZone(it)) }
+                },
+            )
+            add(
+                settingsItem {
+                    SettingSwitch(
+                        stringResource(R.string.settings_code_white_surround),
+                        settings.codeWhiteSurround,
+                        supportingText = stringResource(R.string.settings_code_white_surround_support),
+                    ) { onAction(SettingsAction.SetCodeWhiteSurround(it)) }
+                },
+            )
+            add(
+                settingsItem {
+                    SettingSwitch(
+                        stringResource(R.string.settings_code_rotate_quarter_turn),
+                        settings.codeRotateQuarterTurn,
+                        supportingText = stringResource(R.string.settings_code_rotate_quarter_turn_support),
+                    ) { onAction(SettingsAction.SetCodeRotateQuarterTurn(it)) }
+                },
+            )
+            add(
+                settingsItem {
+                    SettingSwitch(
+                        stringResource(R.string.settings_code_keep_screen_on),
+                        settings.codeKeepScreenOn,
+                        supportingText = stringResource(R.string.settings_code_keep_screen_on_support),
+                    ) { onAction(SettingsAction.SetCodeKeepScreenOn(it)) }
+                },
+            )
+        },
     )
 }
+
+private val codeSizeOptions = listOf(
+    0 to R.string.settings_code_size_small,
+    1 to R.string.settings_code_size_normal,
+    2 to R.string.settings_code_size_large,
+)
 
 @Composable
 private fun PassListSettings(onAction: (SettingsAction) -> Unit) {

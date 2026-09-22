@@ -65,6 +65,11 @@ sealed interface SettingsAction {
     data class SetAccentColor(val value: Long?) : SettingsAction
     data class SetColorStyle(val value: ColorStyle) : SettingsAction
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction
+    data class SetCodeSizeStep(val value: Int) : SettingsAction
+    data class SetCodeWhiteSurround(val value: Boolean) : SettingsAction
+    data class SetCodeExtraQuietZone(val value: Boolean) : SettingsAction
+    data class SetCodeRotateQuarterTurn(val value: Boolean) : SettingsAction
+    data class SetCodeKeepScreenOn(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction
     data object OpenPassViewSettings : SettingsAction

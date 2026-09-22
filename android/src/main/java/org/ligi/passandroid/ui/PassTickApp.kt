@@ -75,6 +75,7 @@ import org.ligi.passandroid.ui.state.MainViewModel
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassUiModel
+import org.ligi.passandroid.ui.state.hasDisplayableCode
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.repository.StartupAppearanceStore
 import org.ligi.passandroid.platform.AndroidFlashlightController
@@ -178,6 +179,19 @@ fun PassTickApp(
         }
         onDispose {
             if (secureContentVisible) activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+    val codeDetailPassId = (backStack.lastOrNull() as? AppDestination.PassDetail)?.passId
+    val keepScreenOn = state.settings.codeKeepScreenOn && codeDetailPassId != null &&
+        state.passes.firstOrNull { it.id == codeDetailPassId }?.hasDisplayableCode() == true
+    DisposableEffect(keepScreenOn) {
+        if (keepScreenOn) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            if (keepScreenOn) activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
     val snackbarHostState = remember { SnackbarHostState() }

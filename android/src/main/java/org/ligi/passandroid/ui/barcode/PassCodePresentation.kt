@@ -1,6 +1,8 @@
 package org.ligi.passandroid.ui.barcode
 
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.Build
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
@@ -42,10 +44,26 @@ import androidx.compose.ui.window.DialogProperties
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import kotlinx.coroutines.withTimeoutOrNull
 
+/** Scanner compatibility options shared by every code surface. */
+data class CodeViewOptions(
+    val sizeStep: Int = 1,
+    val whiteSurround: Boolean = false,
+    val extraQuietZone: Boolean = false,
+    val rotateQuarterTurn: Boolean = false,
+    val keepScreenOn: Boolean = true,
+)
+
+internal fun codeSizeStepFactor(sizeStep: Int): Float = when (sizeStep.coerceIn(0, 2)) {
+    0 -> 0.85f
+    2 -> 1.25f
+    else -> 1f
+}
+
 @Composable
 fun PassCodePreview(
     format: PassBarCodeFormat,
     message: String,
+    options: CodeViewOptions,
     onHoldChanged: (Boolean) -> Unit,
     onPin: () -> Unit,
     modifier: Modifier = Modifier,
@@ -88,6 +106,7 @@ fun PassCodePreview(
             message = message,
             widthPx = constraints.maxWidth,
             heightPx = constraints.maxHeight,
+            options = options,
             contentDescription = "Pass code. Hold or tap to enlarge",
         )
     }
@@ -97,6 +116,7 @@ fun PassCodePreview(
 fun PassCodeImage(
     format: PassBarCodeFormat,
     message: String,
+    options: CodeViewOptions = CodeViewOptions(),
     modifier: Modifier = Modifier,
     contentDescription: String = "Pass code",
 ) {
@@ -106,6 +126,7 @@ fun PassCodeImage(
             message = message,
             widthPx = constraints.maxWidth,
             heightPx = constraints.maxHeight,
+            options = options,
             contentDescription = contentDescription,
         )
     }
@@ -116,6 +137,7 @@ fun ExpandedPassCodeDialog(
     format: PassBarCodeFormat,
     message: String,
     alternativeText: String?,
+    options: CodeViewOptions,
     enhanceBrightness: Boolean,
     onDismiss: () -> Unit,
 ) {
@@ -125,7 +147,9 @@ fun ExpandedPassCodeDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = true),
     ) {
         Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).clickable(onClick = onDismiss),
+            Modifier.fillMaxSize()
+                .background(if (options.whiteSurround) Color.White else Color.Black.copy(alpha = 0.72f))
+                .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
             Surface(
@@ -149,8 +173,9 @@ fun ExpandedPassCodeDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    val aspectRatio = if (format.isQuadratic()) 1f else 2.6f
                     BoxWithConstraints(
-                        Modifier.fillMaxWidth().aspectRatio(if (format.isQuadratic()) 1f else 2.6f),
+                        Modifier.fillMaxWidth().aspectRatio(aspectRatio / codeSizeStepFactor(options.sizeStep)),
                         contentAlignment = Alignment.Center,
                     ) {
                         CrispPassCode(
@@ -158,6 +183,7 @@ fun ExpandedPassCodeDialog(
                             message = message,
                             widthPx = constraints.maxWidth,
                             heightPx = constraints.maxHeight,
+                            options = options,
                             contentDescription = "Expanded pass code",
                         )
                     }
@@ -178,11 +204,12 @@ private fun CrispPassCode(
     message: String,
     widthPx: Int,
     heightPx: Int,
+    options: CodeViewOptions,
     contentDescription: String,
 ) {
     val density = LocalDensity.current
-    val bitmap = remember(format, message, widthPx, heightPx) {
-        CrispBarcodeRenderer.renderBitmap(message, format, widthPx.coerceAtLeast(1), heightPx.coerceAtLeast(1))
+    val bitmap = remember(passCodeBitmapKey(format, message, widthPx, heightPx, options)) {
+        renderPassCodeBitmap(format, message, widthPx, heightPx, options)
     }
     if (bitmap == null) {
         Text("Code cannot be displayed", color = Color.Black)
@@ -199,6 +226,29 @@ private fun CrispPassCode(
         )
     }
 }
+
+// A rotated code renders against the swapped target, so the result fits the layout bounds.
+private fun renderPassCodeBitmap(
+    format: PassBarCodeFormat,
+    message: String,
+    widthPx: Int,
+    heightPx: Int,
+    options: CodeViewOptions,
+): Bitmap? {
+    val targetWidth = if (options.rotateQuarterTurn) heightPx else widthPx
+    val targetHeight = if (options.rotateQuarterTurn) widthPx else heightPx
+    val rendered = CrispBarcodeRenderer.renderBitmap(
+        message,
+        format,
+        targetWidth.coerceAtLeast(1),
+        targetHeight.coerceAtLeast(1),
+        options.extraQuietZone,
+    ) ?: return null
+    return if (options.rotateQuarterTurn) rendered.rotatedQuarterTurn() else rendered
+}
+
+private fun Bitmap.rotatedQuarterTurn(): Bitmap =
+    Bitmap.createBitmap(this, 0, 0, width, height, Matrix().apply { postRotate(90f) }, true)
 
 @Composable
 fun PassCodeBrightnessEffect() {

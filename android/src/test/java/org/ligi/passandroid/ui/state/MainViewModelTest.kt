@@ -967,6 +967,11 @@ private class FakeSettingsRepository(initial: AppSettings = AppSettings()) : Set
         settings.value = settings.value.copy(colorStyle = value)
     }
     override suspend fun setAutomaticBrightness(value: Boolean) = Unit
+    override suspend fun setCodeSizeStep(value: Int) = Unit
+    override suspend fun setCodeWhiteSurround(value: Boolean) = Unit
+    override suspend fun setCodeExtraQuietZone(value: Boolean) = Unit
+    override suspend fun setCodeRotateQuarterTurn(value: Boolean) = Unit
+    override suspend fun setCodeKeepScreenOn(value: Boolean) = Unit
     override suspend fun setSortOrder(value: PassSortOrder) {
         settings.value = settings.value.copy(sortOrder = value)
     }
