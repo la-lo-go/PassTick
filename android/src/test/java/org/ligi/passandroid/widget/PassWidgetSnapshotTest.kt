@@ -2,6 +2,7 @@ package org.ligi.passandroid.widget
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
+import org.ligi.passandroid.model.pass.PassType
 import java.time.Instant
 import java.time.ZoneId
 
@@ -13,10 +14,15 @@ class PassWidgetSnapshotTest {
                 WidgetPass(
                     id = "today",
                     title = "Evening train",
+                    issuer = null,
+                    type = PassType.EVENT,
+                    isPinned = false,
                     startsAtEpochMillis = Instant.parse("2026-08-30T21:30:00Z").toEpochMilli(),
                     endsAtEpochMillis = Instant.parse("2026-08-30T22:30:00Z").toEpochMilli(),
                     location = "Madrid",
                     supportingText = null,
+                    barcodeFormat = null,
+                    barcodeMessage = null,
                 ),
             ),
         )
@@ -39,10 +45,15 @@ class PassWidgetSnapshotTest {
                 WidgetPass(
                     id = "today",
                     title = "Evening train",
+                    issuer = null,
+                    type = PassType.EVENT,
+                    isPinned = false,
                     startsAtEpochMillis = boundary.toEpochMilli(),
                     endsAtEpochMillis = Instant.parse("2026-08-30T22:30:00Z").toEpochMilli(),
                     location = null,
                     supportingText = null,
+                    barcodeFormat = null,
+                    barcodeMessage = null,
                 ),
             ),
         )

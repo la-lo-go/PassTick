@@ -48,6 +48,8 @@ import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.reminder.buildPassReminders
 import org.ligi.passandroid.reminder.PassReminderOverride
 import org.ligi.passandroid.widget.WidgetSnapshotPublisher
+import org.ligi.passandroid.widget.WidgetRefresher
+import org.ligi.passandroid.shortcuts.ShortcutsPublisher
 
 class MainViewModel(
     private val passRepository: PassRepository,
@@ -55,6 +57,8 @@ class MainViewModel(
     private val platformActions: PlatformActions,
     private val reminderScheduler: ReminderScheduler = ReminderScheduler.None,
     private val widgetPublisher: WidgetSnapshotPublisher? = null,
+    private val shortcutsPublisher: ShortcutsPublisher? = null,
+    private val widgetRefresher: WidgetRefresher? = null,
     private val strings: StringResolver = StringResolver { _, _ -> "" },
 ) : ViewModel() {
     private var reminderActionOverrides: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>>? = null
@@ -115,6 +119,7 @@ class MainViewModel(
             },
             timeline = timeline,
             systemAccentColor = systemAccentColor,
+            codePassPickerRows = codePassPickerRows(collections.passes, settings),
         )
     }.combine(importReview) { currentState, review ->
         currentState.copy(importReview = review)
@@ -174,6 +179,18 @@ class MainViewModel(
                             currentPasses.filterNot(PassSnapshot::isTrashed),
                             widgetExcludedIds,
                             settings.lockAllPasses,
+                            settings.homeCardSectionOrder,
+                            settings.hiddenHomeCardSections,
+                            settings.categories,
+                        )
+                    }
+                    runCatching {
+                        shortcutsPublisher?.publish(
+                            currentPasses.filterNot(PassSnapshot::isTrashed),
+                            settings.lockAllPasses,
+                            settings.homeCardSectionOrder,
+                            settings.hiddenHomeCardSections,
+                            settings.categories,
                         )
                     }
                     if (settings.automaticallyMarkPast) {
@@ -187,10 +204,6 @@ class MainViewModel(
     }
 
     fun onAction(action: AppAction) {
-        if (action is AppAction.SetPassReminderActions) {
-            viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) { setPassReminderActions(action) }
-            return
-        }
         if (handlePassMetadataAction(action)) return
         if (action is AppAction.ClearMessage) {
             message.value = null
@@ -202,6 +215,7 @@ class MainViewModel(
         if (handleTrashAction(action)) return
         if (handleCategoryAction(action)) return
         if (handleHomeAction(action)) return
+        if (handleCodeSettingsAction(action)) return
         if (handleAppearanceSettingsAction(action)) return
         if (handlePassListSettingsAction(action)) return
         if (handlePrivacySettingsAction(action)) return
@@ -637,6 +651,53 @@ class MainViewModel(
         else -> false
     }
 
+    private fun handleCodeSettingsAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetAutomaticBrightness -> {
+            viewModelScope.launch {
+                settingsRepository.setAutomaticBrightness(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodePassId -> {
+            viewModelScope.launch {
+                settingsRepository.setCodePassId(action.value)
+                runCatching { widgetRefresher?.refresh() }
+            }
+            true
+        }
+        is AppAction.SetCodeSizeStep -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeSizeStep(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeWhiteSurround -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeWhiteSurround(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeExtraQuietZone -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeExtraQuietZone(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeRotateQuarterTurn -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeRotateQuarterTurn(action.value)
+            }
+            true
+        }
+        is AppAction.SetCodeKeepScreenOn -> {
+            viewModelScope.launch {
+                settingsRepository.setCodeKeepScreenOn(action.value)
+            }
+            true
+        }
+        else -> false
+    }
+
     private fun handleAppearanceSettingsAction(action: AppAction): Boolean = when (action) {
         is AppAction.SetTheme -> {
             viewModelScope.launch { settingsRepository.setThemeMode(action.value) }
@@ -671,12 +732,6 @@ class MainViewModel(
             }
             true
         }
-        is AppAction.SetAutomaticBrightness -> {
-            viewModelScope.launch {
-                settingsRepository.setAutomaticBrightness(action.value)
-            }
-            true
-        }
         is AppAction.SetBlockScreenshots -> {
             viewModelScope.launch {
                 settingsRepository.setBlockScreenshots(action.value)
@@ -692,40 +747,6 @@ class MainViewModel(
         is AppAction.SetImageExportOptions -> {
             viewModelScope.launch {
                 settingsRepository.setImageExportOptions(action.value)
-            }
-            true
-        }
-        else -> handleCodeViewSettingsAction(action)
-    }
-
-    private fun handleCodeViewSettingsAction(action: AppAction): Boolean = when (action) {
-        is AppAction.SetCodeSizeStep -> {
-            viewModelScope.launch {
-                settingsRepository.setCodeSizeStep(action.value)
-            }
-            true
-        }
-        is AppAction.SetCodeWhiteSurround -> {
-            viewModelScope.launch {
-                settingsRepository.setCodeWhiteSurround(action.value)
-            }
-            true
-        }
-        is AppAction.SetCodeExtraQuietZone -> {
-            viewModelScope.launch {
-                settingsRepository.setCodeExtraQuietZone(action.value)
-            }
-            true
-        }
-        is AppAction.SetCodeRotateQuarterTurn -> {
-            viewModelScope.launch {
-                settingsRepository.setCodeRotateQuarterTurn(action.value)
-            }
-            true
-        }
-        is AppAction.SetCodeKeepScreenOn -> {
-            viewModelScope.launch {
-                settingsRepository.setCodeKeepScreenOn(action.value)
             }
             true
         }
@@ -815,6 +836,10 @@ class MainViewModel(
     }
 
     private fun handleReminderAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetPassReminderActions -> {
+            viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) { setPassReminderActions(action) }
+            true
+        }
         is AppAction.TogglePassReminder -> {
             togglePassReminder(action)
             true

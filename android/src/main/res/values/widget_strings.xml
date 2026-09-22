@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_pass_overview_description">Active and upcoming passes</string>
+    <string name="widget_pass_code_description">Pass code</string>
+    <string name="code_widget_empty">No pass selected</string>
+    <string name="code_widget_no_code">No barcode</string>
+    <string name="code_widget_configure_title">Pass code</string>
+    <string name="code_widget_automatic">Automatic</string>
+    <string name="code_widget_automatic_subtitle">First pinned or next pass</string>
+    <string name="code_widget_no_passes">No passes to choose from</string>
+    <string name="tile_pass_code">Pass code</string>
 </resources>

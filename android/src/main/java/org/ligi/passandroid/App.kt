@@ -26,7 +26,11 @@ import org.ligi.passandroid.ui.state.StringResolver
 import org.ligi.passandroid.reminder.AndroidReminderScheduler
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.widget.PassWidgetSnapshotPublisher
+import org.ligi.passandroid.widget.PassWidgetRefresher
+import org.ligi.passandroid.widget.WidgetRefresher
 import org.ligi.passandroid.widget.WidgetSnapshotPublisher
+import org.ligi.passandroid.shortcuts.PassShortcutsPublisher
+import org.ligi.passandroid.shortcuts.ShortcutsPublisher
 import java.io.File
 
 open class App : Application() {
@@ -50,13 +54,15 @@ open class App : Application() {
             single<PlatformActions> { AndroidPlatformActions(this@App, activityProvider = { currentActivity }) }
             single<ReminderScheduler> { AndroidReminderScheduler(this@App) }
             single<WidgetSnapshotPublisher> { PassWidgetSnapshotPublisher(this@App) }
+            single<WidgetRefresher> { PassWidgetRefresher(this@App) }
+            single<ShortcutsPublisher> { PassShortcutsPublisher(this@App) }
             single<StringResolver> {
                 val context = get<Context>()
                 object : StringResolver {
                     override fun resolve(id: Int, vararg args: Any): String = context.getString(id, *args)
                 }
             }
-            viewModel { MainViewModel(get(), get(), get(), get(), get(), get()) }
+            viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
         }
     }
 

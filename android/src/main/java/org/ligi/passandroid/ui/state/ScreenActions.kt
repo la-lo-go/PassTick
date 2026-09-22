@@ -76,6 +76,7 @@ sealed interface SettingsAction {
     data object OpenCodeSettings : SettingsAction
     data object OpenPassViewSettings : SettingsAction
     data object OpenHomeCardSettings : SettingsAction
+    data object OpenPassCodeSettings : SettingsAction
     data class SetHighlightTodayPasses(val value: Boolean) : SettingsAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : SettingsAction
     data class SetTrashEnabled(val value: Boolean) : SettingsAction

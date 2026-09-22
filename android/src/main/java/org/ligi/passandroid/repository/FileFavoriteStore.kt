@@ -2,9 +2,6 @@ package org.ligi.passandroid.repository
 
 import org.json.JSONArray
 import java.io.File
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 open class FileFavoriteStore(
     private val backingFile: File,
@@ -40,7 +37,7 @@ open class FileFavoriteStore(
         val temporaryFile = File.createTempFile("${backingFile.name}.", ".tmp", parent)
         try {
             temporaryFile.writeText(JSONArray(ids.sorted()).toString())
-            replaceFile(temporaryFile, backingFile)
+            replaceFileAtomically(temporaryFile, backingFile)
         } finally {
             temporaryFile.delete()
         }
@@ -59,17 +56,5 @@ open class FileFavoriteStore(
             }.getOrDefault(mutableSetOf())
         }
 
-        fun replaceFile(source: File, target: File) {
-            try {
-                Files.move(
-                    source.toPath(),
-                    target.toPath(),
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING,
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-        }
     }
 }

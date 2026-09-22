@@ -112,6 +112,7 @@ internal fun ReminderChoice(label: String, selected: Boolean, enabled: Boolean =
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
+    codePassLabel: String? = null,
     systemAccentColor: Long? = null,
     scrollToNotifications: Boolean = false,
     onNotificationScrollConsumed: () -> Unit = {},
@@ -363,7 +364,11 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
 }
 
 @Composable
-internal fun CodeSettingsGroup(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+internal fun CodeSettingsGroup(
+    settings: AppSettings,
+    codePassLabel: String?,
+    onAction: (SettingsAction) -> Unit,
+) {
     SettingsGroup(
         entries = buildList {
             add(
@@ -373,6 +378,16 @@ internal fun CodeSettingsGroup(settings: AppSettings, onAction: (SettingsAction)
                         settings.automaticBrightness,
                         supportingText = stringResource(R.string.settings_use_max_brightness_for_codes_support),
                     ) { onAction(SettingsAction.SetAutomaticBrightness(it)) }
+                },
+            )
+            add(
+                settingsItem {
+                    PassListSetting(
+                        icon = Icons.Default.QrCode,
+                        title = stringResource(R.string.settings_pass_code_source),
+                        supportingText = codePassLabel
+                            ?: stringResource(R.string.code_widget_automatic_subtitle),
+                    ) { onAction(SettingsAction.OpenPassCodeSettings) }
                 },
             )
             add(settingsHeader(stringResource(R.string.settings_code_size)))
@@ -466,10 +481,15 @@ private fun PassListSettings(onAction: (SettingsAction) -> Unit) {
 private fun PassListSetting(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
+    supportingText: String? = null,
     onClick: () -> Unit,
 ) {
+    val supporting: (@Composable () -> Unit)? = supportingText
+        ?.takeIf(String::isNotBlank)
+        ?.let { text -> { Text(text) } }
     ListItem(
         leadingContent = { Icon(icon, null) },
+        supportingContent = supporting,
         modifier = Modifier.clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     ) { Text(title) }

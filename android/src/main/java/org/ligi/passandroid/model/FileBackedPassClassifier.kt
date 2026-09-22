@@ -4,9 +4,7 @@ import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import java.io.File
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import org.ligi.passandroid.repository.replaceFileAtomically
 
 class FileBackedPassClassifier(
     private val backingFile: File,
@@ -27,7 +25,7 @@ class FileBackedPassClassifier(
         val temporaryFile = File.createTempFile("${backingFile.name}.", ".tmp", parent)
         try {
             temporaryFile.writeText(adapter.toJson(topicByIdMap))
-            replaceFile(temporaryFile, backingFile)
+            replaceFileAtomically(temporaryFile, backingFile)
         } finally {
             temporaryFile.delete()
         }
@@ -47,17 +45,5 @@ class FileBackedPassClassifier(
                 ?: mutableMapOf()
         }
 
-        private fun replaceFile(source: File, target: File) {
-            try {
-                Files.move(
-                    source.toPath(),
-                    target.toPath(),
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING,
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-        }
     }
 }

@@ -131,6 +131,26 @@ data class PassUiModel(
             documentPageCount = pass.documentPageCount,
             barcodes = pass.barcodes.map { PassBarcodeUiModel(it.format, it.message, it.alternativeText) },
         )
+
+        /**
+         * Card-line projection of a stored pass. It omits artwork, barcodes, and calendar events,
+         * so the widget snapshot stays free of Android-only deep links.
+         */
+        internal fun fromCardLines(pass: PassSnapshot) = PassUiModel(
+            id = pass.id,
+            description = pass.description,
+            creator = pass.creator,
+            type = pass.type,
+            accentColor = pass.accentColor,
+            barcodeFormat = pass.barcodeFormat,
+            barcodeMessage = pass.barcodeMessage,
+            barcodeAlternativeText = pass.barcodeAlternativeText,
+            fields = pass.fields.map { PassFieldUiModel(it.key, it.label, it.value, it.hidden, it.hint) },
+            locations = emptyList(),
+            calendarEvent = null,
+            calendarTimeSpan = pass.calendarTimeSpan?.let { PassTimeSpanUiModel(it.from, it.to) },
+            tagIds = pass.tagIds,
+        )
     }
 
     fun homeCardDetail(): String? = fields.asSequence()
@@ -203,6 +223,7 @@ data class MainUiState(
     val isPreparingImport: Boolean = false,
     /** Passes imported in the last moments; the home list animates them into view. */
     val recentlyImportedIds: Set<String> = emptySet(),
+    val codePassPickerRows: List<CodePassPickerRow> = emptyList(),
 )
 
 sealed interface AppAction {
@@ -249,6 +270,7 @@ sealed interface AppAction {
     data class SetCodeExtraQuietZone(val value: Boolean) : AppAction
     data class SetCodeRotateQuarterTurn(val value: Boolean) : AppAction
     data class SetCodeKeepScreenOn(val value: Boolean) : AppAction
+    data class SetCodePassId(val value: String?) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
     data class ReorderPass(val orderedVisibleIds: List<String>) : AppAction
     data class SetHighlightTodayPasses(val value: Boolean) : AppAction

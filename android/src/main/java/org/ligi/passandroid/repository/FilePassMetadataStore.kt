@@ -3,9 +3,6 @@ package org.ligi.passandroid.repository
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /** Persists user metadata that is independent from the imported pass file. */
 class FilePassMetadataStore(private val backingFile: File) {
@@ -154,11 +151,7 @@ class FilePassMetadataStore(private val backingFile: File) {
                 useCount.toSortedMap().forEach { (id, count) -> put(id, count) }
             })
             temporary.writeText(json.toString())
-            try {
-                Files.move(temporary.toPath(), backingFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(temporary.toPath(), backingFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
+            replaceFileAtomically(temporary, backingFile)
         } finally {
             temporary.delete()
         }

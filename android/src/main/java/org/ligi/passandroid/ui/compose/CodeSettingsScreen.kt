@@ -22,7 +22,11 @@ import org.ligi.passandroid.ui.state.SettingsAction
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CodeSettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+fun CodeSettingsScreen(
+    settings: AppSettings,
+    codePassLabel: String? = null,
+    onAction: (SettingsAction) -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -39,7 +43,7 @@ fun CodeSettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit
             Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
         ) {
-            item { CodeSettingsGroup(settings, onAction) }
+            item { CodeSettingsGroup(settings, codePassLabel, onAction) }
         }
     }
 }

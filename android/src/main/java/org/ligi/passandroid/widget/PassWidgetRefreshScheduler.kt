@@ -23,9 +23,11 @@ internal fun scheduleNextWidgetRefresh(
 ) {
     val alarmManager = requireNotNull(context.getSystemService(AlarmManager::class.java))
     val pendingIntent = widgetRefreshIntent(context)
-    val widgetIds = AppWidgetManager.getInstance(context)
-        .getAppWidgetIds(ComponentName(context, PassOverviewWidgetReceiver::class.java))
-    if (widgetIds.isEmpty()) {
+    val hasInstances = WIDGET_RECEIVERS.any { receiver ->
+        val componentName = ComponentName(context, receiver)
+        AppWidgetManager.getInstance(context).getAppWidgetIds(componentName).isNotEmpty()
+    }
+    if (!hasInstances) {
         alarmManager.cancel(pendingIntent)
         return
     }
@@ -44,6 +46,7 @@ class PassWidgetRefreshReceiver : BroadcastReceiver() {
             try {
                 val snapshot = PassWidgetSnapshotStore(context).read()
                 PassOverviewWidget().updateAll(context)
+                PassCodeWidget().updateAll(context)
                 scheduleNextWidgetRefresh(context, snapshot)
             } finally {
                 pendingResult.finish()
@@ -57,6 +60,11 @@ private fun widgetRefreshIntent(context: Context) = PendingIntent.getBroadcast(
     0,
     Intent(context, PassWidgetRefreshReceiver::class.java).setAction(ACTION_REFRESH_WIDGET),
     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+)
+
+private val WIDGET_RECEIVERS = listOf(
+    PassOverviewWidgetReceiver::class.java,
+    PassCodeWidgetReceiver::class.java,
 )
 
 private const val ACTION_REFRESH_WIDGET = "org.ligi.passandroid.action.REFRESH_WIDGET"
