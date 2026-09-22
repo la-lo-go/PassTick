@@ -10,8 +10,8 @@
         android:pivotX="54"
         android:pivotY="54"
         android:rotation="-45"
-        android:scaleX="0.48"
-        android:scaleY="0.48">
+        android:scaleX="0.55"
+        android:scaleY="0.55">
         <path
             android:fillColor="#FFFFFFFF"
             android:fillType="evenOdd"
