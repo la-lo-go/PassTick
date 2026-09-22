@@ -1,0 +1,5 @@
+- Back up and restore all passes in one archive, and import .pkpasses bundles.
+- Create and duplicate passes, replace the artwork, and read codes from a photo.
+- Reach a pass code from the widget, the quick settings tile, and launcher shortcuts.
+- Expire, snooze, and archive passes automatically, and order the list by use.
+- New barcode formats: Codabar, Code 93, and UPC, plus scanner compatibility options.
