@@ -280,6 +280,24 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                 }
             }
             item {
+                EditorSection(stringResource(R.string.edit_pass_images), initiallyExpanded = false) {
+                    PassArtworkKind.entries.forEach { kind ->
+                        ArtworkEditorRow(
+                            kind = kind,
+                            artwork = pass?.artwork?.firstOrNull { it.kind == kind },
+                            replacementPending = artworkUpdates.any { it.kind == kind },
+                            accentColor = accentColor,
+                            onReplace = {
+                                pendingArtworkKind = kind
+                                artworkPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+            item {
                 EditorSection(stringResource(R.string.edit_pass_calendar)) {
                     DatePickerField(stringResource(R.string.edit_pass_start_date), calendarStart, {
                         calendarStart = it
@@ -369,24 +387,6 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                         onClick = { fields = fields + PassFieldUiModel("local-${fields.size + 1}", "", "", false, null) },
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.edit_pass_add_field)) }
-                }
-            }
-            item {
-                EditorSection(stringResource(R.string.edit_pass_images), initiallyExpanded = true) {
-                    PassArtworkKind.entries.forEach { kind ->
-                        ArtworkEditorRow(
-                            kind = kind,
-                            artwork = pass?.artwork?.firstOrNull { it.kind == kind },
-                            replacementPending = artworkUpdates.any { it.kind == kind },
-                            accentColor = accentColor,
-                            onReplace = {
-                                pendingArtworkKind = kind
-                                artworkPicker.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                                )
-                            },
-                        )
-                    }
                 }
             }
             item {

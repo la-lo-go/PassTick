@@ -186,7 +186,6 @@ data class PassDraft(
 const val PROTECTED_PASSES_CATEGORY_ID = "protected"
 const val PINNED_PASSES_CATEGORY_ID = "pinned"
 const val ARCHIVED_PASSES_CATEGORY_ID = "archived"
-const val EXPIRED_PASSES_CATEGORY_ID = "expired"
 const val TRASHED_PASSES_CATEGORY_ID = "trashed"
 
 data class MainUiState(

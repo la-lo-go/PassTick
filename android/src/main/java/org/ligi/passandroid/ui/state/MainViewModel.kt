@@ -110,7 +110,6 @@ class MainViewModel(
                     PROTECTED_PASSES_CATEGORY_ID,
                     PINNED_PASSES_CATEGORY_ID,
                     ARCHIVED_PASSES_CATEGORY_ID,
-                    EXPIRED_PASSES_CATEGORY_ID,
                     TRASHED_PASSES_CATEGORY_ID,
                 ) || categories.any { it.id == requested }
             },

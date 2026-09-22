@@ -365,7 +365,6 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
 @Composable
 internal fun CodeSettingsGroup(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     SettingsGroup(
-        title = stringResource(R.string.settings_code),
         entries = buildList {
             add(
                 settingsItem {
@@ -386,6 +385,7 @@ internal fun CodeSettingsGroup(settings: AppSettings, onAction: (SettingsAction)
                     },
                 )
             }
+            add(settingsHeader(stringResource(R.string.settings_code_scanner)))
             add(
                 settingsItem {
                     SettingSwitch(
@@ -413,6 +413,7 @@ internal fun CodeSettingsGroup(settings: AppSettings, onAction: (SettingsAction)
                     ) { onAction(SettingsAction.SetCodeRotateQuarterTurn(it)) }
                 },
             )
+            add(settingsHeader(stringResource(R.string.settings_code_screen)))
             add(
                 settingsItem {
                     SettingSwitch(
@@ -448,13 +449,13 @@ private fun PassListSettings(onAction: (SettingsAction) -> Unit) {
                 }
             },
             settingsItem {
-                PassListSetting(Icons.AutoMirrored.Filled.Label, "Tags") {
-                    onAction(SettingsAction.OpenCategories)
+                PassListSetting(Icons.Default.QrCode, stringResource(R.string.settings_code)) {
+                    onAction(SettingsAction.OpenCodeSettings)
                 }
             },
             settingsItem {
-                PassListSetting(Icons.Default.QrCode, stringResource(R.string.settings_code)) {
-                    onAction(SettingsAction.OpenCodeSettings)
+                PassListSetting(Icons.AutoMirrored.Filled.Label, "Tags") {
+                    onAction(SettingsAction.OpenCategories)
                 }
             },
         ),
@@ -770,9 +771,11 @@ private fun settingsItem(visible: Boolean = true, content: @Composable () -> Uni
 private fun settingsHeader(text: String, visible: Boolean = true) = SettingsEntry.Header(text, visible)
 
 @Composable
-private fun SettingsGroup(title: String, modifier: Modifier = Modifier, entries: List<SettingsEntry>) {
+private fun SettingsGroup(title: String? = null, modifier: Modifier = Modifier, entries: List<SettingsEntry>) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+        title?.let {
+            Text(it, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+        }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             entries.forEachIndexed { index, entry ->
                 when (entry) {

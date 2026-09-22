@@ -2,10 +2,6 @@ package org.ligi.passandroid.ui.compose
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import org.ligi.passandroid.model.pass.PassType
-import org.ligi.passandroid.ui.state.EXPIRED_PASSES_CATEGORY_ID
-import org.ligi.passandroid.ui.state.PassUiModel
-import org.threeten.bp.ZonedDateTime
 
 class HomePassSectionsTest {
     @Test
@@ -60,64 +56,6 @@ class HomePassSectionsTest {
         assertThat(sections.pinned.map(Pass::id)).containsExactly("today-pinned")
         assertThat(sections.other.map(Pass::id)).containsExactly("today")
     }
-
-    @Test
-    fun `the Expired filter keeps only passes whose validity end passed`() {
-        val now = ZonedDateTime.parse("2026-08-30T12:00:00Z")
-
-        val selected = selectHomePasses(
-            passes = listOf(
-                uiPass("expired", expiresAt = now.minusMinutes(1)),
-                uiPass("active", expiresAt = now.plusMinutes(1)),
-                uiPass("at-end", expiresAt = now),
-                uiPass("open"),
-            ),
-            selectedCategoryId = EXPIRED_PASSES_CATEGORY_ID,
-            hiddenCategoryIds = emptySet(),
-            protectedPassIds = emptySet(),
-            now = now,
-        )
-
-        assertThat(selected.map(PassUiModel::id)).containsExactly("expired")
-    }
-
-    @Test
-    fun `the Expired filter ignores archive state`() {
-        val now = ZonedDateTime.parse("2026-08-30T12:00:00Z")
-
-        val selected = selectHomePasses(
-            passes = listOf(
-                uiPass("expired", expiresAt = now.minusMinutes(1)).copy(isArchived = true),
-                uiPass("hidden", expiresAt = now.minusMinutes(1), categoryId = "archive"),
-            ),
-            selectedCategoryId = EXPIRED_PASSES_CATEGORY_ID,
-            hiddenCategoryIds = setOf("archive"),
-            protectedPassIds = emptySet(),
-            now = now,
-        )
-
-        assertThat(selected.map(PassUiModel::id)).containsExactly("expired", "hidden")
-    }
-
-    private fun uiPass(
-        id: String,
-        expiresAt: ZonedDateTime? = null,
-        categoryId: String = "new",
-    ) = PassUiModel(
-        id = id,
-        description = "Pass $id",
-        creator = null,
-        type = PassType.EVENT,
-        accentColor = 0,
-        barcodeFormat = null,
-        barcodeMessage = null,
-        barcodeAlternativeText = null,
-        fields = emptyList(),
-        locations = emptyList(),
-        calendarEvent = null,
-        expiresAt = expiresAt,
-        categoryId = categoryId,
-    )
 
     private fun sections(
         vararg passes: Pass,

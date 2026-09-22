@@ -86,7 +86,7 @@
     <string name="edit_pass_add_field">Add field</string>
     <string name="edit_pass_save_and_close">Save and close</string>
     <string name="edit_pass_new_pass">New pass</string>
-    <string name="edit_pass_images">Images and photos</string>
+    <string name="edit_pass_images">Images</string>
     <string name="edit_pass_read_code_from_photo">Read code from photo</string>
     <string name="edit_pass_code_not_found">No code found in the image</string>
     <string name="edit_pass_replace_image">Replace</string>
@@ -154,6 +154,7 @@
     <string name="home_your_passes_live_here">Your passes live here</string>
     <string name="home_import_one_or_more_pass_files">Import one or more pass files.</string>
     <string name="home_no_matching_passes">No matching passes</string>
+    <string name="home_show_all_passes">Show all passes</string>
     <string name="home_clear_search">Clear search</string>
     <string name="home_navigation_menu">Navigation menu</string>
     <string name="home_search_passes">Search passes</string>
@@ -190,6 +191,7 @@
     <string name="settings_code_size_small">Small</string>
     <string name="settings_code_size_normal">Normal</string>
     <string name="settings_code_size_large">Large</string>
+    <string name="settings_code_scanner">Scanner</string>
     <string name="settings_code_extra_quiet_zone">Extra quiet zone</string>
     <string name="settings_code_extra_quiet_zone_support">Adds white space around the code for difficult scanners.</string>
     <string name="settings_code_white_surround">White surround in full screen</string>
@@ -198,6 +200,7 @@
     <string name="settings_code_rotate_quarter_turn_support">Turns the code sideways to match the scanner.</string>
     <string name="settings_code_keep_screen_on">Keep the screen on</string>
     <string name="settings_code_keep_screen_on_support">Prevents the screen from sleeping while a pass with a code is open.</string>
+    <string name="settings_code_screen">Screen</string>
     <string name="settings_privacy">Privacy</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s (%2$d)</string>
@@ -221,7 +224,7 @@
     <string name="settings_notification_actions">Notification actions</string>
     <string name="settings_data">Data</string>
     <string name="settings_export_all_passes">Export all passes</string>
-    <string name="settings_restore_from_backup">Restore from backup</string>
+    <string name="settings_restore_from_backup">Restore .passtick backup</string>
     <string name="category_tag_color">Tag color</string>
     <string name="home_today">Today</string>
     <string name="home_other_passes">Other passes</string>

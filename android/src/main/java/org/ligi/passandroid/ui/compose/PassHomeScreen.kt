@@ -45,7 +45,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
@@ -121,7 +120,6 @@ import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.ui.state.MainUiState
-import org.ligi.passandroid.ui.state.EXPIRED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
@@ -402,16 +400,6 @@ fun PassHomeScreen(
                             onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
                             modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
                         )
-                        NavigationDrawerItem(
-                            label = { Text(stringResource(R.string.home_expired)) },
-                            selected = state.selectedCategoryId == EXPIRED_PASSES_CATEGORY_ID,
-                            icon = { Icon(Icons.Default.HourglassEmpty, null) },
-                            onClick = {
-                                scope.launch { drawerState.close() }
-                                onAction(HomeAction.SelectCategory(EXPIRED_PASSES_CATEGORY_ID))
-                            },
-                            modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_expired"),
-                        )
                         if (state.trashedPasses.isNotEmpty()) {
                             NavigationDrawerItem(
                                 label = { Text(stringResource(R.string.home_trash)) },
@@ -530,7 +518,11 @@ fun PassHomeScreen(
                 val emptyStateVisible = hasNoVisiblePasses && emptyStateAllowed
                 if (emptyStateVisible && !state.isContentLoading && !state.isBusy) {
                     item(key = "empty") {
-                        if (searchTerms.isEmpty()) EmptyHome() else EmptySearch(searchQuery)
+                        when {
+                            searchTerms.isNotEmpty() -> EmptySearch(searchQuery)
+                            state.selectedCategoryId != null -> EmptyFilter { onAction(HomeAction.SelectCategory(null)) }
+                            else -> EmptyHome()
+                        }
                     }
                 }
                 if (showLockedSection) {
@@ -917,6 +909,18 @@ private fun EmptySearch(query: String) {
     ) {
         Text(stringResource(R.string.home_no_matching_passes), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.home_no_matches_for_query, query.trim()), style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun EmptyFilter(onShowAll: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().widthIn(max = 520.dp).padding(horizontal = 24.dp, vertical = 56.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(stringResource(R.string.home_no_matching_passes), style = MaterialTheme.typography.headlineSmall)
+        TextButton(onClick = onShowAll) { Text(stringResource(R.string.home_show_all_passes)) }
     }
 }
 

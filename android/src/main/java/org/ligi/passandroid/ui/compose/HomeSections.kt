@@ -3,12 +3,9 @@ package org.ligi.passandroid.ui.compose
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import org.ligi.passandroid.ui.state.ARCHIVED_PASSES_CATEGORY_ID
-import org.ligi.passandroid.ui.state.EXPIRED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PINNED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
-import org.ligi.passandroid.ui.state.isExpired
-import org.threeten.bp.ZonedDateTime
 
 internal data class HomePassSections<T>(
     val today: List<T>,
@@ -36,12 +33,10 @@ internal fun selectHomePasses(
     selectedCategoryId: String?,
     hiddenCategoryIds: Set<String>,
     protectedPassIds: Set<String>,
-    now: ZonedDateTime = ZonedDateTime.now(),
 ): List<PassUiModel> = when (selectedCategoryId) {
     PROTECTED_PASSES_CATEGORY_ID -> passes.filter { it.id in protectedPassIds }
     PINNED_PASSES_CATEGORY_ID -> passes.filter(PassUiModel::isFavorite)
     ARCHIVED_PASSES_CATEGORY_ID -> passes.filter(PassUiModel::isArchived)
-    EXPIRED_PASSES_CATEGORY_ID -> passes.filter { it.isExpired(now) }
     null -> passes.filterNot { it.categoryId in hiddenCategoryIds || it.isArchived }
     else -> passes.filter { it.categoryId == selectedCategoryId || selectedCategoryId in it.tagIds }
 }

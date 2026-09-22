@@ -53,7 +53,6 @@ import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassArtworkUiModel
 import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.MainUiState
-import org.ligi.passandroid.ui.state.EXPIRED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
@@ -173,9 +172,15 @@ class PassScreensTest {
             PassTheme(ThemeMode.LIGHT) { CodeSettingsScreen(AppSettings(), onAction = actions::add) }
         }
 
-        composeRule.onNodeWithText("Extra quiet zone").assertIsDisplayed()
+        // Only the app bar carries the screen title; the group has no inner title.
+        composeRule.onAllNodesWithText("Code").assertCountEquals(1)
+        composeRule.onNodeWithText("Use max brightness for codes").assertIsDisplayed()
+        composeRule.onNodeWithText("Code size").assertIsDisplayed()
+        composeRule.onNodeWithText("Scanner").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Extra quiet zone").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("White surround in full screen").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Rotate the code a quarter turn").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Screen").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Keep the screen on").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Large").performScrollTo().performClick()
 
@@ -399,6 +404,8 @@ class PassScreensTest {
         composeRule.onNodeWithText("Home cards").assertIsDisplayed()
         composeRule.onNodeWithText("Tags").assertIsDisplayed()
         composeRule.onNodeWithText("Code").assertIsDisplayed()
+        assertThat(composeRule.onNodeWithText("Code").fetchSemanticsNode().boundsInRoot.top)
+            .isLessThan(composeRule.onNodeWithText("Tags").fetchSemanticsNode().boundsInRoot.top)
         composeRule.onNodeWithText("Choose sections and their order").assertDoesNotExist()
         composeRule.onNodeWithText("Choose card content and order").assertDoesNotExist()
         composeRule.onNodeWithText("Manage names, icons, colors, and order").assertDoesNotExist()
@@ -413,11 +420,11 @@ class PassScreensTest {
 
         composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Export all passes"))
         composeRule.onNodeWithText("Export all passes").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Restore from backup"))
-        composeRule.onNodeWithText("Restore from backup").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Restore .passtick backup"))
+        composeRule.onNodeWithText("Restore .passtick backup").assertIsDisplayed()
 
         composeRule.onNodeWithText("Export all passes").performClick()
-        composeRule.onNodeWithText("Restore from backup").performClick()
+        composeRule.onNodeWithText("Restore .passtick backup").performClick()
 
         assertThat(actions).containsExactly(SettingsAction.ExportArchive, SettingsAction.ImportArchive)
     }
@@ -473,21 +480,23 @@ class PassScreensTest {
         composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(1)
         composeRule.onNodeWithText("Code").performClick()
         composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(4)
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(2)
+        composeRule.onNodeWithText("Images").assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
         composeRule.onNodeWithText("Artwork").assertDoesNotExist()
         composeRule.onNodeWithText("Gate").assertIsDisplayed()
         composeRule.onNodeWithText("Add field").assertIsDisplayed()
     }
 
     @Test
-    fun createEditorShowsNewPassTitleAndImageReplacement() {
+    fun createEditorShowsNewPassTitleAndCollapsedImagesSection() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass = null, onAction = {}) }
         }
 
         composeRule.onNodeWithText("New pass").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
-        composeRule.onNodeWithText("Images and photos").assertIsDisplayed()
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(2)
+        composeRule.onNodeWithText("Images").assertIsDisplayed()
     }
 
     @Test
@@ -536,13 +545,12 @@ class PassScreensTest {
     }
 
     @Test
-    fun expiredFilterShowsOnlyExpiredPassesWithABadge() {
+    fun expiredPassCarriesABadge() {
         val state = MainUiState(
             passes = listOf(
                 pass("old", "Old ticket", PassType.EVENT).copy(expiresAt = ZonedDateTime.parse("2020-10-04T18:30:00+02:00")),
                 pass("new", "Current ticket", PassType.EVENT).copy(expiresAt = ZonedDateTime.parse("2099-10-04T18:30:00+02:00")),
             ),
-            selectedCategoryId = EXPIRED_PASSES_CATEGORY_ID,
             isContentLoading = false,
         )
         composeRule.setContent {
@@ -551,21 +559,37 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Old ticket").assertIsDisplayed()
         composeRule.onNodeWithTag("expired_badge", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Current ticket").assertDoesNotExist()
+        composeRule.onNodeWithText("Current ticket").assertIsDisplayed()
     }
 
     @Test
-    fun drawerShowsTheExpiredFilter() {
-        val actions = mutableListOf<HomeAction>()
+    fun drawerHasNoExpiredFilter() {
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), actions::add) }
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), {}) }
         }
 
         composeRule.onNodeWithContentDescription("Navigation menu").performClick()
-        composeRule.onNodeWithTag("drawer_filter_expired").performClick()
-        composeRule.waitUntil(timeoutMillis = 2_000) { actions.isNotEmpty() }
 
-        assertThat(actions).containsExactly(HomeAction.SelectCategory(EXPIRED_PASSES_CATEGORY_ID))
+        composeRule.onNodeWithText("Expired").assertDoesNotExist()
+    }
+
+    @Test
+    fun emptyFilterOffersToShowAllPasses() {
+        val actions = mutableListOf<HomeAction>()
+        val state = MainUiState(
+            passes = listOf(pass("one", "Boarding pass", PassType.BOARDING)),
+            categories = defaultPassCategories,
+            selectedCategoryId = "archive",
+            isContentLoading = false,
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, actions::add) }
+        }
+
+        composeRule.onNodeWithText("No matching passes").assertIsDisplayed()
+        composeRule.onNodeWithText("Show all passes").performClick()
+
+        assertThat(actions).containsExactly(HomeAction.SelectCategory(null))
     }
 
     @Test

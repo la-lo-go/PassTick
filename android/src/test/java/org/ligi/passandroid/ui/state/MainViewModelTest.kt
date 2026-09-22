@@ -394,16 +394,16 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `accepts the expired virtual category`() = runTest(dispatcher) {
+    fun `accepts the archived virtual category`() = runTest(dispatcher) {
         val repository = FakePassRepository(emptyList())
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
         advanceUntilIdle()
 
-        viewModel.onAction(AppAction.SelectCategory(EXPIRED_PASSES_CATEGORY_ID))
+        viewModel.onAction(AppAction.SelectCategory(ARCHIVED_PASSES_CATEGORY_ID))
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo(EXPIRED_PASSES_CATEGORY_ID)
+        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo(ARCHIVED_PASSES_CATEGORY_ID)
     }
 
     @Test
