@@ -86,7 +86,7 @@
     <string name="edit_pass_add_field">Add field</string>
     <string name="edit_pass_save_and_close">Save and close</string>
     <string name="edit_pass_new_pass">New pass</string>
-    <string name="edit_pass_images">Images</string>
+    <string name="edit_pass_images">Images and photos</string>
     <string name="edit_pass_read_code_from_photo">Read code from photo</string>
     <string name="edit_pass_code_not_found">No code found in the image</string>
     <string name="edit_pass_replace_image">Replace</string>
@@ -187,6 +187,7 @@
     <string name="settings_use_max_brightness_for_codes">Use max brightness for codes</string>
     <string name="settings_use_max_brightness_for_codes_support">Uses HDR on screens that support it, otherwise maximum brightness.</string>
     <string name="settings_code_size">Code size</string>
+    <string name="settings_code_options">Code options</string>
     <string name="settings_code_size_small">Small</string>
     <string name="settings_code_size_normal">Normal</string>
     <string name="settings_code_size_large">Large</string>

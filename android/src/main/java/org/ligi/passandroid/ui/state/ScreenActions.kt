@@ -73,6 +73,7 @@ sealed interface SettingsAction {
     data class SetCodeKeepScreenOn(val value: Boolean) : SettingsAction
     data class SetSortOrder(val value: PassSortOrder) : SettingsAction
     data object OpenCategories : SettingsAction
+    data object OpenCodeSettings : SettingsAction
     data object OpenPassViewSettings : SettingsAction
     data object OpenHomeCardSettings : SettingsAction
     data class SetHighlightTodayPasses(val value: Boolean) : SettingsAction

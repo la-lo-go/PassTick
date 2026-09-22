@@ -163,17 +163,16 @@ class PassScreensTest {
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
         composeRule.onNodeWithText("Accent color").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Use AMOLED black background").assertIsDisplayed()
-        composeRule.onNodeWithText("Use max brightness for codes").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Code options").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun settingsExposeCodeViewOptions() {
         val actions = mutableListOf<SettingsAction>()
         composeRule.setContent {
-            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+            PassTheme(ThemeMode.LIGHT) { CodeSettingsScreen(AppSettings(), onAction = actions::add) }
         }
 
-        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Extra quiet zone"))
         composeRule.onNodeWithText("Extra quiet zone").assertIsDisplayed()
         composeRule.onNodeWithText("White surround in full screen").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Rotate the code a quarter turn").performScrollTo().assertIsDisplayed()
@@ -181,6 +180,19 @@ class PassScreensTest {
         composeRule.onNodeWithText("Large").performScrollTo().performClick()
 
         assertThat(actions).containsExactly(SettingsAction.SetCodeSizeStep(2))
+    }
+
+    @Test
+    fun settingsOpenTheCodeOptionsScreen() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Code options"))
+        composeRule.onNodeWithText("Code options").performClick()
+
+        assertThat(actions).containsExactly(SettingsAction.OpenCodeSettings)
     }
 
     @Test
@@ -474,7 +486,7 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("New pass").assertIsDisplayed()
         composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
-        composeRule.onNodeWithText("Images").assertIsDisplayed()
+        composeRule.onNodeWithText("Images and photos").assertIsDisplayed()
     }
 
     @Test

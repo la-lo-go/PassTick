@@ -372,7 +372,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                 }
             }
             item {
-                EditorSection(stringResource(R.string.edit_pass_images), initiallyExpanded = false) {
+                EditorSection(stringResource(R.string.edit_pass_images), initiallyExpanded = true) {
                     PassArtworkKind.entries.forEach { kind ->
                         ArtworkEditorRow(
                             kind = kind,

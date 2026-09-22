@@ -40,6 +40,7 @@ import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.ui.adaptive.AdaptivePassListDetailShell
 import org.ligi.passandroid.ui.barcode.CodeViewOptions
 import org.ligi.passandroid.ui.compose.CategorySettingsScreen
+import org.ligi.passandroid.ui.compose.CodeSettingsScreen
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.ExportImageScreen
 import org.ligi.passandroid.ui.compose.HomeAction
@@ -388,6 +389,11 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     handleSettingsAction(dependencies, action)
                 }
             }
+            entry<AppDestination.CodeSettings> {
+                CodeSettingsScreen(state.settings) { action ->
+                    handleSettingsAction(dependencies, action)
+                }
+            }
             entry<AppDestination.CategorySettings> {
                 CategorySettingsScreen(state.categories.filter { it.role == PassCategoryRole.CUSTOM }) { action ->
                     when (action) {
@@ -477,6 +483,10 @@ private fun handleNavigationSettingsAction(
     }
     SettingsAction.OpenCategories -> {
         dependencies.backStack.add(AppDestination.CategorySettings)
+        true
+    }
+    SettingsAction.OpenCodeSettings -> {
+        dependencies.backStack.add(AppDestination.CodeSettings)
         true
     }
     SettingsAction.OpenPassViewSettings -> {

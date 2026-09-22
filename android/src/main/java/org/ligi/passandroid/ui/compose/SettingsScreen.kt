@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Checkbox
@@ -134,7 +135,7 @@ fun SettingsScreen(
                 item { AppearanceSettings(settings, systemAccentColor, onAction) }
                 item { HomeSettings(settings, onAction) }
                 item { PassListSettings(onAction) }
-                item { CodeSettings(settings, onAction) }
+                item { CodeSettingsSection(onAction) }
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
                 item { ReminderSettings(settings, onAction) }
@@ -363,7 +364,21 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
 }
 
 @Composable
-private fun CodeSettings(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
+private fun CodeSettingsSection(onAction: (SettingsAction) -> Unit) {
+    SettingsGroup(
+        title = stringResource(R.string.settings_pass_codes),
+        entries = listOf(
+            settingsItem {
+                PassListSetting(Icons.Default.QrCode, stringResource(R.string.settings_code_options)) {
+                    onAction(SettingsAction.OpenCodeSettings)
+                }
+            },
+        ),
+    )
+}
+
+@Composable
+internal fun CodeSettingsGroup(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     SettingsGroup(
         title = stringResource(R.string.settings_pass_codes),
         entries = buildList {
