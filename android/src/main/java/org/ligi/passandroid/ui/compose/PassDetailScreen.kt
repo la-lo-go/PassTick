@@ -188,6 +188,7 @@ fun PassDetailScreen(
                         val available = buildSet {
                             if (pass?.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) add(NotificationAction.OPEN_CODE)
                             if (pass?.locations?.isNotEmpty() == true) add(NotificationAction.DIRECTIONS)
+                            add(NotificationAction.SNOOZE)
                         }
                         val selected = reminderActionOverride ?: available
                         if (reminderActionOverride != null) {
@@ -627,6 +628,7 @@ private fun ReminderActionSetting(action: NotificationAction, enabled: Boolean, 
     val label = when (action) {
         NotificationAction.OPEN_CODE -> stringResource(R.string.pass_detail_open_code)
         NotificationAction.DIRECTIONS -> stringResource(R.string.pass_detail_directions)
+        NotificationAction.SNOOZE -> stringResource(R.string.reminder_snooze)
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(enabled, onCheckedChange = onEnabled)

@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
@@ -118,6 +119,7 @@ import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.ui.state.MainUiState
+import org.ligi.passandroid.ui.state.EXPIRED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
@@ -215,21 +217,15 @@ fun PassHomeScreen(
         protectedPassIds,
         protectedPassesUnlocked,
     ) {
-        val selectedPasses = when (state.selectedCategoryId) {
-            PROTECTED_PASSES_CATEGORY_ID -> state.passes.filter { it.id in protectedPassIds }
-            "pinned" -> state.passes.filter(PassUiModel::isFavorite)
-            "archived" -> state.passes.filter(PassUiModel::isArchived)
-            null -> run {
-                val hiddenCategoryIds = state.categories
-                    .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
-                    .mapTo(mutableSetOf(), PassCategory::id)
-                state.passes.filterNot { it.categoryId in hiddenCategoryIds || it.isArchived }
-            }
-            else -> state.passes.filter {
-                it.categoryId == state.selectedCategoryId || state.selectedCategoryId in it.tagIds
-            }
-        }
-        selectedPasses.map { pass ->
+        val hiddenCategoryIds = state.categories
+            .filter { it.role == PassCategoryRole.ARCHIVE || it.role == PassCategoryRole.TRASH }
+            .mapTo(mutableSetOf(), PassCategory::id)
+        selectHomePasses(
+            passes = state.passes,
+            selectedCategoryId = state.selectedCategoryId,
+            hiddenCategoryIds = hiddenCategoryIds,
+            protectedPassIds = protectedPassIds,
+        ).map { pass ->
             pass.copy(isProtected = pass.id in protectedPassIds && !protectedPassesUnlocked)
         }
     }
@@ -396,6 +392,16 @@ fun PassHomeScreen(
                             icon = { Icon(Icons.Default.Archive, null) },
                             onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory("archived")) },
                             modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_archived"),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.home_expired)) },
+                            selected = state.selectedCategoryId == EXPIRED_PASSES_CATEGORY_ID,
+                            icon = { Icon(Icons.Default.HourglassEmpty, null) },
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                onAction(HomeAction.SelectCategory(EXPIRED_PASSES_CATEGORY_ID))
+                            },
+                            modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_expired"),
                         )
                         if (state.trashedPasses.isNotEmpty()) {
                             NavigationDrawerItem(

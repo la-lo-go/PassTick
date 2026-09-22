@@ -107,6 +107,7 @@ import org.ligi.passandroid.ui.state.PassCardLine
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.dateLabel
 import org.ligi.passandroid.ui.state.displayArtwork
+import org.ligi.passandroid.ui.state.isExpired
 import org.ligi.passandroid.ui.state.resolvePassCardLines
 import org.ligi.passandroid.ui.barcode.PassCodeImage
 import org.ligi.passandroid.ui.theme.PassActionButtonGroup
@@ -922,6 +923,7 @@ internal fun HomeCardBody(
                     )
                 }
             }
+            if (pass.isExpired()) ExpiredBadge()
         }
     }
 }
@@ -1072,6 +1074,23 @@ private fun CategoryBadge(category: PassCategory) {
             Spacer(Modifier.size(6.dp))
             Text(category.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
         }
+    }
+}
+
+@Composable
+private fun ExpiredBadge() {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = RoundedCornerShape(50),
+        modifier = Modifier.testTag("expired_badge"),
+    ) {
+        Text(
+            stringResource(R.string.home_expired),
+            Modifier.padding(horizontal = 8.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
     }
 }
 

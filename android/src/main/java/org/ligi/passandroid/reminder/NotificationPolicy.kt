@@ -4,7 +4,7 @@ import kotlin.math.max
 
 enum class NotificationPhase { UPCOMING, ACCESS }
 
-enum class NotificationAction { OPEN_CODE, DIRECTIONS }
+enum class NotificationAction { OPEN_CODE, DIRECTIONS, SNOOZE }
 
 enum class NotificationDisposition { SCHEDULE, SHOW, CANCEL }
 
@@ -12,7 +12,9 @@ enum class NotificationLockScreenDetail { FULL, HIDE_SENSITIVE, HIDDEN }
 
 data class NotificationStrings(
     val passReminder: String = "Pass reminder",
+    val passExpired: String = "Pass expired",
     val startsIn: (durationMillis: Long) -> String = { "Starts in ${durationLabel(it)}" },
+    val expiresIn: (durationMillis: Long) -> String = { "Expires in ${durationLabel(it)}" },
 )
 
 data class NotificationPolicySettings(
@@ -38,23 +40,29 @@ data class NotificationPolicyResult(
 )
 
 object NotificationPolicy {
+    /**
+     * A snooze delivery is always shown; the CANCEL branch would drop a reminder whose event started.
+     */
     fun evaluate(
         reminder: PassReminder,
         nowMillis: Long,
         settings: NotificationPolicySettings = NotificationPolicySettings(),
+        snoozed: Boolean = false,
     ): NotificationPolicyResult {
         val phase = phase(reminder, nowMillis, settings.accessWindowMinutes)
         val disposition = when {
+            snoozed -> NotificationDisposition.SHOW
             nowMillis >= reminder.eventAtMillis -> NotificationDisposition.CANCEL
             nowMillis < reminder.triggerAtMillis -> NotificationDisposition.SCHEDULE
             else -> NotificationDisposition.SHOW
         }
         val body = body(reminder, nowMillis, phase, settings)
         val isProtected = reminder.isProtected || settings.lockAllPasses
+        val title = if (reminder.isExpiration) settings.strings.passExpired else reminder.title
         return NotificationPolicyResult(
-            title = reminder.title,
+            title = title,
             body = body,
-            publicTitle = if (isProtected) settings.strings.passReminder else reminder.title,
+            publicTitle = if (isProtected) settings.strings.passReminder else title,
             publicBody = if (isProtected) publicBody(reminder, nowMillis, phase, settings) else body,
             phase = phase,
             actions = if (disposition == NotificationDisposition.CANCEL) emptySet() else actions(reminder, settings),
@@ -94,7 +102,11 @@ object NotificationPolicy {
         settings: NotificationPolicySettings,
     ): String = when (phase) {
         NotificationPhase.ACCESS, NotificationPhase.UPCOMING ->
-            settings.strings.startsIn(reminder.eventAtMillis - nowMillis)
+            if (reminder.isExpiration) {
+                settings.strings.expiresIn(reminder.eventAtMillis - nowMillis)
+            } else {
+                settings.strings.startsIn(reminder.eventAtMillis - nowMillis)
+            }
     }
 
     private fun actions(
@@ -105,6 +117,7 @@ object NotificationPolicy {
         val enabled = reminder.enabledActions ?: NotificationAction.entries.toSet()
         if (reminder.hasBarcode && NotificationAction.OPEN_CODE in enabled) add(NotificationAction.OPEN_CODE)
         if (reminder.hasLocation && NotificationAction.DIRECTIONS in enabled) add(NotificationAction.DIRECTIONS)
+        if (NotificationAction.SNOOZE in enabled) add(NotificationAction.SNOOZE)
     }
 
     private fun nextTrigger(

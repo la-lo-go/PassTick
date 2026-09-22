@@ -20,16 +20,42 @@ class AndroidReminderSchedulerTest {
     }
 
     @Test
+    fun anExpirationReminderNeverOwnsTheLifecycle() {
+        val event = PassReminder("pass:event:60", "pass", "Title", 20_000, 10_000, 30_000)
+        val expiration = event.copy(
+            id = "pass:event:expiration",
+            eventAtMillis = 90_000,
+            triggerAtMillis = 60_000,
+            endAtMillis = 90_000,
+            ownsLifecycle = false,
+            isExpiration = true,
+        )
+
+        assertThat(lifecycleOwners(listOf(expiration))).isEmpty()
+        assertThat(lifecycleOwners(listOf(event, expiration))).containsExactly(event)
+    }
+
+    @Test
     fun notificationIdIsStablePerPass() {
         assertThat(notificationId("pass-1")).isEqualTo(notificationId("pass-1"))
         assertThat(notificationId("pass-1")).isNotEqualTo(notificationId("pass-2"))
     }
 
     @Test
-    fun exactAlarmRequiresPreferenceAndSystemAccess() {
-        assertThat(useExactAlarm(enabled = false, allowed = true)).isFalse()
-        assertThat(useExactAlarm(enabled = true, allowed = false)).isFalse()
-        assertThat(useExactAlarm(enabled = true, allowed = true)).isTrue()
+    fun expirationNotificationsUseTheirOwnIdNamespace() {
+        val event = PassReminder("pass:event:60", "pass", "Title", 20_000, 10_000, 30_000)
+        val expiration = event.copy(
+            id = "pass:event:expiration",
+            eventAtMillis = 90_000,
+            triggerAtMillis = 60_000,
+            endAtMillis = 90_000,
+            ownsLifecycle = false,
+            isExpiration = true,
+        )
+
+        assertThat(notificationId(event)).isEqualTo(notificationId("pass"))
+        assertThat(notificationId(expiration)).isEqualTo(expirationNotificationId("pass"))
+        assertThat(notificationId(expiration)).isNotEqualTo(notificationId(event))
     }
 
     @Test
@@ -42,6 +68,27 @@ class AndroidReminderSchedulerTest {
         )
         assertThat(decodeReminder(encodeReminder(reminder))).isEqualTo(reminder)
         assertThat(decodeReminder(encodeReminder(reminder.copy(exactTiming = null)))?.exactTiming).isNull()
+    }
+
+    @Test
+    fun reminderEncodingPreservesTheExpirationFlag() {
+        val reminder = PassReminder("id", "pass", "Title", 2_000, 1_000, 3_000, ownsLifecycle = false, isExpiration = true)
+
+        assertThat(decodeReminder(encodeReminder(reminder))).isEqualTo(reminder)
+        assertThat(decodeReminder("""{"id":"a","passId":"b","title":"c","eventAt":1,"triggerAt":2}""")?.isExpiration)
+            .isFalse()
+    }
+
+    @Test
+    fun snoozePostponesForTenMinutes() {
+        assertThat(SNOOZE_MILLIS).isEqualTo(10 * 60_000L)
+    }
+
+    @Test
+    fun exactAlarmRequiresPreferenceAndSystemAccess() {
+        assertThat(useExactAlarm(enabled = false, allowed = true)).isFalse()
+        assertThat(useExactAlarm(enabled = true, allowed = false)).isFalse()
+        assertThat(useExactAlarm(enabled = true, allowed = true)).isTrue()
     }
 
     @Test

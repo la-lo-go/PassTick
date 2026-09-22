@@ -33,7 +33,13 @@ data class PassEvent(
     val longitude: Double? = null,
     val hasBarcode: Boolean = false,
     val isProtected: Boolean = false,
+    val expiresAt: Instant? = null,
 )
+
+/**
+ * A pass expires when its validity end is in the past. The exact end instant is not expired yet.
+ */
+fun PassEvent.isExpired(now: Instant): Boolean = expiresAt?.isBefore(now) == true
 
 data class NormalizedPassTimeSpan(val startsAt: Instant, val endsAt: Instant)
 
@@ -109,6 +115,7 @@ private fun PassSnapshot.toEvent(todayStart: Instant, tomorrowStart: Instant): P
         longitude = eventLocation?.longitude,
         hasBarcode = barcodeFormat != null && !barcodeMessage.isNullOrBlank(),
         isProtected = isProtected,
+        expiresAt = expiresAt?.toInstant(),
     )
 }
 

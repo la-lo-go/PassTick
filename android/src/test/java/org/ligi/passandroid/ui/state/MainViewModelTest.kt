@@ -319,6 +319,94 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `automatically archives a past pass once`() = runTest(dispatcher) {
+        val repository = FakePassRepository(
+            listOf(snapshot("pass-1", "Old event", calendarTimeSpan = span("2020-01-01T10:00:00Z", "2020-01-01T11:00:00Z"))),
+        )
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.SetAutomaticallyMarkPast(true))
+        advanceUntilIdle()
+        advanceUntilIdle()
+
+        assertThat(repository.archiveChanges).containsExactly("pass-1" to true)
+        assertThat(repository.observePasses().first().single().isArchived).isTrue()
+    }
+
+    @Test
+    fun `leaves an already archived past pass untouched`() = runTest(dispatcher) {
+        val repository = FakePassRepository(
+            listOf(
+                snapshot(
+                    "pass-1",
+                    "Old event",
+                    calendarTimeSpan = span("2020-01-01T10:00:00Z", "2020-01-01T11:00:00Z"),
+                    isArchived = true,
+                ),
+            ),
+        )
+        val viewModel = MainViewModel(
+            repository,
+            FakeSettingsRepository(AppSettings(automaticallyMarkPast = true)),
+            FakePlatformActions(),
+        )
+        advanceUntilIdle()
+
+        assertThat(repository.archiveChanges).isEmpty()
+    }
+
+    @Test
+    fun `leaves a trashed past pass untouched`() = runTest(dispatcher) {
+        val repository = FakePassRepository(
+            listOf(
+                snapshot(
+                    "pass-1",
+                    "Old event",
+                    calendarTimeSpan = span("2020-01-01T10:00:00Z", "2020-01-01T11:00:00Z"),
+                    trashedAtEpochMillis = 1_600_000_000_000,
+                ),
+            ),
+        )
+        val viewModel = MainViewModel(
+            repository,
+            FakeSettingsRepository(AppSettings(automaticallyMarkPast = true)),
+            FakePlatformActions(),
+        )
+        advanceUntilIdle()
+
+        assertThat(repository.archiveChanges).isEmpty()
+    }
+
+    @Test
+    fun `keeps a running pass out of the archive`() = runTest(dispatcher) {
+        val repository = FakePassRepository(
+            listOf(snapshot("pass-1", "Later event", calendarTimeSpan = span("2099-01-01T10:00:00Z", "2099-01-01T11:00:00Z"))),
+        )
+        val viewModel = MainViewModel(
+            repository,
+            FakeSettingsRepository(AppSettings(automaticallyMarkPast = true)),
+            FakePlatformActions(),
+        )
+        advanceUntilIdle()
+
+        assertThat(repository.archiveChanges).isEmpty()
+    }
+
+    @Test
+    fun `accepts the expired virtual category`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.SelectCategory(EXPIRED_PASSES_CATEGORY_ID))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.selectedCategoryId).isEqualTo(EXPIRED_PASSES_CATEGORY_ID)
+    }
+
+    @Test
     fun `keeps content loading until passes and settings are ready`() = runTest(dispatcher) {
         val repository = FakePassRepository(listOf(snapshot("pass-1", "Boarding pass")))
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
@@ -676,7 +764,14 @@ class MainViewModelTest {
 
 }
 
-private fun snapshot(id: String, description: String, categoryId: String = "new") = PassSnapshot(
+private fun snapshot(
+    id: String,
+    description: String,
+    categoryId: String = "new",
+    calendarTimeSpan: PassTimeSpanSnapshot? = null,
+    isArchived: Boolean = false,
+    trashedAtEpochMillis: Long? = null,
+) = PassSnapshot(
     id = id,
     description = description,
     creator = null,
@@ -687,9 +782,13 @@ private fun snapshot(id: String, description: String, categoryId: String = "new"
     barcodeAlternativeText = null,
     fields = emptyList(),
     locations = emptyList(),
-    calendarTimeSpan = null,
+    calendarTimeSpan = calendarTimeSpan,
     categoryId = categoryId,
+    isArchived = isArchived,
+    trashedAtEpochMillis = trashedAtEpochMillis,
 )
+
+private fun span(from: String, to: String) = PassTimeSpanSnapshot(ZonedDateTime.parse(from), ZonedDateTime.parse(to))
 
 private fun createdDraft() = PassDraft(
     description = "Loyalty card",
@@ -736,6 +835,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val duplicatedIds = mutableListOf<String>()
     val moved = mutableListOf<Pair<String, String>>()
     val protectionChanges = mutableListOf<Pair<String, Boolean>>()
+    val archiveChanges = mutableListOf<Pair<String, Boolean>>()
     val moveDelayMillis = mutableMapOf<String, Long>()
     val purgedRetentions = mutableListOf<Long>()
     var preparedDraft: ImportDraft? = null
@@ -788,6 +888,7 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
         passes.value = passes.value.map { if (it.id == id) it.copy(notes = notes.trim()) else it }
     }
     override suspend fun setArchived(id: String, isArchived: Boolean) {
+        archiveChanges += id to isArchived
         passes.value = passes.value.map { if (it.id == id) it.copy(isArchived = isArchived) else it }
     }
     override suspend fun setPreferredArtwork(id: String, kind: org.ligi.passandroid.repository.PassArtworkKind?) {
@@ -851,8 +952,8 @@ private class FakePlatformActions : PlatformActions {
     override fun shareImage(pass: PassUiModel, options: PassImageExportOptions) = Unit
 }
 
-private class FakeSettingsRepository : SettingsRepository {
-    override val settings = MutableStateFlow(AppSettings())
+private class FakeSettingsRepository(initial: AppSettings = AppSettings()) : SettingsRepository {
+    override val settings = MutableStateFlow(initial)
     var savedReminderActions: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>> = emptyMap()
     override suspend fun setThemeMode(value: ThemeMode) = Unit
     override suspend fun setAmoledBlackBackground(value: Boolean) = Unit
@@ -876,7 +977,9 @@ private class FakeSettingsRepository : SettingsRepository {
         settings.value = settings.value.copy(categories = value)
     }
     override suspend fun setHighlightTodayPasses(value: Boolean) = Unit
-    override suspend fun setAutomaticallyMarkPast(value: Boolean) = Unit
+    override suspend fun setAutomaticallyMarkPast(value: Boolean) {
+        settings.value = settings.value.copy(automaticallyMarkPast = value)
+    }
     override suspend fun setOfferCalendarAfterImport(value: Boolean) = Unit
     override suspend fun setRemindersEnabled(value: Boolean) = Unit
     override suspend fun setReminderMinutes(value: Set<Int>) = Unit

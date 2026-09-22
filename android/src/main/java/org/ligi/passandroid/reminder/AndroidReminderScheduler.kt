@@ -37,7 +37,10 @@ class AndroidReminderScheduler(private val context: Context) : ReminderScheduler
             alarms.cancel(lifecycleIntent(context, it))
         }
         (previous.map(PassReminder::passId).toSet() - active.map(PassReminder::passId).toSet())
-            .forEach { NotificationManagerCompat.from(context).cancel(notificationId(it)) }
+            .forEach { passId ->
+                NotificationManagerCompat.from(context).cancel(notificationId(passId))
+                NotificationManagerCompat.from(context).cancel(expirationNotificationId(passId))
+            }
         active.forEach { scheduleLeadOrShow(context, it, now, localizedSettings) }
         lifecycleOwners(active).filter { it.triggerAtMillis <= now }.forEach {
             scheduleLifecycle(context, it, now, localizedSettings)
@@ -64,11 +67,21 @@ class AndroidReminderScheduler(private val context: Context) : ReminderScheduler
 class PassReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val reminder = intent.reminderOrNull() ?: return
+        val now = System.currentTimeMillis()
         val settings = readPolicySettings(context)
-        val result = NotificationPolicy.evaluate(reminder, System.currentTimeMillis(), settings)
+        if (intent.action == ACTION_SNOOZE) {
+            scheduleSnooze(context, reminder, now, settings)
+            return
+        }
+        val result = NotificationPolicy.evaluate(
+            reminder,
+            now,
+            settings,
+            snoozed = intent.action == ACTION_SNOOZE_DELIVERY,
+        )
         if (result.disposition == NotificationDisposition.CANCEL) {
             removeStoredEvent(context, reminder)
-            NotificationManagerCompat.from(context).cancel(notificationId(reminder.passId))
+            NotificationManagerCompat.from(context).cancel(notificationId(reminder))
             return
         }
         if (notificationsAllowed(context)) showReminder(context, reminder, result)
@@ -104,6 +117,9 @@ fun reminderNotificationsAvailable(context: Context): Boolean {
 }
 
 internal fun notificationId(passId: String): Int = passId.hashCode()
+internal fun expirationNotificationId(passId: String): Int = "$passId$EXPIRATION_NOTIFICATION_KEY".hashCode()
+internal fun notificationId(reminder: PassReminder): Int =
+    if (reminder.isExpiration) expirationNotificationId(reminder.passId) else notificationId(reminder.passId)
 internal fun useExactAlarm(enabled: Boolean, allowed: Boolean): Boolean = enabled && allowed
 internal fun notificationVisibility(detail: NotificationLockScreenDetail): Int = when (detail) {
     NotificationLockScreenDetail.FULL -> NotificationCompat.VISIBILITY_PUBLIC
@@ -132,8 +148,14 @@ private fun scheduleLeadOrShow(context: Context, reminder: PassReminder, now: Lo
     when (deliveryDecision(result)) {
         ReminderDeliveryDecision.SCHEDULE_LEAD -> setAlarm(context, reminder.triggerAtMillis, result, leadIntent(context, reminder))
         ReminderDeliveryDecision.SHOW_DUE -> if (notificationsAllowed(context)) showReminder(context, reminder, result)
-        ReminderDeliveryDecision.CANCEL -> NotificationManagerCompat.from(context).cancel(notificationId(reminder.passId))
+        ReminderDeliveryDecision.CANCEL -> NotificationManagerCompat.from(context).cancel(notificationId(reminder))
     }
+}
+
+private fun scheduleSnooze(context: Context, reminder: PassReminder, now: Long, settings: NotificationPolicySettings) {
+    val deliveryAt = now + SNOOZE_MILLIS
+    val result = NotificationPolicy.evaluate(reminder, deliveryAt, settings, snoozed = true)
+    setAlarm(context, deliveryAt, result, snoozeDeliveryIntent(context, reminder))
 }
 
 private fun scheduleLifecycle(context: Context, reminder: PassReminder, now: Long, settings: NotificationPolicySettings) {
@@ -168,13 +190,14 @@ private fun showReminder(context: Context, reminder: PassReminder, policy: Notif
         .setVisibility(notificationVisibility(policy.lockScreenDetail))
     if (showsPublicVersion(policy.lockScreenDetail)) builder.setPublicVersion(publicNotification(context, policy))
     policy.actions.take(MAX_ACTIONS).forEach { builder.addReminderAction(context, reminder, it) }
-    NotificationManagerCompat.from(context).notify(notificationId(reminder.passId), builder.build())
+    NotificationManagerCompat.from(context).notify(notificationId(reminder), builder.build())
 }
 
 private fun NotificationCompat.Builder.addReminderAction(context: Context, reminder: PassReminder, action: NotificationAction) {
     when (action) {
         NotificationAction.OPEN_CODE -> addAction(0, context.getString(R.string.reminder_open_code), openPassIntent(context, reminder.passId, true))
         NotificationAction.DIRECTIONS -> addAction(0, context.getString(R.string.reminder_directions), directionsIntent(context, reminder))
+        NotificationAction.SNOOZE -> addAction(0, context.getString(R.string.reminder_snooze), snoozeIntent(context, reminder))
     }
 }
 
@@ -207,6 +230,20 @@ private fun leadIntent(context: Context, reminder: PassReminder) = PendingIntent
     context,
     reminder.id.hashCode(),
     Intent(context, PassReminderReceiver::class.java).putReminder(reminder),
+    PENDING_FLAGS,
+)
+
+private fun snoozeIntent(context: Context, reminder: PassReminder) = PendingIntent.getBroadcast(
+    context,
+    "$SNOOZE_REQUEST_KEY:${reminder.id}".hashCode(),
+    Intent(context, PassReminderReceiver::class.java).apply { action = ACTION_SNOOZE }.putReminder(reminder),
+    PENDING_FLAGS,
+)
+
+private fun snoozeDeliveryIntent(context: Context, reminder: PassReminder) = PendingIntent.getBroadcast(
+    context,
+    "$SNOOZE_DELIVERY_REQUEST_KEY:${reminder.id}".hashCode(),
+    Intent(context, PassReminderReceiver::class.java).apply { action = ACTION_SNOOZE_DELIVERY }.putReminder(reminder),
     PENDING_FLAGS,
 )
 
@@ -255,6 +292,7 @@ private fun readPolicySettings(context: Context): NotificationPolicySettings =
 
 private fun notificationStrings(context: Context) = NotificationStrings(
     passReminder = context.getString(R.string.reminder_pass_reminder),
+    passExpired = context.getString(R.string.reminder_pass_expired),
     startsIn = { remaining ->
         val minutes = durationMinutes(remaining)
         if (minutes < 60) {
@@ -262,6 +300,15 @@ private fun notificationStrings(context: Context) = NotificationStrings(
         } else {
             val hours = durationHours(minutes)
             context.resources.getQuantityString(R.plurals.reminder_starts_in_hours, hours.toInt(), hours.toInt())
+        }
+    },
+    expiresIn = { remaining ->
+        val minutes = durationMinutes(remaining)
+        if (minutes < 60) {
+            context.resources.getQuantityString(R.plurals.reminder_expires_in_minutes, minutes.toInt(), minutes.toInt())
+        } else {
+            val hours = durationHours(minutes)
+            context.resources.getQuantityString(R.plurals.reminder_expires_in_hours, hours.toInt(), hours.toInt())
         }
     },
 )
@@ -285,6 +332,7 @@ internal fun encodeReminder(reminder: PassReminder): String = with(reminder) {
         .put("locationLabel", locationLabel).put("latitude", latitude).put("longitude", longitude)
         .put("hasBarcode", hasBarcode).put("isProtected", isProtected).put("exactTiming", exactTiming)
         .put("enabledActions", enabledActions?.joinToString(",") { it.name }).put("ownsLifecycle", ownsLifecycle)
+        .put("isExpiration", isExpiration)
         .toString()
 }
 
@@ -302,6 +350,7 @@ internal fun decodeReminder(encoded: String): PassReminder? = runCatching {
         enabledActions = value.optString("enabledActions").takeIf { it.isNotBlank() && it != "null" }
             ?.split(',')?.mapNotNullTo(mutableSetOf()) { runCatching { NotificationAction.valueOf(it) }.getOrNull() },
         ownsLifecycle = value.optBoolean("ownsLifecycle", true),
+        isExpiration = value.optBoolean("isExpiration", false),
     )
 }.getOrNull()
 
@@ -316,5 +365,11 @@ private const val ACTIONS_ENABLED = "actions_enabled"
 private const val LOCK_SCREEN_DETAIL = "lock_screen_detail"
 private const val LOCK_ALL_PASSES = "lock_all_passes"
 private const val ACTION_LIFECYCLE = "dev.lalogo.passtick.action.REMINDER_LIFECYCLE"
+private const val ACTION_SNOOZE = "dev.lalogo.passtick.action.REMINDER_SNOOZE"
+private const val ACTION_SNOOZE_DELIVERY = "dev.lalogo.passtick.action.REMINDER_SNOOZE_DELIVERY"
+private const val EXPIRATION_NOTIFICATION_KEY = ":expiration"
+private const val SNOOZE_REQUEST_KEY = "snooze"
+private const val SNOOZE_DELIVERY_REQUEST_KEY = "snooze-delivery"
 private const val MAX_ACTIONS = 3
 private const val PENDING_FLAGS = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+internal const val SNOOZE_MILLIS = 10 * 60_000L

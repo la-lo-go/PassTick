@@ -43,6 +43,7 @@ import org.threeten.bp.LocalDateTime
 import org.threeten.bp.Instant
 import org.threeten.bp.ZoneId
 import org.ligi.passandroid.domain.timeline.buildPassTimeline
+import org.ligi.passandroid.domain.timeline.normalizedTimeSpan
 import org.ligi.passandroid.reminder.ReminderScheduler
 import org.ligi.passandroid.reminder.buildPassReminders
 import org.ligi.passandroid.reminder.PassReminderOverride
@@ -109,6 +110,7 @@ class MainViewModel(
                     PROTECTED_PASSES_CATEGORY_ID,
                     PINNED_PASSES_CATEGORY_ID,
                     ARCHIVED_PASSES_CATEGORY_ID,
+                    EXPIRED_PASSES_CATEGORY_ID,
                     TRASHED_PASSES_CATEGORY_ID,
                 ) || categories.any { it.id == requested }
             },
@@ -170,6 +172,12 @@ class MainViewModel(
                             widgetExcludedIds,
                             settings.lockAllPasses,
                         )
+                    }
+                    if (settings.automaticallyMarkPast) {
+                        // The archived check keeps the effect idempotent across store notifications.
+                        currentPasses.filter { it.hasEndedWithoutArchive(now) }.forEach { pass ->
+                            viewModelScope.launch { runCatching { passRepository.setArchived(pass.id, true) } }
+                        }
                     }
                 }
         }
@@ -971,6 +979,9 @@ private fun legacyCategoryColor(id: String): Long {
 }
 
 private fun PassSnapshot.sortDate() = calendarTimeSpan?.from
+
+private fun PassSnapshot.hasEndedWithoutArchive(now: Instant): Boolean =
+    !isArchived && !isTrashed && normalizedTimeSpan()?.endsAt?.isBefore(now) == true
 
 private fun PassDraft.toTimeSpan(): PassTimeSpanSnapshot? {
     val from = calendarStart.takeIf(String::isNotBlank)?.let {

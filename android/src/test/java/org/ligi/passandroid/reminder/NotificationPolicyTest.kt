@@ -19,7 +19,11 @@ class NotificationPolicyTest {
 
         assertThat(result.phase).isEqualTo(NotificationPhase.UPCOMING)
         assertThat(result.body).isEqualTo("Starts in 1 hour · Central station")
-        assertThat(result.actions).containsExactlyInAnyOrder(NotificationAction.OPEN_CODE, NotificationAction.DIRECTIONS)
+        assertThat(result.actions).containsExactlyInAnyOrder(
+            NotificationAction.OPEN_CODE,
+            NotificationAction.DIRECTIONS,
+            NotificationAction.SNOOZE,
+        )
     }
 
     @Test
@@ -78,11 +82,62 @@ class NotificationPolicyTest {
     }
 
     @Test
-    fun `missing optional content produces a useful generic notification`() {
+    fun `missing optional content still offers snooze`() {
         val result = evaluate(reminder(), "2026-09-09T10:30:00Z")
 
         assertThat(result.body).isEqualTo("Starts in 30 minutes")
-        assertThat(result.actions).isEmpty()
+        assertThat(result.actions).containsExactly(NotificationAction.SNOOZE)
+    }
+
+    @Test
+    fun `expiration notification uses its own title and body`() {
+        val result = evaluate(
+            reminder(locationLabel = "Central station").copy(isExpiration = true),
+            "2026-09-09T10:00:00Z",
+        )
+
+        assertThat(result.title).isEqualTo("Pass expired")
+        assertThat(result.body).isEqualTo("Expires in 1 hour · Central station")
+        assertThat(result.actions).contains(NotificationAction.SNOOZE)
+    }
+
+    @Test
+    fun `protected expiration notification hides its title on the lock screen`() {
+        val result = evaluate(
+            reminder(isProtected = true).copy(isExpiration = true),
+            "2026-09-09T10:00:00Z",
+        )
+
+        assertThat(result.publicTitle).isEqualTo("Pass reminder")
+        assertThat(result.publicBody).isEqualTo("Expires in 1 hour")
+    }
+
+    @Test
+    fun `snooze follows the action settings and the per pass selection`() {
+        val disabled = evaluate(
+            reminder(hasBarcode = true),
+            "2026-09-09T10:30:00Z",
+            NotificationPolicySettings(actionsEnabled = false),
+        )
+        val restricted = evaluate(
+            reminder(hasBarcode = true).copy(enabledActions = setOf(NotificationAction.OPEN_CODE)),
+            "2026-09-09T10:30:00Z",
+        )
+
+        assertThat(disabled.actions).isEmpty()
+        assertThat(restricted.actions).containsExactly(NotificationAction.OPEN_CODE)
+    }
+
+    @Test
+    fun `snoozed delivery bypasses the cancel branch`() {
+        val reminder = reminder()
+        val deliveryTime = time("2026-09-09T11:05:00Z")
+
+        assertThat(evaluate(reminder, "2026-09-09T11:05:00Z").disposition)
+            .isEqualTo(NotificationDisposition.CANCEL)
+        val snoozed = NotificationPolicy.evaluate(reminder, deliveryTime, snoozed = true)
+        assertThat(snoozed.disposition).isEqualTo(NotificationDisposition.SHOW)
+        assertThat(snoozed.actions).contains(NotificationAction.SNOOZE)
     }
 
     @Test
@@ -115,7 +170,7 @@ class NotificationPolicyTest {
             "2026-09-09T10:30:00Z",
         )
 
-        assertThat(result.actions).containsExactly(NotificationAction.OPEN_CODE)
+        assertThat(result.actions).containsExactlyInAnyOrder(NotificationAction.OPEN_CODE, NotificationAction.SNOOZE)
     }
 
     @Test

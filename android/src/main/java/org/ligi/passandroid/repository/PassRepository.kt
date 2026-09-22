@@ -100,6 +100,8 @@ data class PassSnapshot(
     val fields: List<PassFieldSnapshot>,
     val locations: List<PassLocationSnapshot>,
     val calendarTimeSpan: PassTimeSpanSnapshot?,
+    /** Validity end of the pass itself. The calendar span keeps its own fallback behaviour. */
+    val expiresAt: ZonedDateTime? = null,
     val categoryId: String = DEFAULT_PASS_CATEGORY_ID,
     val artwork: List<PassArtworkSnapshot> = emptyList(),
     val isProtected: Boolean = false,
@@ -797,6 +799,7 @@ private fun Pass.toSnapshot(
     locations = locations.map { PassLocationSnapshot(it.name, it.lat, it.lon) },
     calendarTimeSpan = calendarTimespan?.let { PassTimeSpanSnapshot(it.from, it.to) }
         ?: validTimespans?.firstOrNull()?.let { PassTimeSpanSnapshot(it.from, it.to) },
+    expiresAt = validTimespans?.firstOrNull()?.to,
     categoryId = categoryId,
     artwork = PassArtworkKind.entries.mapNotNull { kind ->
         bestArtworkFile(path, kind)

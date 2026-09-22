@@ -153,6 +153,107 @@ class PassReminderTest {
 
         assertThat(reminders).singleElement().extracting(PassReminder::ownsLifecycle).isEqualTo(true)
     }
+
+    /** Characterization: the reminder pipeline drops events that already ended. */
+    @Test
+    fun `an event that already ended produces no reminder`() {
+        val event = event("past", "2026-08-30T09:00:00Z")
+        val timeline = PassTimeline(
+            zoneId = ZoneOffset.UTC,
+            days = listOf(TimelineDay(LocalDate.of(2026, 8, 30), listOf(event))),
+            nearestEventId = null,
+        )
+
+        assertThat(
+            buildPassReminders(timeline, Instant.parse("2026-08-30T11:00:00Z"), leadMinutes = 60),
+        ).isEmpty()
+    }
+
+    @Test
+    fun `builds an expiration reminder with the event lead that never owns the lifecycle`() {
+        val reminders = buildPassReminders(
+            timeline = expiryTimeline(),
+            now = Instant.parse("2026-08-30T10:00:00Z"),
+            leadMinutes = 60,
+        )
+
+        assertThat(reminders.map(PassReminder::id))
+            .containsExactlyInAnyOrder("pass:expiring:event:60", "pass:expiring:event:expiration")
+        val expiration = reminders.single(PassReminder::isExpiration)
+        assertThat(expiration.eventAtMillis).isEqualTo(Instant.parse("2026-08-30T18:00:00Z").toEpochMilli())
+        assertThat(expiration.triggerAtMillis).isEqualTo(Instant.parse("2026-08-30T17:00:00Z").toEpochMilli())
+        assertThat(expiration.endAtMillis).isEqualTo(Instant.parse("2026-08-30T18:00:00Z").toEpochMilli())
+        assertThat(expiration.ownsLifecycle).isFalse()
+    }
+
+    @Test
+    fun `expiration reminder follows the per pass lead and a disabled pass produces none`() {
+        val timeline = expiryTimeline()
+        val now = Instant.parse("2026-08-30T10:00:00Z")
+
+        val custom = buildPassReminders(
+            timeline,
+            now,
+            leadMinutes = 60,
+            overrides = mapOf("expiring" to PassReminderOverride.LeadTime(30)),
+        )
+        val exact = buildPassReminders(
+            timeline,
+            now,
+            leadMinutes = 60,
+            overrides = mapOf("expiring" to PassReminderOverride.ExactAtEvent),
+        )
+        val disabled = buildPassReminders(
+            timeline,
+            now,
+            leadMinutes = 60,
+            overrides = mapOf("expiring" to PassReminderOverride.Disabled),
+        )
+
+        assertThat(custom.single(PassReminder::isExpiration).triggerAtMillis)
+            .isEqualTo(Instant.parse("2026-08-30T17:30:00Z").toEpochMilli())
+        assertThat(exact.single(PassReminder::isExpiration).triggerAtMillis)
+            .isEqualTo(Instant.parse("2026-08-30T18:00:00Z").toEpochMilli())
+        assertThat(disabled).isEmpty()
+    }
+
+    @Test
+    fun `expiration reminder survives an event that already ended`() {
+        val reminders = buildPassReminders(
+            timeline = expiryTimeline(),
+            now = Instant.parse("2026-08-30T13:00:00Z"),
+            leadMinutes = 60,
+        )
+
+        assertThat(reminders).singleElement().extracting(PassReminder::isExpiration).isEqualTo(true)
+    }
+
+    @Test
+    fun `no expiration reminder when the validity end already passed`() {
+        val event = event("lapsed", "2026-08-30T09:00:00Z").copy(
+            expiresAt = Instant.parse("2026-08-30T10:00:00Z"),
+        )
+        val timeline = PassTimeline(
+            zoneId = ZoneOffset.UTC,
+            days = listOf(TimelineDay(LocalDate.of(2026, 8, 30), listOf(event))),
+            nearestEventId = null,
+        )
+
+        assertThat(
+            buildPassReminders(timeline, Instant.parse("2026-08-30T10:00:01Z"), leadMinutes = 60),
+        ).isEmpty()
+    }
+
+    private fun expiryTimeline(): PassTimeline {
+        val event = event("expiring", "2026-08-30T12:00:00Z").copy(
+            expiresAt = Instant.parse("2026-08-30T18:00:00Z"),
+        )
+        return PassTimeline(
+            zoneId = ZoneOffset.UTC,
+            days = listOf(TimelineDay(LocalDate.of(2026, 8, 30), listOf(event))),
+            nearestEventId = event.id,
+        )
+    }
 }
 
 private fun event(passId: String, startsAt: String): PassEvent {

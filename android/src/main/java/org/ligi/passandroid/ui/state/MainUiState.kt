@@ -73,6 +73,8 @@ data class PassUiModel(
     val calendarEvent: CalendarEvent?,
     val artwork: List<PassArtworkUiModel> = emptyList(),
     val calendarTimeSpan: PassTimeSpanUiModel? = null,
+    /** Validity end of the pass. The calendar span keeps its own fallback behaviour. */
+    val expiresAt: ZonedDateTime? = null,
     val categoryId: String = DEFAULT_PASS_CATEGORY_ID,
     val isProtected: Boolean = false,
     val isFavorite: Boolean = false,
@@ -115,6 +117,7 @@ data class PassUiModel(
             },
             artwork = pass.artwork.map { PassArtworkUiModel(it.kind, it.bytes) },
             calendarTimeSpan = pass.calendarTimeSpan?.let { PassTimeSpanUiModel(it.from, it.to) },
+            expiresAt = pass.expiresAt,
             categoryId = pass.categoryId,
             isProtected = pass.isProtected,
             isFavorite = pass.isFavorite,
@@ -149,6 +152,10 @@ fun PassUiModel.displayArtwork(defaultKinds: List<PassArtworkKind>): PassArtwork
     preferredArtworkKind?.let { selected -> artwork.firstOrNull { it.kind == selected } }
         ?: defaultKinds.firstNotNullOfOrNull { kind -> artwork.firstOrNull { it.kind == kind } }
 
+/** Expired means the validity end is in the past. The Expired filter and badge share this rule. */
+fun PassUiModel.isExpired(now: ZonedDateTime = ZonedDateTime.now()): Boolean =
+    expiresAt?.isBefore(now) == true
+
 fun PassLocationUiModel.toPlatformLocation() = PlatformLocation(
     address = name,
     latitude = latitude.takeUnless { it == 0.0 && longitude == 0.0 && !name.isNullOrBlank() },
@@ -174,6 +181,7 @@ data class PassDraft(
 const val PROTECTED_PASSES_CATEGORY_ID = "protected"
 const val PINNED_PASSES_CATEGORY_ID = "pinned"
 const val ARCHIVED_PASSES_CATEGORY_ID = "archived"
+const val EXPIRED_PASSES_CATEGORY_ID = "expired"
 const val TRASHED_PASSES_CATEGORY_ID = "trashed"
 
 data class MainUiState(

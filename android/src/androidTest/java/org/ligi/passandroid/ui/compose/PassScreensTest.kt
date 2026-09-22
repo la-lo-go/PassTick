@@ -53,6 +53,7 @@ import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassArtworkUiModel
 import org.ligi.passandroid.ui.state.PassCustomizationAction
 import org.ligi.passandroid.ui.state.MainUiState
+import org.ligi.passandroid.ui.state.EXPIRED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PROTECTED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.TRASHED_PASSES_CATEGORY_ID
 import org.ligi.passandroid.ui.state.PassUiModel
@@ -64,6 +65,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import org.assertj.core.api.Assertions.assertThat
 import androidx.activity.ComponentActivity
+import org.threeten.bp.ZonedDateTime
 
 class PassScreensTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -133,6 +135,20 @@ class PassScreensTest {
 
         composeRule.onNodeWithContentDescription("Delete forever").performClick()
         composeRule.onNodeWithText("Delete this pass forever?").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsExposeAutomaticArchiveOption() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(1)
+        composeRule.onNodeWithText("Automatically archive past passes").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Automatically archive past passes").performClick()
+
+        assertThat(actions).containsExactly(SettingsAction.SetAutomaticallyMarkPast(true))
     }
 
     @Test
@@ -487,6 +503,39 @@ class PassScreensTest {
 
         composeRule.onNodeWithText("Boarding pass").assertIsDisplayed()
         composeRule.onNodeWithText("Event ticket").assertDoesNotExist()
+    }
+
+    @Test
+    fun expiredFilterShowsOnlyExpiredPassesWithABadge() {
+        val state = MainUiState(
+            passes = listOf(
+                pass("old", "Old ticket", PassType.EVENT).copy(expiresAt = ZonedDateTime.parse("2020-10-04T18:30:00+02:00")),
+                pass("new", "Current ticket", PassType.EVENT).copy(expiresAt = ZonedDateTime.parse("2099-10-04T18:30:00+02:00")),
+            ),
+            selectedCategoryId = EXPIRED_PASSES_CATEGORY_ID,
+            isContentLoading = false,
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(state, {}) }
+        }
+
+        composeRule.onNodeWithText("Old ticket").assertIsDisplayed()
+        composeRule.onNodeWithTag("expired_badge", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Current ticket").assertDoesNotExist()
+    }
+
+    @Test
+    fun drawerShowsTheExpiredFilter() {
+        val actions = mutableListOf<HomeAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { PassHomeScreen(sampleState(), actions::add) }
+        }
+
+        composeRule.onNodeWithContentDescription("Navigation menu").performClick()
+        composeRule.onNodeWithTag("drawer_filter_expired").performClick()
+        composeRule.waitUntil(timeoutMillis = 2_000) { actions.isNotEmpty() }
+
+        assertThat(actions).containsExactly(HomeAction.SelectCategory(EXPIRED_PASSES_CATEGORY_ID))
     }
 
     @Test

@@ -155,6 +155,50 @@ class PassTimelineTest {
         assertThat(normalized?.endsAt).isEqualTo(normalized?.startsAt)
     }
 
+    @Test
+    fun `carries the validity end as the event expiry`() {
+        val snapshot = pass("expiring", "2026-08-30T11:00:00Z", "2026-08-30T12:00:00Z").copy(
+            expiresAt = ZonedDateTime.parse("2026-08-30T18:00:00Z"),
+        )
+
+        val event = buildPassTimeline(
+            listOf(snapshot),
+            Instant.parse("2026-08-30T10:00:00Z"),
+            ZoneId.of("UTC"),
+        ).days.single().events.single()
+
+        assertThat(event.expiresAt).isEqualTo(Instant.parse("2026-08-30T18:00:00Z"))
+    }
+
+    @Test
+    fun `reports expiry only after the validity end`() {
+        val event = buildPassTimeline(
+            listOf(
+                pass("expiring", "2026-08-30T11:00:00Z", "2026-08-30T12:00:00Z").copy(
+                    expiresAt = ZonedDateTime.parse("2026-08-30T18:00:00Z"),
+                ),
+            ),
+            Instant.parse("2026-08-30T10:00:00Z"),
+            ZoneId.of("UTC"),
+        ).days.single().events.single()
+
+        assertThat(event.isExpired(Instant.parse("2026-08-30T17:59:59Z"))).isFalse()
+        assertThat(event.isExpired(Instant.parse("2026-08-30T18:00:00Z"))).isFalse()
+        assertThat(event.isExpired(Instant.parse("2026-08-30T18:00:01Z"))).isTrue()
+    }
+
+    @Test
+    fun `an event without a validity end never expires`() {
+        val event = buildPassTimeline(
+            listOf(pass("open", "2026-08-30T11:00:00Z", "2026-08-30T12:00:00Z")),
+            Instant.parse("2026-08-30T10:00:00Z"),
+            ZoneId.of("UTC"),
+        ).days.single().events.single()
+
+        assertThat(event.expiresAt).isNull()
+        assertThat(event.isExpired(Instant.parse("2030-01-01T00:00:00Z"))).isFalse()
+    }
+
     private fun pass(id: String, start: String, end: String, location: String? = null) = PassSnapshot(
         id = id,
         description = "Event $id",

@@ -346,6 +346,13 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
             },
             settingsItem {
                 SettingSwitch(
+                    stringResource(R.string.settings_automatically_archive_past_passes),
+                    settings.automaticallyMarkPast,
+                    supportingText = stringResource(R.string.settings_passes_move_to_the_archive_after_their_end),
+                ) { onAction(SettingsAction.SetAutomaticallyMarkPast(it)) }
+            },
+            settingsItem {
+                SettingSwitch(
                     stringResource(R.string.settings_keep_deleted_passes_in_trash),
                     settings.trashEnabled,
                     supportingText = stringResource(R.string.settings_deleted_passes_wait_in_trash),
