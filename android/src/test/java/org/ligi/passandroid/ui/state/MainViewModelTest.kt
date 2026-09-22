@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.ligi.passandroid.R
 import org.ligi.passandroid.model.comparator.PassSortOrder
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
@@ -31,6 +32,7 @@ import org.ligi.passandroid.platform.PlatformActions
 import org.ligi.passandroid.platform.PlatformLocation
 import org.ligi.passandroid.functions.CalendarEvent
 import org.ligi.passandroid.repository.AppSettings
+import org.ligi.passandroid.repository.ArchiveRestoreSummary
 import org.ligi.passandroid.repository.PassRepository
 import org.ligi.passandroid.repository.PassFieldSnapshot
 import org.ligi.passandroid.repository.PassLocationSnapshot
@@ -582,6 +584,96 @@ class MainViewModelTest {
         assertThat(viewModel.uiState.value.recentlyImportedIds).contains("created")
     }
 
+    @Test
+    fun `exporting the archive saves a backup and reports success`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val viewModel = MainViewModel(
+            repository,
+            FakeSettingsRepository(),
+            FakePlatformActions(),
+            strings = testStrings(),
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        val destination = org.mockito.Mockito.mock(Uri::class.java)
+        viewModel.onAction(AppAction.ExportArchive(destination))
+        advanceUntilIdle()
+
+        assertThat(repository.exportedArchives).containsExactly(destination)
+        assertThat(viewModel.uiState.value.message).isEqualTo("Backup saved")
+    }
+
+    @Test
+    fun `importing an archive reports the restored pass count`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val viewModel = MainViewModel(
+            repository,
+            FakeSettingsRepository(),
+            FakePlatformActions(),
+            strings = testStrings(),
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        val source = org.mockito.Mockito.mock(Uri::class.java)
+        viewModel.onAction(AppAction.ImportArchive(source))
+        advanceUntilIdle()
+
+        assertThat(repository.importedArchives).containsExactly(source)
+        assertThat(viewModel.uiState.value.message).isEqualTo("Restored 2 passes")
+    }
+
+    @Test
+    fun `importing an archive reports skipped and failed passes`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList()).apply {
+            archiveRestoreSummary = ArchiveRestoreSummary(restored = 2, skipped = 1, failed = 1)
+        }
+        val viewModel = MainViewModel(
+            repository,
+            FakeSettingsRepository(),
+            FakePlatformActions(),
+            strings = testStrings(),
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.ImportArchive(org.mockito.Mockito.mock(Uri::class.java)))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.message).isEqualTo("Restored 2 passes, 1 skipped, 1 failed")
+    }
+
+    @Test
+    fun `shares a retained pkpass original with the apple mime type`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val platformActions = FakePlatformActions()
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), platformActions)
+        val shareUri = org.mockito.Mockito.mock(Uri::class.java)
+        org.mockito.Mockito.`when`(shareUri.lastPathSegment).thenReturn("source.pkpass")
+        repository.shareUri = shareUri
+
+        viewModel.onAction(AppAction.SharePass("pass-1"))
+        advanceUntilIdle()
+
+        assertThat(platformActions.shares).containsExactly(shareUri to "application/vnd.apple.pkpass")
+    }
+
+    @Test
+    fun `shares a rebuilt pass with the espass mime type`() = runTest(dispatcher) {
+        val repository = FakePassRepository(emptyList())
+        val platformActions = FakePlatformActions()
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), platformActions)
+        val shareUri = org.mockito.Mockito.mock(Uri::class.java)
+        org.mockito.Mockito.`when`(shareUri.lastPathSegment).thenReturn("pass-1.espass")
+        repository.shareUri = shareUri
+
+        viewModel.onAction(AppAction.SharePass("pass-1"))
+        advanceUntilIdle()
+
+        assertThat(platformActions.shares).containsExactly(shareUri to "application/vnd.espass-espass+zip")
+    }
+
 }
 
 private fun snapshot(id: String, description: String, categoryId: String = "new") = PassSnapshot(
@@ -621,12 +713,25 @@ private fun documentDraft() = ImportDraft(
     detectedCodes = listOf(DetectedCode(PassBarCodeFormat.QR_CODE, "ticket-code")),
 )
 
+private fun testStrings() = StringResolver { id, args ->
+    when (id) {
+        R.string.message_backup_saved -> "Backup saved"
+        R.string.message_passes_restored -> "Restored ${args[0]} passes"
+        R.string.message_passes_restored_summary -> "Restored ${args[0]} passes, ${args[1]} skipped, ${args[2]} failed"
+        else -> "string-$id"
+    }
+}
+
 private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     private val passes = MutableStateFlow(initial)
     private val trashed = MutableStateFlow<List<PassSnapshot>>(emptyList())
     val deletedIds = mutableListOf<String>()
     val updates = mutableListOf<Pair<String, PassUpdate>>()
     val exports = mutableListOf<Pair<String, Uri>>()
+    val exportedArchives = mutableListOf<Uri>()
+    val importedArchives = mutableListOf<Uri>()
+    var archiveRestoreSummary = ArchiveRestoreSummary(restored = 2, skipped = 0, failed = 0)
+    var shareUri: Uri? = null
     val created = mutableListOf<PassUpdate>()
     val duplicatedIds = mutableListOf<String>()
     val moved = mutableListOf<Pair<String, String>>()
@@ -721,13 +826,25 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
         exports += id to destination
         return Result.success(Unit)
     }
-    override suspend fun prepareShare(id: String) = Result.failure<Uri>(UnsupportedOperationException())
+    override suspend fun exportArchive(destination: Uri): Result<Int> {
+        exportedArchives += destination
+        return Result.success(2)
+    }
+    override suspend fun importArchive(source: Uri): Result<ArchiveRestoreSummary> {
+        importedArchives += source
+        return Result.success(archiveRestoreSummary)
+    }
+    override suspend fun prepareShare(id: String): Result<Uri> =
+        shareUri?.let { Result.success(it) } ?: Result.failure<Uri>(UnsupportedOperationException())
 }
 
 private class FakePlatformActions : PlatformActions {
+    val shares = mutableListOf<Pair<Uri, String>>()
     override fun addToCalendar(event: CalendarEvent) = Unit
     override fun addToCalendarAutomatically(event: CalendarEvent) = true
-    override fun share(uri: Uri, mimeType: String) = Unit
+    override fun share(uri: Uri, mimeType: String) {
+        shares += uri to mimeType
+    }
     override fun printImage(jobName: String, bitmap: android.graphics.Bitmap) = Unit
     override fun openLocation(location: PlatformLocation) = Unit
     override fun openUrl(url: String) = Unit

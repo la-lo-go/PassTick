@@ -48,6 +48,8 @@ class FixedPassListPassStore(private var passes: List<Pass>) : PassStore {
         return pathForId
     }
 
+    override fun getPassDirectories(): List<File> = listOf(pathForId)
+
     private val mutableUpdates = MutableSharedFlow<PassStoreUpdateEvent>(extraBufferCapacity = 1)
     override val updates = mutableUpdates.asSharedFlow()
 

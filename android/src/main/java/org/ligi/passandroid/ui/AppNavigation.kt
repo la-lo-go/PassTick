@@ -88,6 +88,8 @@ internal class AppNavigationDependencies(
     val onResetProtectedState: () -> Unit,
     val onExportImage: (PassUiModel, Boolean, Boolean) -> Unit,
     val imageExporting: Boolean,
+    val onExportArchive: () -> Unit,
+    val onImportArchive: () -> Unit,
     val expandedCodePassId: String?,
     val onExpandedCodeShown: () -> Unit,
     val onShowCalendarPermissionWarning: () -> Unit,
@@ -434,7 +436,23 @@ private fun handleSettingsAction(dependencies: AppNavigationDependencies, action
     if (handleProtectedSettingsAction(dependencies, action)) return
     if (handleAppearanceSettingsAction(dependencies, action)) return
     if (handleDetailSettingsAction(dependencies, action)) return
+    if (handleDataSettingsAction(dependencies, action)) return
     handleNavigationSettingsAction(dependencies, action)
+}
+
+private fun handleDataSettingsAction(
+    dependencies: AppNavigationDependencies,
+    action: SettingsAction,
+): Boolean = when (action) {
+    SettingsAction.ExportArchive -> {
+        dependencies.onExportArchive()
+        true
+    }
+    SettingsAction.ImportArchive -> {
+        dependencies.onImportArchive()
+        true
+    }
+    else -> false
 }
 
 private fun handleNavigationSettingsAction(

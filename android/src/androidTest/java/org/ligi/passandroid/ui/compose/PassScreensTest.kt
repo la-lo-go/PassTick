@@ -359,6 +359,24 @@ class PassScreensTest {
     }
 
     @Test
+    fun settingsExposeBackupAndRestoreActions() {
+        val actions = mutableListOf<SettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Export all passes"))
+        composeRule.onNodeWithText("Export all passes").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Restore from backup"))
+        composeRule.onNodeWithText("Restore from backup").assertIsDisplayed()
+
+        composeRule.onNodeWithText("Export all passes").performClick()
+        composeRule.onNodeWithText("Restore from backup").performClick()
+
+        assertThat(actions).containsExactly(SettingsAction.ExportArchive, SettingsAction.ImportArchive)
+    }
+
+    @Test
     fun mobileLightLayoutRendersAtLargeFontScale() {
         composeRule.setContent {
             DeviceConfigurationOverride(

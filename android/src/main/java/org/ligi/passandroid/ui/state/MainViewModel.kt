@@ -208,23 +208,7 @@ class MainViewModel(
             true
         }
         is AppAction.ImportFiles -> {
-            launchOperation(null) {
-                val results = action.uris.map { uri -> passRepository.import(uri) }
-                val imported = results.mapNotNull { it.getOrNull() }
-                val failedCount = results.count { it.isFailure }
-                addCalendarEventsAfterImport(imported)
-                highlightImported(imported.map(PassSnapshot::id))
-                message.value = when {
-                    failedCount == 0 -> strings.resolve(R.string.message_passes_imported)
-                    imported.isEmpty() -> results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
-                        ?: strings.resolve(R.string.message_operation_failed)
-                    else -> strings.resolve(
-                        R.string.message_passes_imported_summary,
-                        imported.size,
-                        failedCount,
-                    )
-                }
-            }
+            importFiles(action.uris)
             true
         }
         is AppAction.Export -> {
@@ -236,7 +220,7 @@ class MainViewModel(
         is AppAction.SharePass -> {
             launchOperation(strings.resolve(R.string.message_pass_ready_to_share)) {
                 val uri = passRepository.prepareShare(action.id).getOrThrow()
-                platformActions.share(uri, "application/vnd.espass-espass+zip")
+                platformActions.share(uri, shareMimeType(uri))
             }
             true
         }
@@ -252,6 +236,52 @@ class MainViewModel(
                 val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
                 val bitmap = withContext(Dispatchers.Default) { PassImageExporter.renderBitmap(pass, action.options) }
                 platformActions.printImage(pass.description.ifBlank { "Pass" }, bitmap)
+            }
+            true
+        }
+        else -> handleArchiveAction(action)
+    }
+
+    private fun importFiles(uris: List<Uri>) {
+        launchOperation(null) {
+            val results = uris.map { uri -> passRepository.import(uri) }
+            val imported = results.mapNotNull { it.getOrNull() }
+            val failedCount = results.count { it.isFailure }
+            addCalendarEventsAfterImport(imported)
+            highlightImported(imported.map(PassSnapshot::id))
+            message.value = when {
+                failedCount == 0 -> strings.resolve(R.string.message_passes_imported)
+                imported.isEmpty() -> results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
+                    ?: strings.resolve(R.string.message_operation_failed)
+                else -> strings.resolve(
+                    R.string.message_passes_imported_summary,
+                    imported.size,
+                    failedCount,
+                )
+            }
+        }
+    }
+
+    private fun handleArchiveAction(action: AppAction): Boolean = when (action) {
+        is AppAction.ExportArchive -> {
+            launchOperation(strings.resolve(R.string.message_backup_saved)) {
+                passRepository.exportArchive(action.destination).getOrThrow()
+            }
+            true
+        }
+        is AppAction.ImportArchive -> {
+            launchOperation(null) {
+                val summary = passRepository.importArchive(action.source).getOrThrow()
+                message.value = if (summary.skipped == 0 && summary.failed == 0) {
+                    strings.resolve(R.string.message_passes_restored, summary.restored)
+                } else {
+                    strings.resolve(
+                        R.string.message_passes_restored_summary,
+                        summary.restored,
+                        summary.skipped,
+                        summary.failed,
+                    )
+                }
             }
             true
         }
@@ -877,6 +907,17 @@ class MainViewModel(
 }
 
 private const val RECENT_IMPORT_HIGHLIGHT_MILLIS = 2_600L
+
+private const val ESPASS_SHARE_MIME_TYPE = "application/vnd.espass-espass+zip"
+private const val PKPASS_SHARE_MIME_TYPE = "application/vnd.apple.pkpass"
+
+// prepareShare returns the retained original when the import wrote one, so the share keeps its file type.
+internal fun shareMimeType(uri: Uri): String =
+    if (uri.lastPathSegment.orEmpty().endsWith(".pkpass", ignoreCase = true)) {
+        PKPASS_SHARE_MIME_TYPE
+    } else {
+        ESPASS_SHARE_MIME_TYPE
+    }
 
 private fun PassSortOrder.snapshotComparator(): Comparator<PassSnapshot> {
     val ascendingByDate = Comparator<PassSnapshot> { left, right ->

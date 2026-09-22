@@ -83,6 +83,8 @@ sealed interface SettingsAction {
     data class SetBlurProtectedPassCards(val value: Boolean) : SettingsAction
     data class SetSeparateProtectedPasses(val value: Boolean) : SettingsAction
     data class SetBlockScreenshots(val value: Boolean) : SettingsAction
+    data object ExportArchive : SettingsAction
+    data object ImportArchive : SettingsAction
     data object OpenPrivacyPolicy : SettingsAction
     data object OpenThirdPartyLicenses : SettingsAction
     data object OpenSourceCode : SettingsAction

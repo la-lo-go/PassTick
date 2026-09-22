@@ -129,6 +129,9 @@ class AndroidFileSystemPassStore(
         return File(path, safeId)
     }
 
+    override fun getPassDirectories(): List<File> =
+        path.listFiles().orEmpty().filter { it.isDirectory && safePassIdOrNull(it.name) != null }
+
     override fun notifyChange() {
         mutableUpdates.tryEmit(PassStoreUpdateEvent)
     }

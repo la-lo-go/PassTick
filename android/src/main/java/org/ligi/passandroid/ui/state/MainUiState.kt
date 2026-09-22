@@ -197,6 +197,8 @@ sealed interface AppAction {
     data class Import(val uri: Uri) : AppAction
     data class ImportFiles(val uris: List<Uri>) : AppAction
     data class Export(val id: String, val destination: Uri) : AppAction
+    data class ExportArchive(val destination: Uri) : AppAction
+    data class ImportArchive(val source: Uri) : AppAction
     data class SharePass(val id: String) : AppAction
     data class ShareImage(val id: String, val options: PassImageExportOptions) : AppAction
     data class PrintImage(val id: String, val options: PassImageExportOptions) : AppAction

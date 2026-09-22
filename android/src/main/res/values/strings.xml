@@ -204,6 +204,9 @@
     <string name="settings_pass_reminders">Pass reminders</string>
     <string name="settings_exact_reminders">Exact reminder timing</string>
     <string name="settings_notification_actions">Notification actions</string>
+    <string name="settings_data">Data</string>
+    <string name="settings_export_all_passes">Export all passes</string>
+    <string name="settings_restore_from_backup">Restore from backup</string>
     <string name="category_tag_color">Tag color</string>
     <string name="home_today">Today</string>
     <string name="home_other_passes">Other passes</string>
@@ -330,6 +333,9 @@
     <string name="message_pass_duplicated">Pass duplicated</string>
     <string name="message_passes_imported">Passes imported</string>
     <string name="message_pass_exported">Pass exported</string>
+    <string name="message_backup_saved">Backup saved</string>
+    <string name="message_passes_restored">Restored %1$d passes</string>
+    <string name="message_passes_restored_summary">Restored %1$d passes, %2$d skipped, %3$d failed</string>
     <string name="message_pass_ready_to_share">Pass ready to share</string>
     <string name="message_image_ready_to_share">Image ready to share</string>
     <string name="message_pass_saved">Pass saved</string>

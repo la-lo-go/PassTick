@@ -270,6 +270,16 @@ fun PassTickApp(
         exportPassId = null
         if (uri != null && passId != null) viewModel.onAction(AppAction.Export(passId, uri))
     }
+    val exportArchiveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) viewModel.onAction(AppAction.ExportArchive(uri))
+    }
+    val importArchiveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let { viewModel.onAction(AppAction.ImportArchive(it)) }
+    }
     var imageExporting by remember { mutableStateOf(false) }
     fun exportImageToGallery(pass: PassUiModel, barcodeOnly: Boolean, returnToPass: Boolean) {
         val options = if (barcodeOnly) {
@@ -662,6 +672,8 @@ fun PassTickApp(
                     },
                     onExportImage = ::exportImageToGallery,
                     imageExporting = imageExporting,
+                    onExportArchive = { exportArchiveLauncher.launch(backupArchiveFileName()) },
+                    onImportArchive = { importArchiveLauncher.launch(arrayOf("application/zip")) },
                     expandedCodePassId = expandedCodePassId,
                     onExpandedCodeShown = { expandedCodePassId = null },
                     onShowCalendarPermissionWarning = { showCalendarPermissionWarning = true },
@@ -724,6 +736,8 @@ private fun imageExportFileName(description: String?): String {
         .ifBlank { "pass" }
     return "$base ${org.threeten.bp.LocalDate.now()}.png"
 }
+
+private fun backupArchiveFileName(): String = "passtick-backup-${org.threeten.bp.LocalDate.now()}.zip"
 
 private fun exportFileName(description: String?): String {
     val base = description.orEmpty()

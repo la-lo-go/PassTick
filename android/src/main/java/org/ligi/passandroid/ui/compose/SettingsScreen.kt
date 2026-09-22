@@ -44,7 +44,8 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -75,6 +76,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -136,6 +138,7 @@ fun SettingsScreen(
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
                 item { ReminderSettings(settings, onAction) }
+                item { DataSettings(onAction) }
                 item { AboutSettings(onAction) }
             }
         }
@@ -458,41 +461,61 @@ private fun CalendarSettings(settings: AppSettings, onAction: (SettingsAction) -
 }
 
 @Composable
-private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
-    var showBugReportDialog by remember { mutableStateOf(false) }
+private fun DataSettings(onAction: (SettingsAction) -> Unit) {
     SettingsGroup(
-        title = stringResource(R.string.settings_about),
+        title = stringResource(R.string.settings_data),
         entries = listOf(
             settingsItem {
-                ListItem(
-                    leadingContent = { Icon(Icons.Default.Info, null) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                ) {
-                    Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+                PassListSetting(Icons.Default.Upload, stringResource(R.string.settings_export_all_passes)) {
+                    onAction(SettingsAction.ExportArchive)
                 }
             },
             settingsItem {
-                PassListSetting(Icons.Default.PrivacyTip, "Privacy policy") {
-                    onAction(SettingsAction.OpenPrivacyPolicy)
-                }
-            },
-            settingsItem {
-                PassListSetting(PassIcons.GitHub, "Source code and license") {
-                    onAction(SettingsAction.OpenSourceCode)
-                }
-            },
-            settingsItem {
-                PassListSetting(Icons.Default.Description, stringResource(R.string.settings_third_party_licenses)) {
-                    onAction(SettingsAction.OpenThirdPartyLicenses)
-                }
-            },
-            settingsItem {
-                PassListSetting(Icons.Default.BugReport, stringResource(R.string.settings_report_a_bug)) {
-                    showBugReportDialog = true
+                PassListSetting(Icons.Default.Restore, stringResource(R.string.settings_restore_from_backup)) {
+                    onAction(SettingsAction.ImportArchive)
                 }
             },
         ),
     )
+}
+
+@Composable
+private fun AboutSettings(onAction: (SettingsAction) -> Unit) {
+    var showBugReportDialog by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SettingsGroup(
+            title = stringResource(R.string.settings_about),
+            entries = listOf(
+                settingsItem {
+                    PassListSetting(Icons.Default.PrivacyTip, "Privacy policy") {
+                        onAction(SettingsAction.OpenPrivacyPolicy)
+                    }
+                },
+                settingsItem {
+                    PassListSetting(PassIcons.GitHub, "Source code and license") {
+                        onAction(SettingsAction.OpenSourceCode)
+                    }
+                },
+                settingsItem {
+                    PassListSetting(Icons.Default.Description, stringResource(R.string.settings_third_party_licenses)) {
+                        onAction(SettingsAction.OpenThirdPartyLicenses)
+                    }
+                },
+                settingsItem {
+                    PassListSetting(Icons.Default.BugReport, stringResource(R.string.settings_report_a_bug)) {
+                        showBugReportDialog = true
+                    }
+                },
+            ),
+        )
+        Text(
+            text = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
     if (showBugReportDialog) {
         BugReportDialog(
             onDismiss = { showBugReportDialog = false },

@@ -16,6 +16,9 @@ interface PassStore {
 
     fun getPathForID(id: String): File
 
+    /** Every pass directory, including trashed passes. */
+    fun getPassDirectories(): List<File>
+
     val passMap: Map<String, Pass>
 
     var currentPass: Pass?

@@ -31,6 +31,7 @@ import org.ligi.passandroid.repository.io.PassExporter
 import org.ligi.passandroid.repository.io.UnzipPassController
 import java.io.File
 import java.util.UUID
+import org.json.JSONObject
 import org.threeten.bp.Duration
 import org.threeten.bp.Instant
 import org.threeten.bp.ZonedDateTime
@@ -41,8 +42,17 @@ const val DEFAULT_PASS_CATEGORY_ID = "new"
 val TRASH_RETENTION: Duration = Duration.ofDays(7)
 
 internal const val DOCUMENT_FILE_NAME = "source.pdf"
+
+/** The retained original import; prepareShare returns it when the import task wrote it. */
+internal const val ORIGINAL_SOURCE_FILE_NAME = "source.pkpass"
 private const val MAIN_JSON_FILE_NAME = "main.json"
+private const val METADATA_FILE_NAME = "pass-metadata.json"
+private const val PINNED_FILE_NAME = "pass-pinned.json"
+private const val PROTECTION_FILE_NAME = "pass-protection.json"
+private const val CLASSIFIER_STATE_FILE_NAME = "state/classifier_state.json"
+private const val CLASSIFIER_STATE_ARCHIVE_NAME = "classifier_state.json"
 private const val IMPORT_CACHE_DIR = "import"
+private const val ARCHIVE_RESTORE_CACHE_DIR = "restore"
 private const val PAGE_ZERO_FILE_NAME = "page0.png"
 internal const val THUMBNAIL_MAX_DIMENSION = 384
 private val STRIP_ARTWORK_FILE_NAMES = listOf(
@@ -123,6 +133,8 @@ data class PassUpdate(
     val locations: List<PassLocationSnapshot> = emptyList(),
 )
 
+data class ArchiveRestoreSummary(val restored: Int, val skipped: Int, val failed: Int)
+
 interface PassRepository {
     fun observePasses(): Flow<List<PassSnapshot>>
 
@@ -172,6 +184,12 @@ interface PassRepository {
 
     suspend fun export(id: String, destination: Uri): Result<Unit>
 
+    /** Writes every pass and the metadata files to [destination] and returns the pass count. */
+    suspend fun exportArchive(destination: Uri): Result<Int>
+
+    /** Merges the archive into the store. An existing pass id is skipped and counted. */
+    suspend fun importArchive(source: Uri): Result<ArchiveRestoreSummary>
+
     suspend fun prepareShare(id: String): Result<Uri>
 }
 
@@ -181,14 +199,14 @@ class FilePassRepository(
     private val tracker: Tracker,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val protectionStore: FilePassProtectionStore = FilePassProtectionStore(
-        File(context.filesDir, "pass-protection.json"),
+        File(context.filesDir, PROTECTION_FILE_NAME),
     ),
     private val favoriteStore: FileFavoriteStore = FilePinnedStore(
-        File(context.filesDir, "pass-pinned.json"),
+        File(context.filesDir, PINNED_FILE_NAME),
         File(context.filesDir, "pass-favorites.json"),
     ),
     private val metadataStore: FilePassMetadataStore = FilePassMetadataStore(
-        File(context.filesDir, "pass-metadata.json"),
+        File(context.filesDir, METADATA_FILE_NAME),
     ),
 ) : PassRepository {
     private val migratedLegacyPassIds = mutableSetOf<String>()
@@ -607,12 +625,116 @@ class FilePassRepository(
         }
     }
 
+    override suspend fun exportArchive(destination: Uri): Result<Int> = withContext(ioDispatcher) {
+        runCatching {
+            val passDirectories = passStore.getPassDirectories()
+            context.contentResolver.openOutputStream(destination)?.use { output ->
+                PassArchiveWriter(output).use { writer ->
+                    writer.addIndex(passDirectories.size, Instant.now().toEpochMilli())
+                    metadataFiles().filter { it.isFile }.forEach { file ->
+                        writer.addFile(archiveMetadataEntryName(file.name), file)
+                    }
+                    passDirectories.forEach { directory ->
+                        writer.addDirectory("$ARCHIVE_PASSES_DIRECTORY/${directory.name}", directory)
+                    }
+                }
+            } ?: error("Cannot open the export destination")
+            passDirectories.size
+        }
+    }
+
+    override suspend fun importArchive(source: Uri): Result<ArchiveRestoreSummary> = withContext(ioDispatcher) {
+        runCatching {
+            val archive = File.createTempFile("passtick-backup-", ".zip", context.cacheDir)
+            val stagingRoot = File(context.cacheDir, ARCHIVE_RESTORE_CACHE_DIR).apply {
+                deleteRecursively()
+                mkdirs()
+            }
+            try {
+                context.contentResolver.openInputStream(source)?.use { input ->
+                    archive.outputStream().use { output -> input.copyTo(output) }
+                } ?: error("Cannot open the backup archive")
+                PassArchiveReader(archive).use { reader -> restoreArchive(reader, stagingRoot) }
+            } finally {
+                archive.delete()
+                stagingRoot.deleteRecursively()
+            }
+        }
+    }
+
+    private fun restoreArchive(reader: PassArchiveReader, stagingRoot: File): ArchiveRestoreSummary {
+        val ids = reader.passIds()
+        val metadataDirectory = File(stagingRoot, ARCHIVE_METADATA_DIRECTORY)
+        reader.extractMetadata(metadataDirectory)
+        val passStagingRoot = File(stagingRoot, ARCHIVE_PASSES_DIRECTORY)
+        val archivedMetadata = FilePassMetadataStore(File(metadataDirectory, METADATA_FILE_NAME))
+        val archivedPinned = FileFavoriteStore(File(metadataDirectory, PINNED_FILE_NAME))
+        val archivedProtection = FilePassProtectionStore(File(metadataDirectory, PROTECTION_FILE_NAME))
+        val archivedTopics = readClassifierTopics(File(metadataDirectory, CLASSIFIER_STATE_ARCHIVE_NAME))
+        val restored = mutableListOf<String>()
+        val skipped = mutableListOf<String>()
+        val failed = mutableListOf<String>()
+        ids.forEach { id ->
+            val target = passStore.getPathForID(id)
+            when {
+                target.exists() -> skipped += id
+                !reader.hasPassFile(id) -> failed += id
+                else -> {
+                    val staging = File(passStagingRoot, id)
+                    runCatching {
+                        staging.deleteRecursively()
+                        reader.extractPass(id, staging)
+                        movePassIntoPlace(staging, target)
+                        val pass = requireNotNull(passStore.getPassbookForId(id)) { "Restored pass is unreadable" }
+                        metadataStore.setTags(id, archivedMetadata.tags(id))
+                        metadataStore.setArchived(id, archivedMetadata.isArchived(id))
+                        metadataStore.setPreferredArtwork(id, archivedMetadata.preferredArtwork(id))
+                        metadataStore.setTrashedAt(id, archivedMetadata.trashedAt(id))
+                        metadataStore.setNotes(id, archivedMetadata.notes(id))
+                        favoriteStore.setFavorite(id, archivedPinned.isFavorite(id))
+                        protectionStore.setProtected(id, archivedProtection.isProtected(id))
+                        archivedTopics[id]?.let { topic -> passStore.classifier.moveToTopic(pass, topic) }
+                    }.onFailure {
+                        staging.deleteRecursively()
+                        passStore.deletePassWithId(id)
+                        failed += id
+                    }.onSuccess {
+                        restored += id
+                    }
+                }
+            }
+        }
+        passStore.notifyChange()
+        return archiveRestoreSummary(restored, skipped, failed)
+    }
+
+    private fun metadataFiles(): List<File> = listOf(
+        File(context.filesDir, METADATA_FILE_NAME),
+        File(context.filesDir, PINNED_FILE_NAME),
+        File(context.filesDir, PROTECTION_FILE_NAME),
+        File(context.filesDir, CLASSIFIER_STATE_FILE_NAME),
+    )
+
+    private fun readClassifierTopics(file: File): Map<String, String> = runCatching {
+        val json = JSONObject(file.readText())
+        buildMap {
+            json.keys().forEach { id -> json.optString(id).takeIf(String::isNotBlank)?.let { put(id, it) } }
+        }
+    }.getOrDefault(emptyMap())
+
     override suspend fun prepareShare(id: String): Result<Uri> = withContext(ioDispatcher) {
         runCatching {
-            val target = File(context.cacheDir, "share/$id.espass")
-            val exporter = PassExporter(passStore.getPathForID(id), target)
-            exporter.export()
-            exporter.exception?.let { throw it }
+            val directory = passStore.getPathForID(id)
+            val original = File(directory, ORIGINAL_SOURCE_FILE_NAME)
+            val target = if (original.isFile) {
+                original
+            } else {
+                File(context.cacheDir, "share/$id.espass").also { file ->
+                    val exporter = PassExporter(directory, file)
+                    exporter.export()
+                    exporter.exception?.let { throw it }
+                }
+            }
             FileProvider.getUriForFile(context, context.getString(R.string.authority_fileprovider), target)
         }
     }

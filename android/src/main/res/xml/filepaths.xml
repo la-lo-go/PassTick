@@ -4,4 +4,7 @@
             path="share" name="share"/>
     <cache-path
             path="capture" name="capture"/>
+    <!-- The retained original import is shared in place. -->
+    <files-path
+            path="passes" name="passes"/>
 </paths>
