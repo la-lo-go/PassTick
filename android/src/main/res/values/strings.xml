@@ -182,12 +182,11 @@
     <string name="edit_pass_start_date">Start date</string>
     <string name="edit_pass_end_date">End date</string>
     <string name="settings_home">Home</string>
-    <string name="settings_customize_pass_list">Customize pass list</string>
-    <string name="settings_pass_codes">Pass codes</string>
+    <string name="settings_customize_pass_list">Customize</string>
+    <string name="settings_code">Code</string>
     <string name="settings_use_max_brightness_for_codes">Use max brightness for codes</string>
     <string name="settings_use_max_brightness_for_codes_support">Uses HDR on screens that support it, otherwise maximum brightness.</string>
     <string name="settings_code_size">Code size</string>
-    <string name="settings_code_options">Code options</string>
     <string name="settings_code_size_small">Small</string>
     <string name="settings_code_size_normal">Normal</string>
     <string name="settings_code_size_large">Large</string>

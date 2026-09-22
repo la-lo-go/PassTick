@@ -12,6 +12,7 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.ligi.passandroid.navigation.PassDeepLinkRequest
 import org.ligi.passandroid.navigation.passDeepLinkRequestOrNull
 import org.ligi.passandroid.repository.StartupAppearanceStore
+import org.ligi.passandroid.repository.isBackupUri
 import org.ligi.passandroid.ui.PassTickApp
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.MainViewModel
@@ -49,9 +50,11 @@ class MainActivity : ComponentActivity() {
     private fun importFrom(intent: Intent) {
         val uris = intent.importUris()
         if (uris.isEmpty()) return
-        val singleDocument = uris.singleOrNull()?.takeIf { isDocument(it, intent.type) }
-        if (singleDocument != null) {
-            documentImportRequest.value = singleDocument
+        // A shared backup restores through the single-request channel; passes import in bulk.
+        val singleRequest = uris.singleOrNull()
+            ?.takeIf { isDocument(it, intent.type) || isBackupUri(this, it) }
+        if (singleRequest != null) {
+            documentImportRequest.value = singleRequest
         } else {
             viewModel.onAction(AppAction.ImportFiles(uris))
         }

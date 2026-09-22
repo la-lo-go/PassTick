@@ -206,7 +206,7 @@ class StoreScreenshotTest {
             SettingsScreen(showcaseSettings(), onAction = {})
         }
 
-        composeRule.onNodeWithTag("settings_list").performScrollToIndex(4)
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(3)
         capture("settings-privacy")
     }
 

@@ -135,7 +135,6 @@ fun SettingsScreen(
                 item { AppearanceSettings(settings, systemAccentColor, onAction) }
                 item { HomeSettings(settings, onAction) }
                 item { PassListSettings(onAction) }
-                item { CodeSettingsSection(onAction) }
                 item { PrivacySettings(settings, onAction) }
                 item { CalendarSettings(settings, onAction) }
                 item { ReminderSettings(settings, onAction) }
@@ -147,7 +146,7 @@ fun SettingsScreen(
 }
 
 // Must match the order of the settings sections above.
-private const val RemindersSectionIndex = 6
+private const val RemindersSectionIndex = 5
 
 @Composable
 private fun AppearanceSettings(settings: AppSettings, systemAccentColor: Long?, onAction: (SettingsAction) -> Unit) {
@@ -364,23 +363,9 @@ private fun HomeSettings(settings: AppSettings, onAction: (SettingsAction) -> Un
 }
 
 @Composable
-private fun CodeSettingsSection(onAction: (SettingsAction) -> Unit) {
-    SettingsGroup(
-        title = stringResource(R.string.settings_pass_codes),
-        entries = listOf(
-            settingsItem {
-                PassListSetting(Icons.Default.QrCode, stringResource(R.string.settings_code_options)) {
-                    onAction(SettingsAction.OpenCodeSettings)
-                }
-            },
-        ),
-    )
-}
-
-@Composable
 internal fun CodeSettingsGroup(settings: AppSettings, onAction: (SettingsAction) -> Unit) {
     SettingsGroup(
-        title = stringResource(R.string.settings_pass_codes),
+        title = stringResource(R.string.settings_code),
         entries = buildList {
             add(
                 settingsItem {
@@ -465,6 +450,11 @@ private fun PassListSettings(onAction: (SettingsAction) -> Unit) {
             settingsItem {
                 PassListSetting(Icons.AutoMirrored.Filled.Label, "Tags") {
                     onAction(SettingsAction.OpenCategories)
+                }
+            },
+            settingsItem {
+                PassListSetting(Icons.Default.QrCode, stringResource(R.string.settings_code)) {
+                    onAction(SettingsAction.OpenCodeSettings)
                 }
             },
         ),

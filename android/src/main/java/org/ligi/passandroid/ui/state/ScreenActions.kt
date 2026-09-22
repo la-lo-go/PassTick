@@ -101,6 +101,7 @@ sealed interface SettingsAction {
 
 sealed interface PassDetailLayoutSettingsAction {
     data object Back : PassDetailLayoutSettingsAction
+    data object OpenCodeSettings : PassDetailLayoutSettingsAction
     data class Move(val section: PassDetailSection, val offset: Int) : PassDetailLayoutSettingsAction
     data class SetVisible(val section: PassDetailSection, val visible: Boolean) : PassDetailLayoutSettingsAction
 }

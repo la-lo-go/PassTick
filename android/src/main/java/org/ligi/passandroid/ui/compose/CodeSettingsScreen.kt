@@ -26,7 +26,7 @@ fun CodeSettingsScreen(settings: AppSettings, onAction: (SettingsAction) -> Unit
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings_pass_codes)) },
+                title = { Text(stringResource(R.string.settings_code)) },
                 navigationIcon = {
                     IconButton(onClick = { onAction(SettingsAction.Back) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))

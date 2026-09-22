@@ -163,7 +163,7 @@ class PassScreensTest {
         composeRule.onNodeWithText("Theme").assertIsDisplayed()
         composeRule.onNodeWithText("Accent color").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Use AMOLED black background").assertIsDisplayed()
-        composeRule.onNodeWithText("Code options").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Code").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -183,14 +183,14 @@ class PassScreensTest {
     }
 
     @Test
-    fun settingsOpenTheCodeOptionsScreen() {
+    fun settingsOpenTheCodeSettingsScreen() {
         val actions = mutableListOf<SettingsAction>()
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { SettingsScreen(AppSettings(), onAction = actions::add) }
         }
 
-        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Code options"))
-        composeRule.onNodeWithText("Code options").performClick()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("Code"))
+        composeRule.onNodeWithText("Code").performClick()
 
         assertThat(actions).containsExactly(SettingsAction.OpenCodeSettings)
     }
@@ -394,10 +394,11 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithTag("settings_list").performScrollToIndex(2)
-        composeRule.onNodeWithText("Customize pass list").assertIsDisplayed()
+        composeRule.onNodeWithText("Customize").assertIsDisplayed()
         composeRule.onNodeWithText("Pass view").assertIsDisplayed()
         composeRule.onNodeWithText("Home cards").assertIsDisplayed()
         composeRule.onNodeWithText("Tags").assertIsDisplayed()
+        composeRule.onNodeWithText("Code").assertIsDisplayed()
         composeRule.onNodeWithText("Choose sections and their order").assertDoesNotExist()
         composeRule.onNodeWithText("Choose card content and order").assertDoesNotExist()
         composeRule.onNodeWithText("Manage names, icons, colors, and order").assertDoesNotExist()
@@ -924,6 +925,20 @@ class PassScreensTest {
         }
         composeRule.onNodeWithText("Shown").assertDoesNotExist()
         composeRule.onNodeWithText("Hidden").assertDoesNotExist()
+    }
+
+    @Test
+    fun passDetailLayoutOffersCodeSettings() {
+        val actions = mutableListOf<PassDetailLayoutSettingsAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailLayoutSettingsScreen(PassDetailSection.entries, emptySet(), actions::add)
+            }
+        }
+
+        composeRule.onNodeWithText("Code").performClick()
+
+        assertThat(actions).containsExactly(PassDetailLayoutSettingsAction.OpenCodeSettings)
     }
 
     @Test

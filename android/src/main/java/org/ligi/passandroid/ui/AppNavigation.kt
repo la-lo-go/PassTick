@@ -417,6 +417,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                 ) { action ->
                     when (action) {
                         PassDetailLayoutSettingsAction.Back -> dependencies.onBack()
+                        PassDetailLayoutSettingsAction.OpenCodeSettings -> backStack.add(AppDestination.CodeSettings)
                         is PassDetailLayoutSettingsAction.Move -> dependencies.viewModel.onAction(
                             AppAction.MovePassDetailSection(action.section, action.offset),
                         )

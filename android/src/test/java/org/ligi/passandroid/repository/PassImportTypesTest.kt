@@ -27,4 +27,19 @@ class PassImportTypesTest {
         )
         assertThat(passFileImportMimeTypes).doesNotContain("image/*", "application/pdf")
     }
+
+    @Test
+    fun `pass file import types offer the backup format`() {
+        assertThat(passFileImportMimeTypes).contains(backupMimeType)
+        assertThat(supportedPassImportMimeTypes).contains(backupMimeType)
+    }
+
+    @Test
+    fun `backup file names end with the passtick extension`() {
+        assertThat(isBackupFileName("passtick-backup-2026-09-22.passtick")).isTrue()
+        assertThat(isBackupFileName("BACKUP.PASSTICK")).isTrue()
+        assertThat(isBackupFileName("passtick-backup-2026-09-22")).isFalse()
+        assertThat(isBackupFileName("backup.zip")).isFalse()
+        assertThat(isBackupFileName(null)).isFalse()
+    }
 }

@@ -1,6 +1,7 @@
 package org.ligi.passandroid.ui.compose
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +76,17 @@ fun PassDetailLayoutSettingsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item(key = "code") {
+                Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                    ListItem(
+                        leadingContent = { Icon(Icons.Default.QrCode, null) },
+                        modifier = Modifier.clickable {
+                            onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.OpenCodeSettings)
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    ) { Text(stringResource(R.string.settings_code)) }
+                }
+            }
             itemsIndexed(order, key = { _, section -> section.name }) { index, section ->
                 Surface(
                     modifier = Modifier.animateItem(),

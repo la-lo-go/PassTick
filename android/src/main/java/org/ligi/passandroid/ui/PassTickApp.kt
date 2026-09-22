@@ -65,6 +65,9 @@ import org.ligi.passandroid.imports.ImportSource
 import org.ligi.passandroid.navigation.AppDestination
 import org.ligi.passandroid.navigation.passCustomizationDestination
 import org.ligi.passandroid.navigation.PassDeepLinkRequest
+import org.ligi.passandroid.repository.backupFileExtension
+import org.ligi.passandroid.repository.backupMimeType
+import org.ligi.passandroid.repository.isBackupUri
 import org.ligi.passandroid.repository.passFileImportMimeTypes
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.ImportReviewScreen
@@ -227,7 +230,12 @@ fun PassTickApp(
         }
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(uris))
+        if (uris.isNotEmpty()) {
+            val (backups, passFiles) = uris.partition { isBackupUri(context, it) }
+            // A restore action carries one archive; pass files keep the multi-select import.
+            backups.firstOrNull()?.let { viewModel.onAction(AppAction.ImportArchive(it)) }
+            if (passFiles.isNotEmpty()) viewModel.onAction(AppAction.ImportFiles(passFiles))
+        }
     }
     var showImportSourceSheet by remember { mutableStateOf(false) }
     var pendingCaptureUri by remember { mutableStateOf<Uri?>(null) }
@@ -243,6 +251,10 @@ fun PassTickApp(
     LaunchedEffect(requestedDocumentImport) {
         val uri = requestedDocumentImport ?: return@LaunchedEffect
         documentImportRequest.value = null
+        if (isBackupUri(context, uri)) {
+            viewModel.onAction(AppAction.ImportArchive(uri))
+            return@LaunchedEffect
+        }
         val mimeType = context.contentResolver.getType(uri)
         val source = if (mimeType == "application/pdf") ImportSource.PDF else ImportSource.IMAGE
         prepareDocumentImport(uri, source)
@@ -288,7 +300,7 @@ fun PassTickApp(
         if (uri != null && passId != null) viewModel.onAction(AppAction.Export(passId, uri))
     }
     val exportArchiveLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/zip"),
+        ActivityResultContracts.CreateDocument(backupMimeType),
     ) { uri ->
         if (uri != null) viewModel.onAction(AppAction.ExportArchive(uri))
     }
@@ -692,7 +704,7 @@ fun PassTickApp(
                     onExportImage = ::exportImageToGallery,
                     imageExporting = imageExporting,
                     onExportArchive = { exportArchiveLauncher.launch(backupArchiveFileName()) },
-                    onImportArchive = { importArchiveLauncher.launch(arrayOf("application/zip")) },
+                    onImportArchive = { importArchiveLauncher.launch(arrayOf(backupMimeType, "application/zip")) },
                     expandedCodePassId = expandedCodePassId,
                     onExpandedCodeShown = { expandedCodePassId = null },
                     onShowCalendarPermissionWarning = { showCalendarPermissionWarning = true },
@@ -757,7 +769,8 @@ private fun imageExportFileName(description: String?): String {
     return "$base ${org.threeten.bp.LocalDate.now()}.png"
 }
 
-private fun backupArchiveFileName(): String = "passtick-backup-${org.threeten.bp.LocalDate.now()}.zip"
+private fun backupArchiveFileName(): String =
+    "passtick-backup-${org.threeten.bp.LocalDate.now()}$backupFileExtension"
 
 private fun exportFileName(description: String?): String {
     val base = description.orEmpty()
