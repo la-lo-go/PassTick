@@ -1,6 +1,8 @@
 package org.ligi.passandroid.repository.io
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.exception.ZipException
 import okio.buffer
@@ -32,6 +34,12 @@ import java.util.*
 
 object UnzipPassController : KoinComponent {
 
+    private const val PKPASS_EXTENSION = ".pkpass"
+    private const val PKPASSES_EXTENSION = ".pkpasses"
+    private const val PKPASSES_MIME_TYPE = "application/vnd.apple.pkpasses"
+    private const val ORIGINAL_FILE_NAME = "source.pkpass"
+    private const val NOT_A_PASS_REASON = "Pass is not espass or pkpass format :-("
+
     val tracker :Tracker by inject()
 
     interface SuccessCallback {
@@ -47,7 +55,11 @@ object UnzipPassController : KoinComponent {
             spec.inputStreamWithSource.inputStream.use {
                 val tempFile = File.createTempFile("ins", "pass")
                 it.copyTo(FileOutputStream(tempFile))
-                processFile(FileUnzipControllerSpec(tempFile.absolutePath, spec))
+                if (isPkpassesBundle(spec)) {
+                    processPkpassesBundle(spec, tempFile)
+                } else {
+                    processFile(FileUnzipControllerSpec(tempFile.absolutePath, spec))
+                }
                 tempFile.delete()
             }
         } catch (e: Exception) {
@@ -55,6 +67,79 @@ object UnzipPassController : KoinComponent {
             spec.failCallback?.fail("problem with temp file: $e")
         }
 
+    }
+
+    private fun isPkpassesBundle(spec: InputStreamUnzipControllerSpec): Boolean {
+        val uri = Uri.parse(spec.inputStreamWithSource.source)
+        return hasPkpassesName(uri.lastPathSegment) ||
+            hasPkpassesName(displayName(spec.context, uri)) ||
+            runCatching { spec.context.contentResolver.getType(uri) }.getOrNull() == PKPASSES_MIME_TYPE
+    }
+
+    private fun hasPkpassesName(name: String?): Boolean =
+        name?.endsWith(PKPASSES_EXTENSION, ignoreCase = true) == true
+
+    /** Providers such as Downloads hide the file name from the URI, so ask for the display name. */
+    private fun displayName(context: Context, uri: Uri): String? = runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
+        }
+    }.getOrNull()
+
+    /**
+     * A .pkpasses bundle is a ZIP of .pkpass files and has no manifest at the top level.
+     * Every entry imports through the single-pass path; one broken entry must not stop the others.
+     */
+    private fun processPkpassesBundle(spec: InputStreamUnzipControllerSpec, bundleFile: File) {
+        val bundlePath = File(spec.context.cacheDir, "temp/${UUID.randomUUID()}")
+        bundlePath.mkdirs()
+        try {
+            extractArchive(bundleFile, bundlePath)
+            val entries = bundlePath.listFiles().orEmpty()
+                .filter { it.isFile && it.name.endsWith(PKPASS_EXTENSION, ignoreCase = true) }
+                .sortedBy { it.name }
+            var importedCount = 0
+            var firstFailure: String? = null
+            entries.forEach { entry ->
+                var importedId: String? = null
+                var entryFailure: String? = null
+                val entrySpec = UnzipControllerSpec(
+                    targetPath = spec.targetPath,
+                    context = spec.context,
+                    passStore = spec.passStore,
+                    onSuccessCallback = object : SuccessCallback {
+                        override fun call(uuid: String) {
+                            importedId = uuid
+                            spec.onSuccessCallback?.call(uuid)
+                        }
+                    },
+                    failCallback = object : FailCallback {
+                        override fun fail(reason: String) {
+                            entryFailure = reason
+                        }
+                    },
+                ).apply { overwrite = spec.overwrite }
+                try {
+                    processFile(FileUnzipControllerSpec(entry.absolutePath, spec.inputStreamWithSource.source, entrySpec))
+                } catch (e: Exception) {
+                    tracker.trackException("problem importing a pkpasses entry", e, false)
+                    entryFailure = e.message
+                }
+                val id = importedId
+                // The repository reports one pass per import, so load every entry here to keep it visible.
+                if (id != null && spec.passStore.getPassbookForId(id) != null) {
+                    importedCount++
+                } else {
+                    firstFailure = firstFailure ?: entryFailure ?: NOT_A_PASS_REASON
+                }
+            }
+            if (importedCount == 0) {
+                spec.failCallback?.fail(firstFailure ?: NOT_A_PASS_REASON)
+            }
+        } finally {
+            bundlePath.deleteRecursively()
+        }
     }
 
     private fun processFile(spec: FileUnzipControllerSpec) {
@@ -71,7 +156,7 @@ object UnzipPassController : KoinComponent {
 
         File(path, "source.obj").bufferedWriter().write(spec.source)
 
-        extractArchive(spec, path)
+        extractArchive(File(spec.zipFileString), path)
 
         val manifestPassId = try {
             readManifestPassId(path)
@@ -83,18 +168,27 @@ object UnzipPassController : KoinComponent {
         if (manifestPassId == null) {
             if (importImagePass(spec)) return
             if (importPdfPass(spec)) return
-            spec.failCallback?.fail("Pass is not espass or pkpass format :-(")
+            spec.failCallback?.fail(NOT_A_PASS_REASON)
             return
         }
 
         val uuid = safePassIdOrNull(manifestPassId) ?: generatedUuid
+        retainOriginalFile(spec, path)
         moveExtractedPass(spec, path, uuid)
         spec.onSuccessCallback?.call(uuid)
     }
 
-    private fun extractArchive(spec: FileUnzipControllerSpec, path: File) {
+    /** Keep the received archive so a later share returns the original bytes instead of a re-zip. */
+    private fun retainOriginalFile(spec: FileUnzipControllerSpec, path: File) {
+        val original = File(spec.zipFileString)
+        if (original.isFile) {
+            original.copyTo(File(path, ORIGINAL_FILE_NAME), overwrite = true)
+        }
+    }
+
+    private fun extractArchive(archive: File, path: File) {
         try {
-            val zipFile = ZipFile(spec.zipFileString)
+            val zipFile = ZipFile(archive)
             zipFile.extractAll(path.absolutePath)
         } catch (e: ZipException) {
             e.printStackTrace()

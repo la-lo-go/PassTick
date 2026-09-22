@@ -6,6 +6,7 @@ package org.ligi.passandroid.repository
  */
 val passFileImportMimeTypes = listOf(
     "application/vnd.apple.pkpass",
+    "application/vnd.apple.pkpasses",
     "application/pkpass",
     "application/vnd.espass-espass",
     "application/vnd.espass-espass+zip",
