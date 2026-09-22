@@ -67,12 +67,6 @@ internal fun ImportSourceSheet(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
             ImportSourceRow(
-                icon = Icons.Default.Add,
-                title = stringResource(R.string.import_sheet_create),
-                onDismiss = onDismiss,
-                onClick = onCreateManually,
-            )
-            ImportSourceRow(
                 icon = Icons.Default.Description,
                 title = stringResource(R.string.import_sheet_pass_file),
                 onDismiss = onDismiss,
@@ -95,6 +89,12 @@ internal fun ImportSourceSheet(
                 title = stringResource(R.string.import_sheet_camera),
                 onDismiss = onDismiss,
                 onClick = onTakePhoto,
+            )
+            ImportSourceRow(
+                icon = Icons.Default.Add,
+                title = stringResource(R.string.import_sheet_create),
+                onDismiss = onDismiss,
+                onClick = onCreateManually,
             )
         }
     }

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
@@ -283,6 +284,12 @@ fun PassDetailScreen(
                                 leadingIcon = { Icon(Icons.Default.QrCode, null) },
                                 enabled = pass?.hasDisplayableCode() == true,
                                 onClick = { overflowOpen = false; onAction(PassDetailAction.SaveBarcodeImage) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_duplicate)) },
+                                leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
+                                enabled = pass != null,
+                                onClick = { overflowOpen = false; onAction(PassDetailAction.Duplicate) },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.pass_detail_customize_pass)) },

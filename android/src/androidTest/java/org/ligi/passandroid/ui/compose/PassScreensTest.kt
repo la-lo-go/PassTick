@@ -885,6 +885,21 @@ class PassScreensTest {
     }
 
     @Test
+    fun passActionsOfferDuplication() {
+        val actions = mutableListOf<PassDetailAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Duplicate").performClick()
+
+        assertThat(actions).contains(PassDetailAction.Duplicate)
+    }
+
+    @Test
     fun passCustomizationSelectsAnEmbeddedImage() {
         val actions = mutableListOf<PassCustomizationAction>()
         val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(

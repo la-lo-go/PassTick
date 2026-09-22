@@ -57,12 +57,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import org.ligi.passandroid.navigation.PassDateField
+import org.ligi.passandroid.imports.DocumentImportProcessor
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.PassArtworkKind
@@ -74,7 +76,9 @@ import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.threeten.bp.ZonedDateTime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.stringResource
 import androidx.annotation.StringRes
 import org.ligi.passandroid.R
@@ -121,6 +125,27 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
     val scope = rememberCoroutineScope()
     val resources = LocalResources.current
     val hapticFeedback = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val codePhotoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val detected = withContext(Dispatchers.Default) {
+                DocumentImportProcessor.decodeNormalizedBitmap(context, uri)
+                    ?.let { bitmap -> DocumentImportProcessor.detectCodes(bitmap) }
+                    ?.firstOrNull()
+            }
+            if (detected == null) {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(
+                    resources.getString(R.string.edit_pass_code_not_found),
+                    withDismissAction = true,
+                )
+            } else {
+                barcodeFormat = detected.format
+                barcodeMessage = detected.message
+            }
+        }
+    }
     fun currentDraft() = PassDraft(
         description = description,
         creator = creator,
@@ -155,7 +180,11 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
         }
     }
 
-    BackHandler(onBack = ::saveAndClose)
+    fun closeEditor() {
+        onAction(EditPassAction.Back)
+    }
+
+    BackHandler(onBack = if (pass == null) ::closeEditor else ::saveAndClose)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -168,7 +197,14 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = ::saveAndClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.edit_pass_save_and_go_back)) }
+                    IconButton(onClick = if (pass == null) ::closeEditor else ::saveAndClose) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            stringResource(
+                                if (pass == null) R.string.edit_pass_discard_changes else R.string.edit_pass_save_and_go_back,
+                            ),
+                        )
+                    }
                 },
                 actions = {
                     Box {
@@ -176,7 +212,7 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                         DropdownMenu(editorMenuOpen, { editorMenuOpen = false }) {
                             DropdownMenuItem(text = { Text(stringResource(R.string.edit_pass_discard_changes)) }, onClick = {
                                 editorMenuOpen = false
-                                onAction(EditPassAction.Back)
+                                closeEditor()
                             })
                         }
                     }
@@ -233,6 +269,14 @@ fun EditPassScreen(pass: PassUiModel?, initialDateField: PassDateField? = null, 
                     }
                     OutlinedTextField(barcodeMessage, { barcodeMessage = it }, label = { Text(stringResource(R.string.edit_pass_barcode_data)) }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(alternativeText, { alternativeText = it }, label = { Text(stringResource(R.string.edit_pass_barcode_text)) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedButton(
+                        onClick = {
+                            codePhotoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.edit_pass_read_code_from_photo)) }
                 }
             }
             item {
