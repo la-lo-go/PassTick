@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -92,6 +91,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -175,14 +175,25 @@ internal fun UndoOperation.toAppAction() = when (this) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun PassHomeScreen(
+internal fun PassHomeScreen(
     state: MainUiState,
     onAction: (HomeAction) -> Unit,
     showTodayHero: Boolean = true,
     protectedPassesUnlocked: Boolean = false,
     recentlyImportedIds: Set<String> = emptySet(),
-    listState: LazyListState = rememberLazyListState(),
+    listPosition: HomeListPosition = rememberHomeListPosition(),
 ) {
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = listPosition.firstVisibleItemIndex,
+        initialFirstVisibleItemScrollOffset = listPosition.firstVisibleItemScrollOffset,
+    )
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                listPosition.firstVisibleItemIndex = index
+                listPosition.firstVisibleItemScrollOffset = offset
+            }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var undoSnackbarJob by remember { mutableStateOf<Job?>(null) }
@@ -473,7 +484,7 @@ fun PassHomeScreen(
             val expanded = maxWidth >= 840.dp
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().testTag("home_list"),
                 contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {

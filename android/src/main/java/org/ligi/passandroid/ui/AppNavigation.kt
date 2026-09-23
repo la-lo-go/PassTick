@@ -8,7 +8,6 @@ import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +51,7 @@ import org.ligi.passandroid.ui.compose.PassCustomizationScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
 import org.ligi.passandroid.ui.compose.PassHomeScreen
+import org.ligi.passandroid.ui.compose.HomeListPosition
 import org.ligi.passandroid.ui.compose.BUG_REPORT_MAIL_URL
 import org.ligi.passandroid.ui.compose.BUG_REPORT_URL
 import org.ligi.passandroid.ui.compose.PRIVACY_POLICY_URL
@@ -106,7 +106,7 @@ internal class AppNavigationDependencies(
     val onSettingsScrollConsumed: () -> Unit,
     val coroutineScope: CoroutineScope,
     val snackbarHostState: SnackbarHostState,
-    val homeListState: LazyListState,
+    val homeListPosition: HomeListPosition,
 )
 
 @Composable
@@ -123,7 +123,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                     showTodayHero = state.settings.highlightTodayPasses,
                     protectedPassesUnlocked = dependencies.protectedPassesUnlocked,
                     recentlyImportedIds = state.recentlyImportedIds,
-                    listState = dependencies.homeListState,
+                    listPosition = dependencies.homeListPosition,
                     onAction = dependencies.onHomeAction,
                 )
             }
@@ -136,7 +136,7 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                             showTodayHero = state.settings.highlightTodayPasses,
                             protectedPassesUnlocked = dependencies.protectedPassesUnlocked,
                             recentlyImportedIds = state.recentlyImportedIds,
-                            listState = dependencies.homeListState,
+                            listPosition = dependencies.homeListPosition,
                             onAction = { action ->
                                 if (action is HomeAction.OpenPass) {
                                     dependencies.onOpenPass(action.id, true)

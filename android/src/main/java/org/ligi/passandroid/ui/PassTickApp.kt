@@ -72,6 +72,7 @@ import org.ligi.passandroid.repository.passFileImportMimeTypes
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.ImportReviewScreen
 import org.ligi.passandroid.ui.compose.ImportSourceSheet
+import org.ligi.passandroid.ui.compose.rememberHomeListPosition
 import org.ligi.passandroid.ui.compose.toAppAction
 import org.ligi.passandroid.ui.state.AppAction
 import org.ligi.passandroid.ui.state.ImportReviewAction
@@ -152,7 +153,7 @@ fun PassTickApp(
     val context = LocalContext.current
     val backStack = rememberNavBackStack(AppDestination.PassList)
     // Hoisted so the home scroll position survives navigation and configuration changes.
-    val homeListState = rememberLazyListState()
+    val homeListPosition = rememberHomeListPosition()
     fun popBackStack() {
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
@@ -721,7 +722,7 @@ fun PassTickApp(
                     onSettingsScrollConsumed = { scrollSettingsToNotifications = false },
                     coroutineScope = coroutineScope,
                     snackbarHostState = snackbarHostState,
-                    homeListState = homeListState,
+                    homeListPosition = homeListPosition,
                 ),
             )
             if (showImportSourceSheet) {
