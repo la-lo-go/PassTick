@@ -42,7 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clipToBounds
+import kotlin.math.roundToInt
 import kotlinx.coroutines.withTimeoutOrNull
+import org.ligi.passandroid.ui.compose.transformGestures
 
 /** Scanner compatibility options shared by every code surface. */
 data class CodeViewOptions(
@@ -68,8 +75,9 @@ fun PassCodePreview(
     onPin: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var zoom by remember { mutableFloatStateOf(1f) }
     BoxWithConstraints(
-        modifier.pointerInput(format, message) {
+        modifier.pinchCodeSize(zoom) { zoom = it }.pointerInput(format, message) {
             awaitEachGesture {
                 val down = awaitFirstDown()
                 val gestureResult = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
@@ -108,6 +116,7 @@ fun PassCodePreview(
             heightPx = constraints.maxHeight,
             options = options,
             contentDescription = "Pass code. Hold or tap to enlarge",
+            zoom = zoom,
         )
     }
 }
@@ -174,8 +183,10 @@ fun ExpandedPassCodeDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     val aspectRatio = if (format.isQuadratic()) 1f else 2.6f
+                    var zoom by remember { mutableFloatStateOf(1f) }
                     BoxWithConstraints(
-                        Modifier.fillMaxWidth().aspectRatio(aspectRatio / codeSizeStepFactor(options.sizeStep)),
+                        Modifier.fillMaxWidth().aspectRatio(aspectRatio / codeSizeStepFactor(options.sizeStep))
+                            .pinchCodeSize(zoom) { zoom = it },
                         contentAlignment = Alignment.Center,
                     ) {
                         CrispPassCode(
@@ -185,6 +196,7 @@ fun ExpandedPassCodeDialog(
                             heightPx = constraints.maxHeight,
                             options = options,
                             contentDescription = "Expanded pass code",
+                            zoom = zoom,
                         )
                     }
                     alternativeText?.takeIf(String::isNotBlank)?.let { locator ->
@@ -198,6 +210,21 @@ fun ExpandedPassCodeDialog(
     }
 }
 
+private const val MinCodeZoom = 0.4f
+private const val MaxCodeZoom = 1.6f
+
+/**
+ * Pinch changes only the drawn size of the code for as long as the surface stays composed.
+ * A smaller code leaves a white margin around it, which scanners read as quiet zone.
+ */
+@Composable
+private fun Modifier.pinchCodeSize(zoom: Float, onZoom: (Float) -> Unit): Modifier = this
+    .clipToBounds()
+    .then(if (zoom == 1f) Modifier else Modifier.background(Color.White))
+    .transformGestures(currentScale = { 1f }, onGesture = { change, _ ->
+        onZoom((zoom * change).coerceIn(MinCodeZoom, MaxCodeZoom))
+    })
+
 @Composable
 private fun CrispPassCode(
     format: PassBarCodeFormat,
@@ -206,10 +233,13 @@ private fun CrispPassCode(
     heightPx: Int,
     options: CodeViewOptions,
     contentDescription: String,
+    zoom: Float = 1f,
 ) {
     val density = LocalDensity.current
-    val bitmap = remember(passCodeBitmapKey(format, message, widthPx, heightPx, options)) {
-        renderPassCodeBitmap(format, message, widthPx, heightPx, options)
+    val zoomedWidth = (widthPx * zoom).roundToInt()
+    val zoomedHeight = (heightPx * zoom).roundToInt()
+    val bitmap = remember(passCodeBitmapKey(format, message, zoomedWidth, zoomedHeight, options)) {
+        renderPassCodeBitmap(format, message, zoomedWidth, zoomedHeight, options)
     }
     if (bitmap == null) {
         Text("Code cannot be displayed", color = Color.Black)
