@@ -31,10 +31,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -169,6 +171,7 @@ private fun PageContent(image: ImageBitmap?, modifier: Modifier) {
 private fun ZoomableImage(bitmap: ImageBitmap, modifier: Modifier = Modifier) {
     var scale by remember(bitmap) { mutableFloatStateOf(1f) }
     var offset by remember(bitmap) { mutableStateOf(Offset.Zero) }
+    var container by remember { mutableStateOf(IntSize.Zero) }
     val description = stringResource(R.string.pass_detail_document_description)
     val zoomLabel = stringResource(R.string.pass_detail_document_zoom)
     val toggleZoom = {
@@ -187,11 +190,12 @@ private fun ZoomableImage(bitmap: ImageBitmap, modifier: Modifier = Modifier) {
             .pointerInput(bitmap) {
                 detectTapGestures(onDoubleTap = { toggleZoom() })
             }
+            .onSizeChanged { container = it }
             .transformGestures(
                 currentScale = { scale },
                 onGesture = { zoomChange, panChange ->
                     scale = (scale * zoomChange).coerceIn(1f, 6f)
-                    offset = if (scale > 1f) offset + panChange else Offset.Zero
+                    offset = if (scale > 1f) clampPan(offset + panChange, bitmap, container, scale) else Offset.Zero
                 },
             )
             .semantics { onClick(label = zoomLabel) { toggleZoom(); true } }
@@ -202,6 +206,15 @@ private fun ZoomableImage(bitmap: ImageBitmap, modifier: Modifier = Modifier) {
                 translationY = offset.y
             },
     )
+}
+
+/** Keeps the zoomed page edge from leaving the viewport, so panning stops at the page borders. */
+private fun clampPan(offset: Offset, bitmap: ImageBitmap, container: IntSize, scale: Float): Offset {
+    if (container.width == 0 || container.height == 0) return offset
+    val fit = minOf(container.width.toFloat() / bitmap.width, container.height.toFloat() / bitmap.height)
+    val maxX = ((bitmap.width * fit * scale - container.width) / 2f).coerceAtLeast(0f)
+    val maxY = ((bitmap.height * fit * scale - container.height) / 2f).coerceAtLeast(0f)
+    return Offset(offset.x.coerceIn(-maxX, maxX), offset.y.coerceIn(-maxY, maxY))
 }
 
 private suspend fun decodeDocument(bytes: ByteArray): ImageBitmap? = withContext(Dispatchers.Default) {
