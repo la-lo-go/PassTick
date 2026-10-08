@@ -58,7 +58,7 @@
     <string name="pass_detail_pass_not_found">Pass not found</string>
     <string name="pass_detail_protected_pass">Protected pass</string>
     <string name="pass_detail_open_in_maps">Open in Maps</string>
-    <string name="pass_detail_date_and_time">Date and time</string>
+    <string name="pass_detail_date_and_time">Date</string>
     <string name="pass_detail_note">Note</string>
     <string name="pass_detail_add_note">Add note</string>
     <string name="pass_detail_remove_note">Remove note</string>

@@ -58,9 +58,9 @@ enum class PassCategoryRole { INBOX, FAVORITES, ARCHIVE, PAST, TRASH, CUSTOM }
 enum class PassDetailSection {
     ARTWORK,
     BARCODE,
+    CALENDAR,
     FIELDS,
     LOCATIONS,
-    CALENDAR,
     NOTES,
 }
 
