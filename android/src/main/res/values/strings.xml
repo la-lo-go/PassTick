@@ -345,8 +345,12 @@
     <string name="home_no_matches_for_query">Try fewer or different words for "%1$s".</string>
     <string name="reminder_pass_reminder">Pass reminder</string>
     <string name="reminder_pass_expired">Pass expired</string>
-    <string name="reminder_channel_name">Pass reminders</string>
-    <string name="reminder_channel_description">Notifications for dated passes</string>
+    <string name="reminder_channel_name">Upcoming passes</string>
+    <string name="reminder_channel_description">Reminders before a dated pass starts</string>
+    <string name="reminder_channel_access_name">Pass ready to use</string>
+    <string name="reminder_channel_access_description">Alerts shortly before a pass starts, when you need its code</string>
+    <string name="reminder_channel_expiration_name">Pass expiration</string>
+    <string name="reminder_channel_expiration_description">Alerts before a pass stops being valid</string>
     <string name="reminder_open_code">Open code</string>
     <string name="reminder_directions">Directions</string>
     <string name="reminder_snooze">Snooze</string>

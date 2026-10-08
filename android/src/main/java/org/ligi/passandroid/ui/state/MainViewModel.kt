@@ -165,6 +165,14 @@ class MainViewModel(
                                 settings.reminderMinutes,
                                 overrides,
                                 settings.reminderActionsByPass,
+                                currentPasses.associate { pass ->
+                                    pass.id to resolvePassCardTitle(
+                                        PassUiModel.fromCardLines(pass),
+                                        settings.homeCardSectionOrder,
+                                        settings.hiddenHomeCardSections,
+                                        settings.categories,
+                                    )
+                                },
                             )
                         } else {
                             emptyList()

@@ -92,6 +92,22 @@ class AndroidReminderSchedulerTest {
     }
 
     @Test
+    fun aDismissedReminderIsNotPostedAgain() {
+        assertThat(shouldPost(alreadyDelivered = false, visible = false, force = false)).isTrue()
+        assertThat(shouldPost(alreadyDelivered = true, visible = true, force = false)).isTrue()
+        assertThat(shouldPost(alreadyDelivered = true, visible = false, force = false)).isFalse()
+        assertThat(shouldPost(alreadyDelivered = true, visible = false, force = true)).isTrue()
+    }
+
+    @Test
+    fun remindersUseOneChannelPerCategory() {
+        val event = PassReminder(id = "e", passId = "p", title = "t", eventAtMillis = 10, triggerAtMillis = 5)
+        assertThat(channelId(event, NotificationPhase.UPCOMING)).isEqualTo("pass_reminders")
+        assertThat(channelId(event, NotificationPhase.ACCESS)).isEqualTo("pass_access")
+        assertThat(channelId(event.copy(isExpiration = true), NotificationPhase.ACCESS)).isEqualTo("pass_expiration")
+    }
+
+    @Test
     fun lockScreenLevelsMapToNotificationVisibility() {
         assertThat(notificationVisibility(NotificationLockScreenDetail.FULL)).isEqualTo(NotificationCompat.VISIBILITY_PUBLIC)
         assertThat(notificationVisibility(NotificationLockScreenDetail.HIDE_SENSITIVE)).isEqualTo(NotificationCompat.VISIBILITY_PRIVATE)

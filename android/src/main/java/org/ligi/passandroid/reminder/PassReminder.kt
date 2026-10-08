@@ -42,6 +42,7 @@ fun buildPassReminders(
     leadMinutes: Set<Int>,
     overrides: Map<String, PassReminderOverride> = emptyMap(),
     actionOverrides: Map<String, Set<NotificationAction>> = emptyMap(),
+    titles: Map<String, String> = emptyMap(),
 ): List<PassReminder> {
     val nowMillis = now.toEpochMilli()
     val events = timeline.days.asSequence().flatMap { it.events.asSequence() }
@@ -54,7 +55,7 @@ fun buildPassReminders(
                 PassReminder(
                     id = "${event.id}:$safeMinutes",
                     passId = event.pass.passId,
-                    title = event.title,
+                    title = titles[event.pass.passId] ?: event.title,
                     eventAtMillis = event.startsAt.toEpochMilli(),
                     triggerAtMillis = event.startsAt.toEpochMilli() - safeMinutes * 60_000L,
                     endAtMillis = event.endsAt.toEpochMilli(),
@@ -70,7 +71,7 @@ fun buildPassReminders(
             }
         }
     val expirationReminders = events.mapNotNull { event ->
-        event.expirationReminder(nowMillis, leadMinutes, overrides, actionOverrides)
+        event.expirationReminder(nowMillis, leadMinutes, overrides, actionOverrides, titles)
     }
     return (eventReminders + expirationReminders)
         .filter { it.triggerAtMillis >= nowMillis || it.ownsLifecycle }
@@ -97,13 +98,14 @@ private fun PassEvent.expirationReminder(
     globalLeadMinutes: Set<Int>,
     overrides: Map<String, PassReminderOverride>,
     actionOverrides: Map<String, Set<NotificationAction>>,
+    titles: Map<String, String>,
 ): PassReminder? {
     val expiresAtMillis = expiresAt?.toEpochMilli()?.takeIf { it > nowMillis } ?: return null
     val minutes = reminderLeadMinutes(globalLeadMinutes, overrides).maxOrNull() ?: return null
     return PassReminder(
         id = "$id:expiration",
         passId = pass.passId,
-        title = title,
+        title = titles[pass.passId] ?: title,
         eventAtMillis = expiresAtMillis,
         triggerAtMillis = expiresAtMillis - minutes * 60_000L,
         endAtMillis = expiresAtMillis,

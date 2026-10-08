@@ -13,6 +13,8 @@ enum class NotificationLockScreenDetail { FULL, HIDE_SENSITIVE, HIDDEN }
 data class NotificationStrings(
     val passReminder: String = "Pass reminder",
     val passExpired: String = "Pass expired",
+    /** Clock time of the event. An empty label leaves the time out of the text. */
+    val timeLabel: (epochMillis: Long) -> String = { "" },
     val startsIn: (durationMillis: Long) -> String = { "Starts in ${durationLabel(it)}" },
     val expiresIn: (durationMillis: Long) -> String = { "Expires in ${durationLabel(it)}" },
 )
@@ -101,12 +103,12 @@ object NotificationPolicy {
         phase: NotificationPhase,
         settings: NotificationPolicySettings,
     ): String = when (phase) {
-        NotificationPhase.ACCESS, NotificationPhase.UPCOMING ->
-            if (reminder.isExpiration) {
-                settings.strings.expiresIn(reminder.eventAtMillis - nowMillis)
-            } else {
-                settings.strings.startsIn(reminder.eventAtMillis - nowMillis)
-            }
+        NotificationPhase.ACCESS, NotificationPhase.UPCOMING -> {
+            val remaining = reminder.eventAtMillis - nowMillis
+            val text = if (reminder.isExpiration) settings.strings.expiresIn(remaining) else settings.strings.startsIn(remaining)
+            val time = settings.strings.timeLabel(reminder.eventAtMillis)
+            if (time.isBlank()) text else "$text ($time)"
+        }
     }
 
     private fun actions(
@@ -143,6 +145,16 @@ object NotificationPolicy {
 }
 
 internal fun durationMinutes(durationMillis: Long): Long = max(1, (durationMillis + MINUTE - 1) / MINUTE)
+
+/**
+ * Delay until the rounded remaining-time label next changes. Minutes show up to one hour, then whole hours.
+ * One extra second keeps the refresh after the boundary.
+ */
+internal fun labelChangeDelayMillis(remainingMillis: Long): Long {
+    val minutes = durationMinutes(remainingMillis)
+    val threshold = if (minutes <= 60) (minutes - 1) * MINUTE else (durationHours(minutes) - 1) * 60 * MINUTE
+    return (remainingMillis - threshold).coerceAtLeast(0) + 1_000
+}
 
 internal fun durationHours(minutes: Long): Long = (minutes + 59) / 60
 

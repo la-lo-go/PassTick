@@ -11,10 +11,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.text.format.DateFormat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import java.util.Date
 import org.json.JSONObject
 import org.ligi.passandroid.MainActivity
 import org.ligi.passandroid.R
@@ -41,11 +43,12 @@ class AndroidReminderScheduler(private val context: Context) : ReminderScheduler
                 NotificationManagerCompat.from(context).cancel(notificationId(passId))
                 NotificationManagerCompat.from(context).cancel(expirationNotificationId(passId))
             }
-        active.forEach { scheduleLeadOrShow(context, it, now, localizedSettings) }
+        val posted = active.filter { scheduleLeadOrShow(context, it, now, localizedSettings) }.mapTo(mutableSetOf(), PassReminder::id)
         lifecycleOwners(active).filter { it.triggerAtMillis <= now }.forEach {
-            scheduleLifecycle(context, it, now, localizedSettings)
+            scheduleLifecycle(context, it, now, localizedSettings, refresh = it.id in posted || isVisible(context, notificationId(it)))
         }
         store(context, active)
+        pruneDelivered(context, activeIds)
         storePolicySettings(context, localizedSettings)
     }
 
@@ -70,6 +73,7 @@ class PassReminderReceiver : BroadcastReceiver() {
         val now = System.currentTimeMillis()
         val settings = readPolicySettings(context)
         if (intent.action == ACTION_SNOOZE) {
+            NotificationManagerCompat.from(context).cancel(notificationId(reminder))
             scheduleSnooze(context, reminder, now, settings)
             return
         }
@@ -84,9 +88,10 @@ class PassReminderReceiver : BroadcastReceiver() {
             NotificationManagerCompat.from(context).cancel(notificationId(reminder))
             return
         }
-        if (notificationsAllowed(context)) showReminder(context, reminder, result)
+        val posted = notificationsAllowed(context) &&
+            showReminder(context, reminder, result, force = intent.action == ACTION_SNOOZE_DELIVERY)
         if (intent.action == ACTION_LIFECYCLE || intent.action == null && isLifecycleOwner(context, reminder)) {
-            scheduleLifecycle(context, reminder, System.currentTimeMillis(), settings)
+            scheduleLifecycle(context, reminder, System.currentTimeMillis(), settings, refresh = posted)
         }
     }
 }
@@ -98,23 +103,40 @@ class ReminderBootReceiver : BroadcastReceiver() {
 }
 
 fun ensureReminderNotificationChannel(context: Context) {
-    context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-        NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.reminder_channel_name),
-            NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply {
-            description = context.getString(R.string.reminder_channel_description)
-        },
-    )
+    val manager = context.getSystemService(NotificationManager::class.java)
+    listOf(
+        Triple(CHANNEL_ID, R.string.reminder_channel_name to R.string.reminder_channel_description, NotificationManager.IMPORTANCE_DEFAULT),
+        Triple(CHANNEL_ACCESS, R.string.reminder_channel_access_name to R.string.reminder_channel_access_description, NotificationManager.IMPORTANCE_HIGH),
+        Triple(CHANNEL_EXPIRATION, R.string.reminder_channel_expiration_name to R.string.reminder_channel_expiration_description, NotificationManager.IMPORTANCE_DEFAULT),
+    ).forEach { (id, text, importance) ->
+        manager.createNotificationChannel(
+            NotificationChannel(id, context.getString(text.first), importance).apply {
+                description = context.getString(text.second)
+            },
+        )
+    }
 }
 
+/** Reminders can only reach the user when the app may notify and at least one channel is on. */
 fun reminderNotificationsAvailable(context: Context): Boolean {
     ensureReminderNotificationChannel(context)
     val manager = context.getSystemService(NotificationManager::class.java)
     return NotificationManagerCompat.from(context).areNotificationsEnabled() &&
-        manager.getNotificationChannel(CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE
+        REMINDER_CHANNELS.any { manager.getNotificationChannel(it)?.importance != NotificationManager.IMPORTANCE_NONE }
 }
+
+internal fun channelId(reminder: PassReminder, phase: NotificationPhase): String = when {
+    reminder.isExpiration -> CHANNEL_EXPIRATION
+    phase == NotificationPhase.ACCESS -> CHANNEL_ACCESS
+    else -> CHANNEL_ID
+}
+
+/**
+ * A reminder is posted once. Later syncs and lifecycle alarms only refresh a notification that is
+ * still visible, so a dismissed notification does not come back. A snooze delivery is always posted.
+ */
+internal fun shouldPost(alreadyDelivered: Boolean, visible: Boolean, force: Boolean): Boolean =
+    force || !alreadyDelivered || visible
 
 internal fun notificationId(passId: String): Int = passId.hashCode()
 internal fun expirationNotificationId(passId: String): Int = "$passId$EXPIRATION_NOTIFICATION_KEY".hashCode()
@@ -143,12 +165,19 @@ internal fun lifecycleOwners(reminders: List<PassReminder>): List<PassReminder> 
     .values
     .map { group -> group.minWith(compareBy(PassReminder::triggerAtMillis, PassReminder::id)) }
 
-private fun scheduleLeadOrShow(context: Context, reminder: PassReminder, now: Long, settings: NotificationPolicySettings) {
+/** Returns true when the call posted a notification. */
+private fun scheduleLeadOrShow(context: Context, reminder: PassReminder, now: Long, settings: NotificationPolicySettings): Boolean {
     val result = NotificationPolicy.evaluate(reminder, now, settings)
-    when (deliveryDecision(result)) {
-        ReminderDeliveryDecision.SCHEDULE_LEAD -> setAlarm(context, reminder.triggerAtMillis, result, leadIntent(context, reminder))
-        ReminderDeliveryDecision.SHOW_DUE -> if (notificationsAllowed(context)) showReminder(context, reminder, result)
-        ReminderDeliveryDecision.CANCEL -> NotificationManagerCompat.from(context).cancel(notificationId(reminder))
+    return when (deliveryDecision(result)) {
+        ReminderDeliveryDecision.SCHEDULE_LEAD -> {
+            setAlarm(context, reminder.triggerAtMillis, result, leadIntent(context, reminder))
+            false
+        }
+        ReminderDeliveryDecision.SHOW_DUE -> notificationsAllowed(context) && showReminder(context, reminder, result, force = false)
+        ReminderDeliveryDecision.CANCEL -> {
+            NotificationManagerCompat.from(context).cancel(notificationId(reminder))
+            false
+        }
     }
 }
 
@@ -158,9 +187,20 @@ private fun scheduleSnooze(context: Context, reminder: PassReminder, now: Long, 
     setAlarm(context, deliveryAt, result, snoozeDeliveryIntent(context, reminder))
 }
 
-private fun scheduleLifecycle(context: Context, reminder: PassReminder, now: Long, settings: NotificationPolicySettings) {
+/**
+ * While the notification is on screen, the alarm also fires each time the remaining-time text changes,
+ * so the text stays current. A dismissed notification only keeps the phase and end alarms.
+ */
+private fun scheduleLifecycle(
+    context: Context,
+    reminder: PassReminder,
+    now: Long,
+    settings: NotificationPolicySettings,
+    refresh: Boolean,
+) {
     val result = NotificationPolicy.evaluate(reminder, now, settings)
-    val triggerAt = result.nextTriggerAtMillis ?: return
+    val phaseAt = result.nextTriggerAtMillis ?: return
+    val triggerAt = if (refresh) minOf(phaseAt, now + labelChangeDelayMillis(reminder.eventAtMillis - now)) else phaseAt
     setAlarm(context, triggerAt, result, lifecycleIntent(context, reminder))
 }
 
@@ -174,12 +214,17 @@ private fun setAlarm(context: Context, triggerAt: Long, result: NotificationPoli
     }
 }
 
-private fun showReminder(context: Context, reminder: PassReminder, policy: NotificationPolicyResult) {
+/** Returns true when the call posted or updated the notification. */
+private fun showReminder(context: Context, reminder: PassReminder, policy: NotificationPolicyResult, force: Boolean): Boolean {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-    ) return
+    ) return false
     ensureReminderNotificationChannel(context)
-    val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+    val id = notificationId(reminder)
+    val key = deliveryKey(reminder)
+    if (!shouldPost(key in readDelivered(context), isVisible(context, id), force)) return false
+    val channel = channelId(reminder, policy.phase)
+    val builder = NotificationCompat.Builder(context, channel)
         .setSmallIcon(R.drawable.ic_notification_pass)
         .setContentTitle(policy.title)
         .setContentText(policy.body)
@@ -188,10 +233,17 @@ private fun showReminder(context: Context, reminder: PassReminder, policy: Notif
         .setOnlyAlertOnce(true)
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
         .setVisibility(notificationVisibility(policy.lockScreenDetail))
-    if (showsPublicVersion(policy.lockScreenDetail)) builder.setPublicVersion(publicNotification(context, policy))
+    val remaining = reminder.eventAtMillis - System.currentTimeMillis()
+    if (remaining > 0) builder.setTimeoutAfter(remaining)
+    if (showsPublicVersion(policy.lockScreenDetail)) builder.setPublicVersion(publicNotification(context, policy, channel))
     policy.actions.take(MAX_ACTIONS).forEach { builder.addReminderAction(context, reminder, it) }
-    NotificationManagerCompat.from(context).notify(notificationId(reminder), builder.build())
+    NotificationManagerCompat.from(context).notify(id, builder.build())
+    markDelivered(context, key)
+    return true
 }
+
+private fun isVisible(context: Context, id: Int): Boolean =
+    context.getSystemService(NotificationManager::class.java).activeNotifications.any { it.id == id }
 
 private fun NotificationCompat.Builder.addReminderAction(context: Context, reminder: PassReminder, action: NotificationAction) {
     when (action) {
@@ -201,8 +253,8 @@ private fun NotificationCompat.Builder.addReminderAction(context: Context, remin
     }
 }
 
-private fun publicNotification(context: Context, policy: NotificationPolicyResult): Notification =
-    NotificationCompat.Builder(context, CHANNEL_ID)
+private fun publicNotification(context: Context, policy: NotificationPolicyResult, channel: String): Notification =
+    NotificationCompat.Builder(context, channel)
         .setSmallIcon(R.drawable.ic_notification_pass)
         .setContentTitle(policy.publicTitle)
         .setContentText(policy.publicBody)
@@ -266,6 +318,20 @@ private fun store(context: Context, reminders: List<PassReminder>) {
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(STORED, encoded) }
 }
 
+private fun deliveryKey(reminder: PassReminder) = "${reminder.id}$DELIVERY_SEPARATOR${reminder.triggerAtMillis}"
+
+private fun readDelivered(context: Context): Set<String> =
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(DELIVERED, emptySet()).orEmpty()
+
+private fun markDelivered(context: Context, key: String) {
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(DELIVERED, readDelivered(context) + key) }
+}
+
+private fun pruneDelivered(context: Context, activeIds: Set<String>) {
+    val kept = readDelivered(context).filterTo(mutableSetOf()) { it.substringBeforeLast(DELIVERY_SEPARATOR) in activeIds }
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(DELIVERED, kept) }
+}
+
 private fun storePolicySettings(context: Context, settings: NotificationPolicySettings) {
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
         putInt(ACCESS_WINDOW, settings.accessWindowMinutes)
@@ -293,6 +359,7 @@ private fun readPolicySettings(context: Context): NotificationPolicySettings =
 private fun notificationStrings(context: Context) = NotificationStrings(
     passReminder = context.getString(R.string.reminder_pass_reminder),
     passExpired = context.getString(R.string.reminder_pass_expired),
+    timeLabel = { epochMillis -> DateFormat.getTimeFormat(context).format(Date(epochMillis)) },
     startsIn = { remaining ->
         val minutes = durationMinutes(remaining)
         if (minutes < 60) {
@@ -355,7 +422,13 @@ internal fun decodeReminder(encoded: String): PassReminder? = runCatching {
 }.getOrNull()
 
 private val RESCHEDULE_ACTIONS = setOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED)
+/** The first channel keeps its original id so existing user choices survive the split. */
 private const val CHANNEL_ID = "pass_reminders"
+private const val CHANNEL_ACCESS = "pass_access"
+private const val CHANNEL_EXPIRATION = "pass_expiration"
+private val REMINDER_CHANNELS = listOf(CHANNEL_ID, CHANNEL_ACCESS, CHANNEL_EXPIRATION)
+private const val DELIVERED = "delivered"
+private const val DELIVERY_SEPARATOR = "@"
 private const val EXTRA_REMINDER = "reminder"
 private const val PREFS = "pass_reminder_schedule"
 private const val STORED = "reminders"
