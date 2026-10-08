@@ -379,6 +379,8 @@ fun PassTickApp(
     fun requestDelete(passId: String) {
         val trashEnabled = state.settings.trashEnabled
         viewModel.onAction(AppAction.SetPassPendingDeletion(passId, true))
+        // Trash is a reversible move, so it happens now; only a permanent delete waits for the undo window.
+        if (trashEnabled) viewModel.onAction(AppAction.TrashPass(passId))
         coroutineScope.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
             val timeout = launch {
@@ -394,10 +396,11 @@ fun PassTickApp(
                 duration = SnackbarDuration.Indefinite,
             )
             timeout.cancel()
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.onAction(AppAction.SetPassPendingDeletion(passId, false))
-            } else {
-                viewModel.onAction(if (trashEnabled) AppAction.TrashPass(passId) else AppAction.DeletePass(passId))
+            val undone = result == SnackbarResult.ActionPerformed
+            when {
+                trashEnabled -> if (undone) viewModel.onAction(AppAction.RestoreFromTrash(passId))
+                undone -> viewModel.onAction(AppAction.SetPassPendingDeletion(passId, false))
+                else -> viewModel.onAction(AppAction.DeletePass(passId))
             }
         }
     }
