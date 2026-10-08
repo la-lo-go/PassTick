@@ -850,7 +850,6 @@ private data class HomeSortOption(val order: PassSortOrder, val label: String) {
 private fun homeSortOptions(selectedSort: PassSortOrder, showManual: Boolean) = buildList {
     if (showManual) add(HomeSortOption(PassSortOrder.MANUAL, stringResource(R.string.home_manual)))
     add(HomeSortOption(PassSortOrder.DATE_DESC, if (selectedSort == PassSortOrder.DATE_ASC) stringResource(R.string.home_oldest) else stringResource(R.string.home_newest)))
-    add(HomeSortOption(PassSortOrder.DATE_DIFF, stringResource(R.string.home_nearest)))
     add(HomeSortOption(PassSortOrder.TYPE, stringResource(R.string.home_type)))
     add(HomeSortOption(PassSortOrder.MOST_USED, stringResource(R.string.home_most_used)))
 }
