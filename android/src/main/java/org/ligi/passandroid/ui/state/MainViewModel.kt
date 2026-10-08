@@ -561,6 +561,13 @@ class MainViewModel(
     }
 
     private fun handleCategoryAction(action: AppAction): Boolean = when (action) {
+        is AppAction.SetTagPinned -> {
+            viewModelScope.launch {
+                val pinned = uiState.value.settings.pinnedTagIds
+                settingsRepository.setPinnedTagIds(if (action.pinned) pinned + action.id else pinned - action.id)
+            }
+            true
+        }
         is AppAction.SelectCategory -> {
             selectedCategoryId.value = action.categoryId
             viewModelScope.launch { settingsRepository.setSelectedCategoryId(action.categoryId) }

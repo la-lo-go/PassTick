@@ -123,6 +123,8 @@
     <string name="category_delete_tag">Delete tag?</string>
     <string name="category_delete">Delete</string>
     <string name="category_tags">Tags</string>
+    <string name="category_pin_tag">Pin tag</string>
+    <string name="category_unpin_tag">Unpin tag</string>
     <string name="category_add_tag">Add tag</string>
     <string name="category_name">Name</string>
     <string name="category_save">Save</string>

@@ -273,6 +273,7 @@ sealed interface AppAction {
     data class SetCodePassId(val value: String?) : AppAction
     data class SetSortOrder(val value: PassSortOrder) : AppAction
     data class ReorderPass(val orderedVisibleIds: List<String>) : AppAction
+    data class SetTagPinned(val id: String, val pinned: Boolean) : AppAction
     data class SetHighlightTodayPasses(val value: Boolean) : AppAction
     data class SetAutomaticallyMarkPast(val value: Boolean) : AppAction
     data class SetOfferCalendarAfterImport(val value: Boolean) : AppAction

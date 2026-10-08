@@ -149,6 +149,7 @@ sealed interface HomeAction {
     data class SetTrashEnabled(val value: Boolean) : HomeAction
     data object EmptyTrash : HomeAction
     data class ToggleFavorite(val id: String) : HomeAction
+    data class SetTagPinned(val id: String, val pinned: Boolean) : HomeAction
     data class ToggleProtected(val id: String) : HomeAction
     data class Undo(val operation: UndoOperation) : HomeAction
     data object ImportPass : HomeAction
@@ -211,6 +212,7 @@ internal fun PassHomeScreen(
     var todayExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var pinnedExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var otherExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
+    var collapsedTagIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val protectedPassIds = remember(state.passes, state.trashedPasses, state.selectedCategoryId, state.settings.lockAllPasses) {
         val source = if (state.selectedCategoryId == TRASHED_PASSES_CATEGORY_ID) {
             state.passes + state.trashedPasses
@@ -349,10 +351,11 @@ internal fun PassHomeScreen(
         }
     }
 
-    val visibleCategories = remember(state.categories, state.passes) {
+    val pinnedTagIds = state.settings.pinnedTagIds
+    val visibleCategories = remember(state.categories, state.passes, pinnedTagIds) {
         state.categories.filter { category ->
             category.role == PassCategoryRole.CUSTOM && state.passes.any { category.id in it.tagIds }
-        }
+        }.sortedByDescending { it.id in pinnedTagIds }
     }
     BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
     ModalNavigationDrawer(
@@ -432,10 +435,26 @@ internal fun PassHomeScreen(
                             )
                         }
                         visibleCategories.forEach { category ->
+                            val tagPinned = category.id in pinnedTagIds
                             NavigationDrawerItem(
                                 label = { Text(category.name) },
                                 selected = state.selectedCategoryId == category.id,
                                 icon = { Icon(categoryIcon(category.icon), category.icon) },
+                                badge = {
+                                    IconButton(onClick = { onAction(HomeAction.SetTagPinned(category.id, !tagPinned)) }) {
+                                        Icon(
+                                            Icons.Default.PushPin,
+                                            contentDescription = stringResource(
+                                                if (tagPinned) R.string.category_unpin_tag else R.string.category_pin_tag,
+                                            ),
+                                            tint = if (tagPinned) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                            },
+                                        )
+                                    }
+                                },
                                 onClick = { scope.launch { drawerState.close() }; onAction(HomeAction.SelectCategory(category.id)) },
                                 modifier = Modifier.padding(horizontal = 12.dp).testTag("drawer_filter_${category.id}"),
                             )
@@ -482,6 +501,41 @@ internal fun PassHomeScreen(
     ) { scaffoldPadding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(scaffoldPadding)) {
             val expanded = maxWidth >= 840.dp
+            val remainingFeed: @Composable (List<PassUiModel>) -> Unit = { feedPasses ->
+                TicketFeed(
+                    passes = feedPasses,
+                    recentlyImportedIds = recentlyImportedIds,
+                    categories = state.categories,
+                    columns = if (expanded) 2 else 1,
+                    hero = false,
+                    sectionOrder = state.settings.homeCardSectionOrder,
+                    hiddenSections = state.settings.hiddenHomeCardSections,
+                    showProtectedPassLockIcon = state.settings.showProtectedPassLockIcon,
+                    blurProtectedPassCards = state.settings.blurProtectedPassCards,
+                    onOpen = { onAction(HomeAction.OpenPass(it)) },
+                    onArchive = { id, restoring, originalCategoryId ->
+                        if (restoring) {
+                            dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), passRestoredMessage)
+                        } else {
+                            dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), passArchivedMessage)
+                        }
+                    },
+                    onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
+                    onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
+                    onToggleProtected = { onAction(HomeAction.ToggleProtected(it)) },
+                    onReorder = { onAction(HomeAction.ReorderPass(it)) },
+                    onPreviewChanged = {
+                        previewPassId = it
+                        if (it == null) previewOpeningPassId = null
+                    },
+                    onPreviewOpeningChanged = { previewOpeningPassId = it },
+                    onProtectedPreviewRequested = {
+                        scope.launch { snackbarHostState.showSnackbar(unlockPreviewMessage) }
+                    },
+                    openSwipePassId = openSwipePassId,
+                    tagCategories = state.categories,
+                )
+            }
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().testTag("home_list"),
@@ -610,46 +664,33 @@ internal fun PassHomeScreen(
                     }
                 }
                 if (remainingPasses.isNotEmpty()) {
-                    // The heading only labels the leftover group; without other sections it has no contrast.
-                    val showOtherPassesHeading = todayPasses.isNotEmpty() || pinnedPasses.isNotEmpty() ||
-                        showLockedSection
-                    if (showOtherPassesHeading) {
-                        item(key = "passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
-                    }
-                    if (otherExpanded || !showOtherPassesHeading) item(key = "pass-feed") {
-                        TicketFeed(
-                            passes = remainingPasses,
-                            recentlyImportedIds = recentlyImportedIds,
-                            categories = state.categories,
-                            columns = if (expanded) 2 else 1,
-                            hero = false,
-                            sectionOrder = state.settings.homeCardSectionOrder,
-                            hiddenSections = state.settings.hiddenHomeCardSections,
-                            showProtectedPassLockIcon = state.settings.showProtectedPassLockIcon,
-                            blurProtectedPassCards = state.settings.blurProtectedPassCards,
-                            onOpen = { onAction(HomeAction.OpenPass(it)) },
-                            onArchive = { id, restoring, originalCategoryId ->
-                                if (restoring) {
-                                    dispatchReversible(HomeAction.Restore(id), UndoOperation.Restore(id, originalCategoryId), passRestoredMessage)
-                                } else {
-                                    dispatchReversible(HomeAction.Archive(id), UndoOperation.Archive(id, originalCategoryId), passArchivedMessage)
-                                }
-                            },
-                            onDelete = { id, _ -> onAction(HomeAction.Delete(id)) },
-                            onToggleFavorite = { onAction(HomeAction.ToggleFavorite(it)) },
-                            onToggleProtected = { onAction(HomeAction.ToggleProtected(it)) },
-                            onReorder = { onAction(HomeAction.ReorderPass(it)) },
-                            onPreviewChanged = {
-                                previewPassId = it
-                                if (it == null) previewOpeningPassId = null
-                            },
-                            onPreviewOpeningChanged = { previewOpeningPassId = it },
-                            onProtectedPreviewRequested = {
-                                scope.launch { snackbarHostState.showSnackbar(unlockPreviewMessage) }
-                            },
-                            openSwipePassId = openSwipePassId,
-                            tagCategories = state.categories,
+                    val grouping = if (state.selectedCategoryId == null) {
+                        groupByPinnedTags(
+                            remainingPasses,
+                            visibleCategories.mapNotNullTo(linkedSetOf()) { it.id.takeIf { id -> id in pinnedTagIds } },
+                            PassUiModel::tagIds,
                         )
+                    } else {
+                        PinnedTagGroups(emptyList(), remainingPasses)
+                    }
+                    grouping.groups.forEach { (tagId, groupPasses) ->
+                        val tag = state.categories.firstOrNull { it.id == tagId } ?: return@forEach
+                        val collapsed = tagId in collapsedTagIds
+                        item(key = "tag-heading-$tagId") {
+                            SectionHeading(tag.name, !collapsed) {
+                                collapsedTagIds = if (collapsed) collapsedTagIds - tagId else collapsedTagIds + tagId
+                            }
+                        }
+                        if (!collapsed) item(key = "tag-feed-$tagId") { remainingFeed(groupPasses) }
+                    }
+                    if (grouping.rest.isNotEmpty()) {
+                        // The heading only labels the leftover group; without other sections it has no contrast.
+                        val showOtherPassesHeading = todayPasses.isNotEmpty() || pinnedPasses.isNotEmpty() ||
+                            showLockedSection || grouping.groups.isNotEmpty()
+                        if (showOtherPassesHeading) {
+                            item(key = "passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
+                        }
+                        if (otherExpanded || !showOtherPassesHeading) item(key = "pass-feed") { remainingFeed(grouping.rest) }
                     }
                 }
                 }

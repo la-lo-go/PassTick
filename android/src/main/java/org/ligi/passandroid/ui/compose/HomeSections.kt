@@ -40,3 +40,18 @@ internal fun selectHomePasses(
     null -> passes.filterNot { it.categoryId in hiddenCategoryIds || it.isArchived }
     else -> passes.filter { it.categoryId == selectedCategoryId || selectedCategoryId in it.tagIds }
 }
+
+internal data class PinnedTagGroups<T>(val groups: List<Pair<String, List<T>>>, val rest: List<T>)
+
+/** A pass joins the first pinned tag it carries, so no pass shows twice. Tags without passes make no group. */
+internal fun <T> groupByPinnedTags(
+    passes: List<T>,
+    pinnedTagIds: Set<String>,
+    tagIdsOf: (T) -> Collection<String>,
+): PinnedTagGroups<T> {
+    val owner = passes.associateWith { pass -> tagIdsOf(pass).firstOrNull { it in pinnedTagIds } }
+    val groups = pinnedTagIds.mapNotNull { tagId ->
+        passes.filter { owner[it] == tagId }.takeIf(List<T>::isNotEmpty)?.let { tagId to it }
+    }
+    return PinnedTagGroups(groups, passes.filter { owner[it] == null })
+}

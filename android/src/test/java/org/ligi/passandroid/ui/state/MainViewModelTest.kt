@@ -1055,6 +1055,9 @@ private class FakeSettingsRepository(initial: AppSettings = AppSettings()) : Set
         settings.value = settings.value.copy(reminderLeadMinutesByPass = value)
     }
     override suspend fun setReminderExactPassIds(value: Set<String>) = Unit
+    override suspend fun setPinnedTagIds(value: Set<String>) {
+        settings.value = settings.value.copy(pinnedTagIds = value)
+    }
     override suspend fun setReminderActionsByPass(
         value: Map<String, Set<org.ligi.passandroid.reminder.NotificationAction>>,
     ) {

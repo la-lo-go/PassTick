@@ -476,6 +476,7 @@ fun PassTickApp(
                 setProtectedWithAuthentication(action.id, !pass.isProtected)
             }
             is HomeAction.SelectCategory -> viewModel.onAction(AppAction.SelectCategory(action.categoryId))
+            is HomeAction.SetTagPinned -> viewModel.onAction(AppAction.SetTagPinned(action.id, action.pinned))
             is HomeAction.RecordUse -> viewModel.onAction(AppAction.RecordPassUse(action.id))
             is HomeAction.SetSortOrder -> viewModel.onAction(AppAction.SetSortOrder(action.order))
             is HomeAction.ReorderPass -> viewModel.onAction(AppAction.ReorderPass(action.orderedVisibleIds))

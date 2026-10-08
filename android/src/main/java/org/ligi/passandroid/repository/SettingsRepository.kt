@@ -166,6 +166,7 @@ data class AppSettings(
     val reminderExcludedPassIds: Set<String> = emptySet(),
     val reminderLeadMinutesByPass: Map<String, Int> = emptyMap(),
     val reminderExactPassIds: Set<String> = emptySet(),
+    val pinnedTagIds: Set<String> = emptySet(),
     val reminderActionsByPass: Map<String, Set<NotificationAction>> = emptyMap(),
     val notificationAccessWindowMinutes: Int = 15,
     val notificationExactTiming: Boolean = false,
@@ -220,6 +221,7 @@ interface SettingsRepository {
     suspend fun setReminderExcludedPassIds(value: Set<String>)
     suspend fun setReminderLeadMinutesByPass(value: Map<String, Int>)
     suspend fun setReminderExactPassIds(value: Set<String>)
+    suspend fun setPinnedTagIds(value: Set<String>)
     suspend fun setReminderActionsByPass(value: Map<String, Set<NotificationAction>>)
     suspend fun setNotificationAccessWindowMinutes(value: Int)
     suspend fun setNotificationExactTiming(value: Boolean)
@@ -282,6 +284,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             reminderExcludedPassIds = preferences[REMINDER_EXCLUDED_PASS_IDS].orEmpty(),
             reminderLeadMinutesByPass = preferences[REMINDER_LEAD_BY_PASS]?.let(::decodeReminderLeads).orEmpty(),
             reminderExactPassIds = preferences[REMINDER_EXACT_PASS_IDS].orEmpty(),
+            pinnedTagIds = preferences[PINNED_TAG_IDS].orEmpty(),
             reminderActionsByPass = preferences[REMINDER_ACTIONS_BY_PASS]?.let(::decodeReminderActions).orEmpty(),
             notificationAccessWindowMinutes = (preferences[NOTIFICATION_ACCESS_WINDOW] ?: 15).coerceIn(0, 120),
             notificationExactTiming = preferences[NOTIFICATION_EXACT_TIMING] ?: false,
@@ -435,6 +438,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         encodeReminderLeads(value),
     )
     override suspend fun setReminderExactPassIds(value: Set<String>) = update(REMINDER_EXACT_PASS_IDS, value)
+    override suspend fun setPinnedTagIds(value: Set<String>) = update(PINNED_TAG_IDS, value)
     override suspend fun setReminderActionsByPass(value: Map<String, Set<NotificationAction>>) =
         update(REMINDER_ACTIONS_BY_PASS, encodeReminderActions(value))
     override suspend fun setNotificationAccessWindowMinutes(value: Int) =
@@ -547,6 +551,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val REMINDER_EXCLUDED_PASS_IDS = stringSetPreferencesKey("reminder_excluded_pass_ids")
         val REMINDER_LEAD_BY_PASS = stringPreferencesKey("reminder_lead_minutes_by_pass")
         val REMINDER_EXACT_PASS_IDS = stringSetPreferencesKey("reminder_exact_pass_ids")
+        val PINNED_TAG_IDS = stringSetPreferencesKey("pinned_tag_ids")
         val REMINDER_ACTIONS_BY_PASS = stringPreferencesKey("reminder_actions_by_pass")
         val NOTIFICATION_ACCESS_WINDOW = intPreferencesKey("notification_access_window_minutes")
         val NOTIFICATION_EXACT_TIMING = booleanPreferencesKey("notification_exact_timing")
