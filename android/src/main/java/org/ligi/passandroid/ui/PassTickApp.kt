@@ -83,7 +83,6 @@ import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.hasDisplayableCode
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.repository.StartupAppearanceStore
-import org.ligi.passandroid.platform.AndroidFlashlightController
 import org.ligi.passandroid.platform.PassAuthenticator
 import org.ligi.passandroid.platform.PassImageExporter
 import org.ligi.passandroid.repository.PassImageContent
@@ -349,12 +348,6 @@ fun PassTickApp(
             }
         }
     }
-    val flashlightController = remember { AndroidFlashlightController(context.applicationContext) }
-    DisposableEffect(flashlightController) {
-        onDispose { flashlightController.close() }
-    }
-    val flashlightFlow = remember(flashlightController) { flashlightController.state }
-    val flashlight by flashlightFlow.collectAsStateWithLifecycle()
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -521,7 +514,6 @@ fun PassTickApp(
                 }
             }
             PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
-            is PassDetailAction.SetFlashlightEnabled -> flashlightController.setEnabled(action.enabled)
             PassDetailAction.OpenReminderSettings -> {
                 scrollSettingsToNotifications = true
                 backStack.add(AppDestination.Settings)
@@ -720,8 +712,6 @@ fun PassTickApp(
                         scrollSettingsToNotifications = true
                         backStack.add(AppDestination.Settings)
                     },
-                    flashlightAvailable = flashlight.isAvailable,
-                    flashlightEnabled = flashlight.isEnabled,
                     scrollSettingsToNotifications = scrollSettingsToNotifications,
                     onSettingsScrollConsumed = { scrollSettingsToNotifications = false },
                     coroutineScope = coroutineScope,

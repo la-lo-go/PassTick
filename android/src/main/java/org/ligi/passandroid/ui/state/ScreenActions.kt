@@ -27,7 +27,6 @@ sealed interface PassDetailAction {
         val exactAtEvent: Boolean = false,
     ) : PassDetailAction
     data class SetReminderActions(val actions: Set<org.ligi.passandroid.reminder.NotificationAction>?) : PassDetailAction
-    data class SetFlashlightEnabled(val enabled: Boolean) : PassDetailAction
     data class OpenLocation(val index: Int) : PassDetailAction
     data class MoveToCategory(val categoryId: String) : PassDetailAction
     data class SetTags(val tagIds: Set<String>) : PassDetailAction

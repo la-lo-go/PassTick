@@ -49,7 +49,7 @@ This repository is an independent modernization of the original [PassAndroid pro
 ### Codes and actions
 
 - Show all supported barcode formats, and swipe between several codes on one pass.
-- Open the code from the pass, the widget, a deep link, or a notification, with increased brightness and an optional flashlight.
+- Open the code from the pass, the widget, a deep link, or a notification, with increased brightness.
 - Open pass locations in an installed map app.
 - Add an event to a writable calendar and detect when it is already there.
 

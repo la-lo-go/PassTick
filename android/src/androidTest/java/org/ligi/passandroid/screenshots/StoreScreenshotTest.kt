@@ -109,7 +109,6 @@ class StoreScreenshotTest {
             PassDetailScreen(
                 pass = heroDayPasses().first(),
                 categories = defaultPassCategories,
-                flashlightAvailable = true,
                 calendarEventPresent = true,
                 onAction = {},
             )
@@ -133,7 +132,6 @@ class StoreScreenshotTest {
             PassDetailScreen(
                 pass = importedDocumentPass(),
                 categories = defaultPassCategories,
-                flashlightAvailable = true,
                 calendarEventPresent = false,
                 documentPages = PassDocumentPages { _, _, _ -> importPagePng() },
                 onAction = {},

@@ -100,8 +100,6 @@ internal class AppNavigationDependencies(
     val onShowCalendarPermissionWarning: () -> Unit,
     val onRequestNotificationPermission: () -> Unit,
     val onOpenNotificationSettings: () -> Unit,
-    val flashlightAvailable: Boolean,
-    val flashlightEnabled: Boolean,
     val scrollSettingsToNotifications: Boolean,
     val onSettingsScrollConsumed: () -> Unit,
     val coroutineScope: CoroutineScope,
@@ -202,8 +200,6 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                                 reminderActionOverride = state.settings.reminderActionsByPass[selected.passId],
                                 initialCodeExpanded = dependencies.expandedCodePassId == selected.passId,
                                 onInitialCodeShown = { dependencies.onExpandedCodeShown() },
-                                flashlightAvailable = dependencies.flashlightAvailable,
-                                flashlightEnabled = dependencies.flashlightEnabled,
                                 enhanceCodeBrightness = state.settings.automaticBrightness,
                                 codeViewOptions = CodeViewOptions(
                                     sizeStep = state.settings.codeSizeStep,

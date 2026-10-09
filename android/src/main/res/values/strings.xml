@@ -244,8 +244,6 @@
     <string name="app_unlock">Unlock</string>
     <string name="app_unlocking_protected_pass">Unlocking protected pass...</string>
     <string name="pass_detail_hide_actions">Hide actions</string>
-    <string name="pass_detail_turn_flashlight_off">Turn flashlight off</string>
-    <string name="pass_detail_turn_flashlight_on">Turn flashlight on</string>
     <string name="pass_detail_locked_by_app_protection">Locked by app protection</string>
     <string name="pass_detail_unlocked_with_fingerprint_or_screen_lock">Unlocked with fingerprint or screen lock</string>
     <string name="pass_detail_already_in_calendar">Already in calendar</string>

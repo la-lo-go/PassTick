@@ -30,8 +30,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FlashOff
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.LocationOn
@@ -69,7 +67,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -120,8 +117,6 @@ fun PassDetailScreen(
     reminderActionOverride: Set<NotificationAction>? = null,
     initialCodeExpanded: Boolean = false,
     onInitialCodeShown: () -> Unit = {},
-    flashlightAvailable: Boolean = false,
-    flashlightEnabled: Boolean = false,
     enhanceCodeBrightness: Boolean = true,
     codeViewOptions: CodeViewOptions = CodeViewOptions(),
     calendarEventPresent: Boolean = false,
@@ -158,9 +153,6 @@ fun PassDetailScreen(
                 codePinned = false
             },
         )
-    }
-    DisposableEffect(Unit) {
-        onDispose { onAction(PassDetailAction.SetFlashlightEnabled(false)) }
     }
     if (configureReminder) {
         AlertDialog(
@@ -448,17 +440,6 @@ fun PassDetailScreen(
                 ) {
                     IconButton(onClick = { onAction(PassDetailAction.Share) }) {
                         Icon(Icons.Default.Share, stringResource(R.string.pass_detail_share_pass))
-                    }
-                    if (!pass.barcodeMessage.isNullOrBlank()) {
-                        IconButton(
-                            onClick = { onAction(PassDetailAction.SetFlashlightEnabled(!flashlightEnabled)) },
-                            enabled = flashlightAvailable || flashlightEnabled,
-                        ) {
-                            Icon(
-                                if (flashlightEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                                if (flashlightEnabled) stringResource(R.string.pass_detail_turn_flashlight_off) else stringResource(R.string.pass_detail_turn_flashlight_on),
-                            )
-                        }
                     }
                 }
             }
