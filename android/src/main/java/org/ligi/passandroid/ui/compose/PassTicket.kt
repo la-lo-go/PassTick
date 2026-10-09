@@ -100,6 +100,8 @@ internal fun PassTicket(
     pass: PassUiModel,
     layout: PassTicketLayout,
     modifier: Modifier = Modifier,
+    /** True when the code comes before the details in the pass view order, so the ticket is upside down. */
+    codeOnTop: Boolean = false,
     code: (@Composable () -> Unit)? = null,
 ) {
     val colors = ticketColors(pass, layout)
@@ -133,53 +135,79 @@ internal fun PassTicket(
             .background(edgeColor)
             .padding(TicketEdgeWidth),
     ) {
-        Column(
-            Modifier.fillMaxWidth()
-                .clip(if (code != null) InnerTopShape else InnerShape)
-                .background(colors.container)
-                .padding(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            TicketHeader(pass, layout, issuer, typeLabel, headerFields, colors)
-            when (layout) {
-                is PassTicketLayout.Boarding -> {
-                    Route(layout.origin, layout.destination, colors)
-                    pass.calendarTimeSpan?.from?.let { from ->
-                        TonalCells(stringResource(R.string.pass_detail_ticket_date) to dateLabel(from, null), emptyList(), colors)
-                    }
-                }
-                is PassTicketLayout.Event -> EventMain(pass, layout, issuer, colors)
-                is PassTicketLayout.Coupon -> PrimaryValue(layout.offer, issuer, colors)
-                is PassTicketLayout.StoreCard -> {
-                    PrimaryValue(layout.primary, issuer, colors)
-                    layout.progress?.let { progress ->
-                        LinearProgressIndicator(
-                            progress = { progress.fraction },
-                            modifier = Modifier.fillMaxWidth(),
-                            color = colors.content,
-                            trackColor = colors.tonal,
-                        )
-                    }
-                }
-                is PassTicketLayout.Generic -> PrimaryValue(layout.primary, issuer, colors)
-                PassTicketLayout.Simple -> SimpleTitle(pass, colors)
-            }
-            if (gridFields.isNotEmpty()) {
+        val detailsShape = when {
+            code == null -> InnerShape
+            codeOnTop -> InnerBottomShape
+            else -> InnerTopShape
+        }
+        val details: @Composable () -> Unit = {
+            Column(
+                Modifier.fillMaxWidth()
+                    .clip(detailsShape)
+                    .background(colors.container)
+                    .padding(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                TicketHeader(pass, layout, issuer, typeLabel, headerFields, colors)
                 when (layout) {
-                    PassTicketLayout.Simple -> FieldList(gridFields, colors)
-                    is PassTicketLayout.Event -> FieldGrid(gridFields, colors, EventColumns, columnGap = 2.dp, cellPadding = 12.dp)
-                    else -> FieldGrid(gridFields, colors, List(GRID_COLUMNS) { 1f }, columnGap = 12.dp, cellPadding = 0.dp)
+                    is PassTicketLayout.Boarding -> {
+                        Route(layout.origin, layout.destination, colors)
+                        pass.calendarTimeSpan?.from?.let { from ->
+                            TonalCells(stringResource(R.string.pass_detail_ticket_date) to dateLabel(from, null), emptyList(), colors)
+                        }
+                    }
+                    is PassTicketLayout.Event -> EventMain(pass, layout, issuer, colors)
+                    is PassTicketLayout.Coupon -> PrimaryValue(layout.offer, issuer, colors)
+                    is PassTicketLayout.StoreCard -> {
+                        PrimaryValue(layout.primary, issuer, colors)
+                        layout.progress?.let { progress ->
+                            LinearProgressIndicator(
+                                progress = { progress.fraction },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = colors.content,
+                                trackColor = colors.tonal,
+                            )
+                        }
+                    }
+                    is PassTicketLayout.Generic -> PrimaryValue(layout.primary, issuer, colors)
+                    PassTicketLayout.Simple -> SimpleTitle(pass, colors)
+                }
+                if (gridFields.isNotEmpty()) {
+                    when (layout) {
+                        PassTicketLayout.Simple -> FieldList(gridFields, colors)
+                        is PassTicketLayout.Event -> FieldGrid(gridFields, colors, EventColumns, columnGap = 2.dp, cellPadding = 12.dp)
+                        else -> FieldGrid(gridFields, colors, List(GRID_COLUMNS) { 1f }, columnGap = 12.dp, cellPadding = 0.dp)
+                    }
                 }
             }
         }
-        if (code != null) {
+        val codeArea: @Composable () -> Unit = {
+            Box(
+                Modifier.fillMaxWidth()
+                    .clip(if (codeOnTop) InnerTopShape else InnerBottomShape)
+                    .background(Color.White)
+                    .padding(start = 6.dp, end = 6.dp, top = if (codeOnTop) 10.dp else 0.dp, bottom = if (codeOnTop) 0.dp else 10.dp),
+            ) { code?.invoke() }
+        }
+        val perforation: @Composable () -> Unit = {
             Perforation(
                 colors.container,
-                Modifier.onGloballyPositioned { tearLine = it.positionInRoot().y - ticketTop + it.size.height / 2f },
+                colorOnTop = !codeOnTop,
+                modifier = Modifier.onGloballyPositioned { tearLine = it.positionInRoot().y - ticketTop + it.size.height / 2f },
             )
-            Box(
-                Modifier.fillMaxWidth().clip(InnerBottomShape).background(Color.White).padding(start = 6.dp, end = 6.dp, bottom = 10.dp),
-            ) { code() }
+        }
+        when {
+            code == null -> details()
+            codeOnTop -> {
+                codeArea()
+                perforation()
+                details()
+            }
+            else -> {
+                details()
+                perforation()
+                codeArea()
+            }
         }
     }
 }
@@ -426,11 +454,12 @@ private fun DrawScope.drawTicketNotches(edgeColor: Color, tearLine: Float) {
 // The pass color ends at the tear line, like a paper ticket torn at its perforation. A row of holes runs between
 // the edge notches. The holes are cut out of the ticket, so the screen shows through.
 @Composable
-private fun Perforation(passColor: Color, modifier: Modifier) {
+private fun Perforation(passColor: Color, colorOnTop: Boolean, modifier: Modifier) {
     Canvas(modifier.fillMaxWidth().height(PerforationHeight)) {
         val center = size.height / 2f
-        drawRect(passColor, size = Size(size.width, center))
-        drawRect(Color.White, topLeft = Offset(0f, center), size = Size(size.width, center))
+        val colorTop = if (colorOnTop) 0f else center
+        drawRect(passColor, topLeft = Offset(0f, colorTop), size = Size(size.width, center))
+        drawRect(Color.White, topLeft = Offset(0f, center - colorTop), size = Size(size.width, center))
         val notch = PerforationNotchRadius.toPx()
         val holeWidth = PerforationHoleWidth.toPx()
         val holeHeight = PerforationHoleHeight.toPx()

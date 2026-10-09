@@ -58,8 +58,8 @@ enum class PassCategoryRole { INBOX, FAVORITES, ARCHIVE, PAST, TRASH, CUSTOM }
 // The declaration order is the default order of the pass screen.
 enum class PassDetailSection {
     ARTWORK,
-    BARCODE,
     FIELDS,
+    BARCODE,
     ACTIONS,
     BACK_FIELDS,
     CALENDAR,
@@ -69,6 +69,17 @@ enum class PassDetailSection {
 
 // These sections were added after the first release. A stored order without them gets them right after the ticket.
 private val SectionsAddedAfterRelease = setOf(PassDetailSection.ACTIONS, PassDetailSection.BACK_FIELDS)
+
+// The old default put the code before the details. The order now decides which part of the ticket is on top, so
+// this unchanged default moves to the new one and keeps the code at the bottom.
+private val OrderBeforeTicketOrdering = listOf(
+    PassDetailSection.ARTWORK,
+    PassDetailSection.BARCODE,
+    PassDetailSection.CALENDAR,
+    PassDetailSection.FIELDS,
+    PassDetailSection.LOCATIONS,
+    PassDetailSection.NOTES,
+)
 
 enum class HomeCardSection {
     ARTWORK,
@@ -91,6 +102,7 @@ val defaultPassDetailSectionOrder = PassDetailSection.entries
 
 fun normalizePassDetailSectionOrder(sections: List<PassDetailSection>): List<PassDetailSection> {
     val known = sections.distinct()
+    if (known.filterNot { it in SectionsAddedAfterRelease } == OrderBeforeTicketOrdering) return defaultPassDetailSectionOrder
     val added = defaultPassDetailSectionOrder.filter { it in SectionsAddedAfterRelease && it !in known }
     val afterTicket = known.indexOfLast { it == PassDetailSection.BARCODE || it == PassDetailSection.FIELDS } + 1
     // Without a ticket section in the saved list, the default order decides where the new sections go.

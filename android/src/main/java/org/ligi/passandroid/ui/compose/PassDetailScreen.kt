@@ -540,6 +540,9 @@ internal fun PassDetailSectionList(
     // The ticket joins the details and the code, so it takes the place of whichever comes first.
     val ticketAnchor = visibleSections.firstOrNull { it == PassDetailSection.FIELDS || it == PassDetailSection.BARCODE }
     // Without a banner above it, the code is the main visual and uses the larger size.
+    // The order of the two ticket parts in the pass view settings decides which one is on top.
+    val codeOnTop = PassDetailSection.BARCODE in visibleSections && PassDetailSection.FIELDS in visibleSections &&
+        visibleSections.indexOf(PassDetailSection.BARCODE) < visibleSections.indexOf(PassDetailSection.FIELDS)
     val emphasized = !pass.isDocumentPass || PassDetailSection.ARTWORK in hiddenSections
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         visibleSections.forEach { section ->
@@ -557,6 +560,7 @@ internal fun PassDetailSectionList(
                             PassTicket(
                                 pass = pass,
                                 layout = layout,
+                                codeOnTop = codeOnTop,
                                 code = if (showCode) {
                                     { PassCodes(pass, emphasized, codeViewOptions, onBarcodeHoldChanged, onBarcodePin) }
                                 } else {

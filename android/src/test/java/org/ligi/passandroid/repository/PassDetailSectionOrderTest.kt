@@ -13,11 +13,25 @@ import org.ligi.passandroid.repository.PassDetailSection.NOTES
 
 class PassDetailSectionOrderTest {
     @Test
-    fun `an order saved before the action sections gets them right after the ticket`() {
+    fun `the old unchanged default moves to the new default`() {
         val saved = listOf(ARTWORK, BARCODE, CALENDAR, FIELDS, LOCATIONS, NOTES)
 
+        assertThat(normalizePassDetailSectionOrder(saved)).isEqualTo(defaultPassDetailSectionOrder)
+    }
+
+    @Test
+    fun `the old default saved with the action sections also moves to the new default`() {
+        val saved = listOf(ARTWORK, BARCODE, CALENDAR, FIELDS, ACTIONS, BACK_FIELDS, LOCATIONS, NOTES)
+
+        assertThat(normalizePassDetailSectionOrder(saved)).isEqualTo(defaultPassDetailSectionOrder)
+    }
+
+    @Test
+    fun `a custom order saved before the action sections gets them right after the ticket`() {
+        val saved = listOf(NOTES, BARCODE, FIELDS, ARTWORK, CALENDAR, LOCATIONS)
+
         assertThat(normalizePassDetailSectionOrder(saved))
-            .containsExactly(ARTWORK, BARCODE, CALENDAR, FIELDS, ACTIONS, BACK_FIELDS, LOCATIONS, NOTES)
+            .containsExactly(NOTES, BARCODE, FIELDS, ACTIONS, BACK_FIELDS, ARTWORK, CALENDAR, LOCATIONS)
     }
 
     @Test
@@ -30,6 +44,6 @@ class PassDetailSectionOrderTest {
     @Test
     fun `an empty saved order falls back to the default order`() {
         assertThat(normalizePassDetailSectionOrder(emptyList()))
-            .containsExactly(ARTWORK, BARCODE, FIELDS, ACTIONS, BACK_FIELDS, CALENDAR, LOCATIONS, NOTES)
+            .containsExactly(ARTWORK, FIELDS, BARCODE, ACTIONS, BACK_FIELDS, CALENDAR, LOCATIONS, NOTES)
     }
 }

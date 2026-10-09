@@ -146,7 +146,7 @@
     <string name="layout_pass_image">Pass image</string>
     <string name="layout_document_pages">Document pages</string>
     <string name="layout_document_pages_hint">Only for imported PDFs and images</string>
-    <string name="layout_barcode_hint">The code below the ticket</string>
+    <string name="layout_barcode_hint">Place it above Ticket to show the code on top</string>
     <string name="layout_ticket">Ticket</string>
     <string name="layout_ticket_hint">Issuer, route or title, dates, and fields</string>
     <string name="layout_action_buttons">Action buttons</string>
