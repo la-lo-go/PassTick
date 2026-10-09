@@ -990,7 +990,8 @@ private fun CardMetadataRow(
 }
 
 @Composable
-internal fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modifier) {
+/** [lines] are the card lines in the configured order, so the preview names the pass like its card. */
+internal fun PassHoldPreview(pass: PassUiModel, lines: List<String>, opening: Boolean, modifier: Modifier) {
     val openingProgress by animateFloatAsState(
         targetValue = if (opening) 1f else 0f,
         animationSpec = tween(durationMillis = 180),
@@ -1007,8 +1008,10 @@ internal fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modi
         shadowElevation = 12.dp,
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(pass.description, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            pass.creator?.takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            val dateLabel = pass.dateLabel()
+            Text(lines.firstOrNull() ?: pass.description, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            // The date has its own line below the code, so the card date line is left out here.
+            lines.drop(1).filterNot { it == dateLabel }.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
             if (pass.barcodeFormat != null && !pass.barcodeMessage.isNullOrBlank()) {
                 Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
                     PassCodeImage(
@@ -1020,7 +1023,7 @@ internal fun PassHoldPreview(pass: PassUiModel, opening: Boolean, modifier: Modi
                     )
                 }
             }
-            pass.dateLabel()?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+            dateLabel?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
             pass.fields.filterNot { it.hidden }.take(4).forEach { field ->
                 Text("${field.label}: ${field.value}", style = MaterialTheme.typography.bodyMedium)
             }

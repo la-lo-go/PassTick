@@ -761,6 +761,12 @@ internal fun PassHomeScreen(
                 previewContent?.let { pass ->
                     PassHoldPreview(
                         pass = pass,
+                        lines = resolvePassCardTextLines(
+                            pass,
+                            state.settings.homeCardSectionOrder,
+                            state.settings.hiddenHomeCardSections,
+                            state.categories,
+                        ),
                         opening = previewOpeningPassId == pass.id,
                         modifier = if (expanded) {
                             Modifier.fillMaxHeight().widthIn(max = 440.dp).padding(16.dp)

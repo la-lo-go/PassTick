@@ -38,6 +38,7 @@ import org.ligi.passandroid.repository.TRASH_RETENTION
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.SettingsRepository
+import org.ligi.passandroid.functions.CalendarEvent
 import org.threeten.bp.Duration
 import org.threeten.bp.LocalDateTime
 import org.threeten.bp.Instant
@@ -468,7 +469,7 @@ class MainViewModel(
     private fun handlePassPresentationAction(action: AppAction): Boolean = when (action) {
         is AppAction.AddToCalendar -> {
             withPass(action.id) { pass ->
-                pass.calendarEvent?.let(platformActions::addToCalendar) ?: error("Pass has no date")
+                pass.calendarEventWithCardTitle()?.let(platformActions::addToCalendar) ?: error("Pass has no date")
             }
             true
         }
@@ -972,9 +973,15 @@ class MainViewModel(
 
     private fun addCalendarEventsAfterImport(imported: List<PassSnapshot>) {
         if (!uiState.value.settings.offerCalendarAfterImport) return
-        imported.asSequence().map(PassUiModel::from).mapNotNull(PassUiModel::calendarEvent).forEach { event ->
+        imported.asSequence().map(PassUiModel::from).mapNotNull { it.calendarEventWithCardTitle() }.forEach { event ->
             check(platformActions.addToCalendarAutomatically(event)) { "No writable calendar is available" }
         }
+    }
+
+    // The event takes the card title, so a cinema ticket is named after the film, not the ticket seller.
+    private fun PassUiModel.calendarEventWithCardTitle(): CalendarEvent? = calendarEvent?.let { event ->
+        val settings = uiState.value.settings
+        event.copy(title = resolvePassCardTitle(this, settings.homeCardSectionOrder, settings.hiddenHomeCardSections, settings.categories))
     }
 
     private fun highlightImported(ids: List<String>) {
