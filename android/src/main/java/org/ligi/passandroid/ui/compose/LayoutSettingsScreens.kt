@@ -173,7 +173,6 @@ private fun PassDetailSection.displayName() = when (this) {
 // Only the sections whose behavior is not obvious from the name get a line.
 private fun PassDetailSection.supportingText(): Int? = when (this) {
     PassDetailSection.ARTWORK -> R.string.layout_document_pages_hint
-    PassDetailSection.BARCODE -> R.string.layout_barcode_hint
     PassDetailSection.LOCATIONS -> R.string.layout_locations_hint
     else -> null
 }
