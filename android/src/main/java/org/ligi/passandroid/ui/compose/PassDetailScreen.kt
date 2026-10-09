@@ -118,6 +118,7 @@ import org.ligi.passandroid.ui.state.hasDisplayableCode
 import org.ligi.passandroid.ui.barcode.CodeViewOptions
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
 import org.ligi.passandroid.ui.barcode.PassCodePreview
+import org.ligi.passandroid.ui.barcode.rememberCodeZoomState
 import org.ligi.passandroid.ui.barcode.codeSizeStepFactor
 import org.threeten.bp.format.DateTimeFormatter
 import androidx.compose.ui.res.stringResource
@@ -796,7 +797,7 @@ private fun SinglePassCode(
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val height = codeHeight(code.format, maxWidth, emphasized, options.sizeStep)
-        PassCodePreview(code.format, code.message, options, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
+        PassCodePreview(code.format, code.message, options, onHoldChanged, onPin, height, rememberCodeZoomState(), Modifier.fillMaxWidth())
     }
 }
 
@@ -816,6 +817,7 @@ private fun BarcodePager(
         val pagerWidth = if (showArrows) maxWidth - BarcodePagerArrowWidth * 2 else maxWidth
         val height = codes.maxOf { codeHeight(it.format, pagerWidth, emphasized, options.sizeStep) }
         val pagerState = rememberPagerState(pageCount = { codes.size })
+        val zoomState = rememberCodeZoomState()
         val scope = rememberCoroutineScope()
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -831,9 +833,9 @@ private fun BarcodePager(
                         },
                     )
                 }
-                HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).height(height)) { page ->
+                HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).height(height * zoomState.layoutScale)) { page ->
                     val code = codes[page]
-                    PassCodePreview(code.format, code.message, options, onHoldChanged, onPin, Modifier.fillMaxWidth().height(height))
+                    PassCodePreview(code.format, code.message, options, onHoldChanged, onPin, height, zoomState, Modifier.fillMaxWidth())
                 }
                 if (showArrows) {
                     BarcodePagerArrow(

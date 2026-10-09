@@ -28,6 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,12 +77,12 @@ fun PassCodePreview(
     options: CodeViewOptions,
     onHoldChanged: (Boolean) -> Unit,
     onPin: () -> Unit,
+    baseHeight: Dp,
+    zoomState: CodeZoomState,
     modifier: Modifier = Modifier,
 ) {
-    var zoom by remember { mutableFloatStateOf(1f) }
-    var maxZoom by remember { mutableFloatStateOf(MaxCodeZoom) }
     BoxWithConstraints(
-        modifier.pinchCodeSize(zoom, { maxZoom }) { zoom = it }.pointerInput(format, message) {
+        modifier.height(baseHeight * zoomState.layoutScale).pinchCodeSize(zoomState).pointerInput(format, message) {
             awaitEachGesture {
                 val down = awaitFirstDown()
                 val gestureResult = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
@@ -111,16 +114,14 @@ fun PassCodePreview(
         },
         contentAlignment = Alignment.Center,
     ) {
-        val limit = rememberMaxCodeZoom(format, message, constraints.maxWidth, constraints.maxHeight, options)
-        SideEffect { maxZoom = limit }
-        CrispPassCode(
+        ZoomedCode(
             format = format,
             message = message,
-            widthPx = constraints.maxWidth,
-            heightPx = constraints.maxHeight,
             options = options,
+            baseHeightPx = with(LocalDensity.current) { baseHeight.roundToPx() },
+            zoomState = zoomState,
             contentDescription = "Pass code. Hold or tap to enlarge",
-            zoom = zoom.coerceAtMost(limit),
+            widthPx = constraints.maxWidth,
         )
     }
 }
@@ -187,23 +188,20 @@ fun ExpandedPassCodeDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     val aspectRatio = if (format.isQuadratic()) 1f else 2.6f
-                    var zoom by remember { mutableFloatStateOf(1f) }
-                    var maxZoom by remember { mutableFloatStateOf(MaxCodeZoom) }
+                    val zoomState = rememberCodeZoomState()
+                    val baseAspect = aspectRatio / codeSizeStepFactor(options.sizeStep)
                     BoxWithConstraints(
-                        Modifier.fillMaxWidth().aspectRatio(aspectRatio / codeSizeStepFactor(options.sizeStep))
-                            .pinchCodeSize(zoom, { maxZoom }) { zoom = it },
+                        Modifier.fillMaxWidth().aspectRatio(baseAspect / zoomState.layoutScale).pinchCodeSize(zoomState),
                         contentAlignment = Alignment.Center,
                     ) {
-                        val limit = rememberMaxCodeZoom(format, message, constraints.maxWidth, constraints.maxHeight, options)
-                        SideEffect { maxZoom = limit }
-                        CrispPassCode(
+                        ZoomedCode(
                             format = format,
                             message = message,
-                            widthPx = constraints.maxWidth,
-                            heightPx = constraints.maxHeight,
                             options = options,
+                            baseHeightPx = (constraints.maxWidth / baseAspect).roundToInt(),
+                            zoomState = zoomState,
                             contentDescription = "Expanded pass code",
-                            zoom = zoom.coerceAtMost(limit),
+                            widthPx = constraints.maxWidth,
                         )
                     }
                     alternativeText?.takeIf(String::isNotBlank)?.let { locator ->
@@ -218,24 +216,69 @@ fun ExpandedPassCodeDialog(
 }
 
 private const val MinCodeZoom = 0.4f
-private const val MaxCodeZoom = 1.6f
+private const val MaxCodeZoom = 3f
+
+/**
+ * The pinch zoom of a code. Zooming in grows the surface that holds the code, so nothing is cut off, until the
+ * code is as wide as its parent. Zooming out keeps the surface and leaves a white margin around the code.
+ */
+@Stable
+class CodeZoomState {
+    private var requested by mutableFloatStateOf(1f)
+
+    /** The largest zoom before the code would pass the width of its parent. Set by the layout. */
+    var max by mutableFloatStateOf(1f)
+
+    val zoom: Float get() = requested.coerceIn(MinCodeZoom, max.coerceAtLeast(1f))
+
+    /** How much the surface of the code grows. It never shrinks below its configured size. */
+    val layoutScale: Float get() = zoom.coerceAtLeast(1f)
+
+    internal fun pinch(factor: Float) {
+        requested = (zoom * factor).coerceIn(MinCodeZoom, max.coerceAtLeast(1f))
+    }
+}
+
+@Composable
+fun rememberCodeZoomState() = remember { CodeZoomState() }
 
 /**
  * Pinch changes only the drawn size of the code for as long as the surface stays composed.
  * A smaller code leaves a white margin around it, which scanners read as quiet zone.
  */
 @Composable
-private fun Modifier.pinchCodeSize(zoom: Float, maxZoom: () -> Float, onZoom: (Float) -> Unit): Modifier = this
+private fun Modifier.pinchCodeSize(zoomState: CodeZoomState): Modifier = this
     .clipToBounds()
-    .then(if (zoom == 1f) Modifier else Modifier.background(Color.White))
-    .transformGestures(currentScale = { 1f }, onGesture = { change, _ ->
-        onZoom((zoom * change).coerceIn(MinCodeZoom, maxZoom().coerceAtLeast(MinCodeZoom)))
-    })
+    .then(if (zoomState.zoom == 1f) Modifier else Modifier.background(Color.White))
+    .transformGestures(currentScale = { 1f }, onGesture = { change, _ -> zoomState.pinch(change) })
 
 /**
- * The zoom at which the code fills the component. The code is drawn at the largest size that fits the component, and
- * a bigger one would run past its edges and cut off modules, so the pinch stops there.
+ * Draws the code at the configured size times the zoom. The largest zoom is the one at which the code is as wide as
+ * the component, because the surface grows in height and only the width of the parent can cut the code off.
  */
+@Composable
+private fun ZoomedCode(
+    format: PassBarCodeFormat,
+    message: String,
+    options: CodeViewOptions,
+    baseHeightPx: Int,
+    zoomState: CodeZoomState,
+    contentDescription: String,
+    widthPx: Int,
+) {
+    val limit = rememberMaxCodeZoom(format, message, widthPx, baseHeightPx, options)
+    SideEffect { zoomState.max = limit }
+    CrispPassCode(
+        format = format,
+        message = message,
+        widthPx = widthPx,
+        heightPx = baseHeightPx,
+        options = options,
+        contentDescription = contentDescription,
+        zoom = zoomState.zoom,
+    )
+}
+
 @Composable
 private fun rememberMaxCodeZoom(
     format: PassBarCodeFormat,
@@ -245,7 +288,7 @@ private fun rememberMaxCodeZoom(
     options: CodeViewOptions,
 ): Float = remember(passCodeBitmapKey(format, message, widthPx, heightPx, options)) {
     renderPassCodeBitmap(format, message, widthPx, heightPx, options)?.let { fitted ->
-        minOf(widthPx / fitted.width.toFloat(), heightPx / fitted.height.toFloat()).coerceIn(1f, MaxCodeZoom)
+        (widthPx / fitted.width.toFloat()).coerceIn(1f, MaxCodeZoom)
     } ?: 1f
 }
 
