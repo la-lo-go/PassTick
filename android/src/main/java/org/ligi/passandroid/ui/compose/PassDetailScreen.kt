@@ -37,6 +37,14 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.AddAlert
+import androidx.compose.material.icons.filled.EditCalendar
+import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.ui.graphics.Shape
+import androidx.annotation.StringRes
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.ui.semantics.Role
@@ -65,8 +73,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingToolbarDefaults
-import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -445,18 +451,8 @@ fun PassDetailScreen(
         },
         floatingActionButton = {
             if (pass != null) {
-                HorizontalFloatingToolbar(
-                    expanded = true,
-                    colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
-                    floatingActionButton = {
-                        FloatingToolbarDefaults.StandardFloatingActionButton(onClick = { onAction(PassDetailAction.Edit) }) {
-                            Icon(Icons.Default.Edit, stringResource(R.string.pass_detail_edit_pass))
-                        }
-                    },
-                ) {
-                    IconButton(onClick = { onAction(PassDetailAction.Share) }) {
-                        Icon(Icons.Default.Share, stringResource(R.string.pass_detail_share_pass))
-                    }
+                FloatingActionButton(onClick = { onAction(PassDetailAction.Edit) }) {
+                    Icon(Icons.Default.Edit, stringResource(R.string.pass_detail_edit_pass))
                 }
             }
         },
@@ -696,57 +692,65 @@ private fun PassQuickActions(
     val hasDate = pass.calendarEvent != null
     val hasLocation = pass.locations.isNotEmpty()
     // Unavailable actions are left out, so a pass without a date or a place shows no inactive buttons.
-    if (!hasDate && !hasLocation) return
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val actions = buildList {
         if (hasDate) {
-            QuickAction(
-                icon = if (calendarEventPresent) Icons.Default.Check else Icons.Default.CalendarMonth,
-                label = stringResource(if (calendarEventPresent) R.string.pass_detail_in_calendar else R.string.pass_detail_action_calendar),
-                selected = calendarEventPresent,
-                onClick = { if (!calendarEventPresent) onAction(PassDetailAction.AddToCalendar) },
-                onLongClick = onEditDate,
+            add(
+                QuickActionSpec(
+                    icon = if (calendarEventPresent) Icons.Default.EventAvailable else Icons.Default.EditCalendar,
+                    label = if (calendarEventPresent) R.string.pass_detail_in_calendar else R.string.pass_detail_action_calendar,
+                    selected = calendarEventPresent,
+                    onClick = { if (!calendarEventPresent) onAction(PassDetailAction.AddToCalendar) },
+                    onLongClick = onEditDate,
+                ),
             )
+            add(QuickActionSpec(Icons.Default.AddAlert, R.string.pass_detail_action_reminder, onClick = onConfigureReminder))
         }
         if (hasLocation) {
-            QuickAction(
-                icon = Icons.Default.Directions,
-                label = stringResource(R.string.pass_detail_directions),
-                onClick = { onAction(PassDetailAction.OpenLocation(0)) },
-            )
+            add(QuickActionSpec(Icons.Default.Directions, R.string.pass_detail_directions, onClick = { onAction(PassDetailAction.OpenLocation(0)) }))
         }
-        if (hasDate) {
-            QuickAction(
-                icon = Icons.Default.Notifications,
-                label = stringResource(R.string.pass_detail_action_reminder),
-                onClick = onConfigureReminder,
-            )
+        add(QuickActionSpec(Icons.Default.Share, R.string.pass_detail_action_share, onClick = { onAction(PassDetailAction.Share) }))
+    }
+    // A connected button group: outer corners are round, inner corners are tight, like the Expressive button group.
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        actions.forEachIndexed { index, action ->
+            val start = if (index == 0) QuickActionOuterCorner else QuickActionInnerCorner
+            val end = if (index == actions.lastIndex) QuickActionOuterCorner else QuickActionInnerCorner
+            QuickAction(action, RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end))
         }
     }
 }
 
+private class QuickActionSpec(
+    val icon: ImageVector,
+    @StringRes val label: Int,
+    val selected: Boolean = false,
+    val onLongClick: (() -> Unit)? = null,
+    val onClick: () -> Unit,
+)
+
+private val QuickActionOuterCorner = 24.dp
+private val QuickActionInnerCorner = 6.dp
+
 @Composable
-private fun RowScope.QuickAction(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    selected: Boolean = false,
-    onLongClick: (() -> Unit)? = null,
-) {
+private fun RowScope.QuickAction(action: QuickActionSpec, shape: Shape) {
     val colors = MaterialTheme.colorScheme
+    val content = if (action.selected) colors.onPrimary else colors.onSecondaryContainer
     Column(
-        Modifier.weight(1f),
+        Modifier.weight(1f).fillMaxHeight().clip(shape)
+            .background(if (action.selected) colors.primary else colors.secondaryContainer)
+            .combinedClickable(role = Role.Button, onClick = action.onClick, onLongClick = action.onLongClick)
+            .padding(horizontal = 4.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
-        Box(
-            Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(18.dp))
-                .background(if (selected) colors.primary else colors.secondaryContainer)
-                .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = onLongClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, label, tint = if (selected) colors.onPrimary else colors.onSecondaryContainer)
-        }
-        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        Icon(action.icon, null, tint = content)
+        Text(
+            stringResource(action.label),
+            color = content,
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+        )
     }
 }
 

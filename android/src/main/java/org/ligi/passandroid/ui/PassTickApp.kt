@@ -357,6 +357,14 @@ fun PassTickApp(
             viewModel.onAction(AppAction.SetRemindersEnabled(false))
         }
     }
+    var pendingCalendarPassId by remember { mutableStateOf<String?>(null) }
+    // Reading the calendar lets the pass screen show that the event is already there. The event is added either way.
+    val calendarReadPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        pendingCalendarPassId?.let { viewModel.onAction(AppAction.AddToCalendar(it)) }
+        pendingCalendarPassId = null
+    }
     val calendarPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { permissions ->
@@ -513,7 +521,14 @@ fun PassTickApp(
                     exportImageToGallery(pass, barcodeOnly = true, returnToPass = false)
                 }
             }
-            PassDetailAction.AddToCalendar -> viewModel.onAction(AppAction.AddToCalendar(passId))
+            PassDetailAction.AddToCalendar -> {
+                if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
+                    viewModel.onAction(AppAction.AddToCalendar(passId))
+                } else {
+                    pendingCalendarPassId = passId
+                    calendarReadPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+                }
+            }
             PassDetailAction.OpenReminderSettings -> {
                 scrollSettingsToNotifications = true
                 backStack.add(AppDestination.Settings)

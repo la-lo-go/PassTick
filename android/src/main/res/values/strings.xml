@@ -62,8 +62,9 @@
     <string name="pass_detail_note">Note</string>
     <string name="pass_detail_ticket_date">Date</string>
     <string name="pass_detail_ticket_time">Time</string>
-    <string name="pass_detail_action_calendar">Calendar</string>
-    <string name="pass_detail_action_reminder">Reminder</string>
+    <string name="pass_detail_action_calendar">Add event</string>
+    <string name="pass_detail_action_reminder">Remind me</string>
+    <string name="pass_detail_action_share">Share</string>
     <string name="pass_detail_more_information">More information</string>
     <plurals name="pass_detail_back_fields">
         <item quantity="one">%d field from the back of the pass</item>
