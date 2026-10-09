@@ -182,7 +182,8 @@ private fun AppearanceSettings(settings: AppSettings, systemAccentColor: Long?, 
             add(settingsItem(visible = colorSelectorVisible) { AccentColorSelector(settings.accentColor, systemAccentColor, onAction) })
             add(settingsHeader(stringResource(R.string.settings_color_style), visible = styleSelectorVisible))
             add(settingsItem(visible = styleSelectorVisible) { ColorStyleSelector(settings.accentColor, settings.colorStyle, onAction) })
-            if (settings.themeMode == ThemeMode.DARK) {
+            // System mode can be dark too, so AMOLED is offered for both.
+            if (settings.themeMode != ThemeMode.LIGHT) {
                 add(
                     settingsItem {
                         SettingSwitch(stringResource(R.string.settings_use_amoled_black_background), settings.amoledBlackBackground) {
@@ -797,6 +798,11 @@ private sealed interface SettingsEntry {
 
 private fun settingsItem(visible: Boolean = true, content: @Composable () -> Unit) = SettingsEntry.Item(visible, content)
 
+private fun SettingsEntry.isVisible() = when (this) {
+    is SettingsEntry.Header -> visible
+    is SettingsEntry.Item -> visible
+}
+
 private fun settingsHeader(text: String, visible: Boolean = true) = SettingsEntry.Header(text, visible)
 
 @Composable
@@ -824,8 +830,11 @@ private fun SettingsGroup(title: String? = null, modifier: Modifier = Modifier, 
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut(),
                     ) {
-                        val roundTop = index == 0 || entries[index - 1] is SettingsEntry.Header
-                        val roundBottom = index == entries.lastIndex || entries[index + 1] is SettingsEntry.Header
+                        // Hidden neighbors do not count, so an item that follows a hidden block still rounds its edge.
+                        val previous = entries.subList(0, index).lastOrNull { it.isVisible() }
+                        val next = entries.subList(index + 1, entries.size).firstOrNull { it.isVisible() }
+                        val roundTop = previous == null || previous is SettingsEntry.Header
+                        val roundBottom = next == null || next is SettingsEntry.Header
                         val shape = RoundedCornerShape(
                             topStart = if (roundTop) 28.dp else 0.dp,
                             topEnd = if (roundTop) 28.dp else 0.dp,

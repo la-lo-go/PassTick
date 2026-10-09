@@ -59,11 +59,13 @@ internal fun ColorScheme.toAmoled(): ColorScheme = copy(
     scrim = scrim.darken(),
     surfaceBright = surfaceBright.darken(),
     surfaceDim = surfaceDim.darken(),
-    surfaceContainer = Color.Black,
+    // Cards, lists, and settings groups sit on the container roles. They stay dark grey so they stand out from the
+    // black surface; only the lowest container matches the surface.
+    surfaceContainer = surfaceContainer.darken(),
     surfaceContainerHigh = surfaceContainerHigh.darken(),
     surfaceContainerHighest = surfaceContainerHighest.darken(),
     surfaceContainerLow = surfaceContainerLow.darken(),
-    surfaceContainerLowest = surfaceContainerLowest.darken(),
+    surfaceContainerLowest = Color.Black,
     primaryFixed = primaryFixed.darken(),
     primaryFixedDim = primaryFixedDim.darken(),
     secondaryFixed = secondaryFixed.darken(),
