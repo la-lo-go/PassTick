@@ -62,6 +62,7 @@ sealed interface SettingsAction {
     data class SetTheme(val value: ThemeMode) : SettingsAction
     data class SetAmoledBlackBackground(val value: Boolean) : SettingsAction
     data class SetDynamicColors(val value: Boolean) : SettingsAction
+    data class SetPassDynamicColors(val value: Boolean) : SettingsAction
     data class SetAccentColor(val value: Long?) : SettingsAction
     data class SetColorStyle(val value: ColorStyle) : SettingsAction
     data class SetAutomaticBrightness(val value: Boolean) : SettingsAction

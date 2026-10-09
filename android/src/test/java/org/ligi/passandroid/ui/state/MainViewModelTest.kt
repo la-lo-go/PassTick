@@ -1117,6 +1117,9 @@ private class FakeSettingsRepository(initial: AppSettings = AppSettings()) : Set
     override suspend fun setLockAllPasses(value: Boolean) {
         settings.value = settings.value.copy(lockAllPasses = value)
     }
+    override suspend fun setPassDynamicColors(value: Boolean) {
+        settings.value = settings.value.copy(passDynamicColors = value)
+    }
     override suspend fun setShowProtectedPassLockIcon(value: Boolean) {
         settings.value = settings.value.copy(showProtectedPassLockIcon = value)
     }

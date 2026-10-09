@@ -795,6 +795,12 @@ class MainViewModel(
             }
             true
         }
+        is AppAction.SetPassDynamicColors -> {
+            viewModelScope.launch {
+                settingsRepository.setPassDynamicColors(action.value)
+            }
+            true
+        }
         is AppAction.SetShowProtectedPassLockIcon -> {
             viewModelScope.launch {
                 settingsRepository.setShowProtectedPassLockIcon(action.value)

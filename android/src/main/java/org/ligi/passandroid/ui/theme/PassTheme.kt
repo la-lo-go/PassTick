@@ -3,6 +3,9 @@ package org.ligi.passandroid.ui.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -54,3 +57,33 @@ fun PassTheme(
         content = content,
     )
 }
+
+/**
+ * Colors a pass screen from the pass color, so the screen matches the ticket. The Content style keeps the scheme
+ * close to the brand color. Light or dark follows the surrounding theme.
+ */
+@Composable
+fun PassColorTheme(
+    passColor: Int?,
+    enabled: Boolean,
+    amoledBlackBackground: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (!enabled || passColor == null) {
+        content()
+        return
+    }
+    val dark = MaterialTheme.colorScheme.surface.luminance() < DARK_SURFACE_LUMINANCE
+    val colors = remember(passColor, dark, amoledBlackBackground) {
+        val scheme = generateAccentColorScheme(Color(passColor).copy(alpha = 1f), dark, ColorStyle.CONTENT)
+        if (dark && amoledBlackBackground) scheme.toAmoled() else scheme
+    }
+    MaterialExpressiveTheme(
+        colorScheme = colors,
+        motionScheme = MotionScheme.expressive(),
+        shapes = PassShapes,
+        content = content,
+    )
+}
+
+private const val DARK_SURFACE_LUMINANCE = 0.5f

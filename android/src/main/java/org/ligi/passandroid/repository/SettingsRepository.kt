@@ -145,6 +145,8 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val amoledBlackBackground: Boolean = false,
     val dynamicColors: Boolean = true,
+    /** Only applies while [dynamicColors] is on: each pass screen then uses a scheme from the pass color. */
+    val passDynamicColors: Boolean = true,
     val accentColor: Long? = null,
     val colorStyle: ColorStyle = ColorStyle.TONAL_SPOT,
     val automaticBrightness: Boolean = true,
@@ -201,6 +203,7 @@ interface SettingsRepository {
         suspend fun setThemeMode(value: ThemeMode)
     suspend fun setAmoledBlackBackground(value: Boolean)
     suspend fun setDynamicColors(value: Boolean)
+    suspend fun setPassDynamicColors(value: Boolean)
     suspend fun setAccentColor(value: Long?)
     suspend fun setColorStyle(value: ColorStyle)
     suspend fun setAutomaticBrightness(value: Boolean)
@@ -258,6 +261,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             } ?: ThemeMode.SYSTEM,
             amoledBlackBackground = preferences[AMOLED_BLACK_BACKGROUND] ?: (preferences[THEME] == "AMOLED"),
             dynamicColors = accent.dynamicColors,
+            passDynamicColors = preferences[PASS_DYNAMIC_COLORS] ?: true,
             accentColor = accent.accentColor,
             colorStyle = preferences[COLOR_STYLE]?.let { value ->
                 runCatching { ColorStyle.valueOf(value) }.getOrNull()
@@ -365,6 +369,8 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         )
         update(DYNAMIC_COLORS, value)
     }
+
+    override suspend fun setPassDynamicColors(value: Boolean) = update(PASS_DYNAMIC_COLORS, value)
 
     override suspend fun setAccentColor(value: Long?) {
         val current = StartupAppearanceStore.read(context)
@@ -528,6 +534,7 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         // Legacy key that held the removed AccentPalette enum name. Read-only for migration.
         val ACCENT = stringPreferencesKey("accent_palette")
         val DYNAMIC_COLORS = booleanPreferencesKey("dynamic_colors")
+        val PASS_DYNAMIC_COLORS = booleanPreferencesKey("pass_dynamic_colors")
         val ACCENT_COLOR = longPreferencesKey("accent_color")
         val COLOR_STYLE = stringPreferencesKey("color_style")
         val AMOLED_BLACK_BACKGROUND = booleanPreferencesKey("amoled_black_background")

@@ -262,6 +262,7 @@ sealed interface AppAction {
     data class SetTheme(val value: ThemeMode) : AppAction
     data class SetAmoledBlackBackground(val value: Boolean) : AppAction
     data class SetDynamicColors(val value: Boolean) : AppAction
+    data class SetPassDynamicColors(val value: Boolean) : AppAction
     data class SetAccentColor(val value: Long?) : AppAction
     data class SetColorStyle(val value: ColorStyle) : AppAction
     data class SetAutomaticBrightness(val value: Boolean) : AppAction

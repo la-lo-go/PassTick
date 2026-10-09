@@ -169,6 +169,15 @@ private fun AppearanceSettings(settings: AppSettings, systemAccentColor: Long?, 
                     },
                 )
             }
+            if (dynamicAvailable && settings.dynamicColors) {
+                add(
+                    settingsItem {
+                        SettingSwitch(stringResource(R.string.settings_pass_dynamic_color), settings.passDynamicColors) {
+                            onAction(SettingsAction.SetPassDynamicColors(it))
+                        }
+                    },
+                )
+            }
             add(settingsHeader(stringResource(R.string.settings_accent_color), visible = colorSelectorVisible))
             add(settingsItem(visible = colorSelectorVisible) { AccentColorSelector(settings.accentColor, systemAccentColor, onAction) })
             add(settingsHeader(stringResource(R.string.settings_color_style), visible = styleSelectorVisible))

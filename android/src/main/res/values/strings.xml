@@ -113,6 +113,7 @@
     <string name="settings_accent_default">Default accent color</string>
     <string name="settings_accent_custom">Custom color</string>
     <string name="settings_dynamic_color">Dynamic colors</string>
+    <string name="settings_pass_dynamic_color">Use each pass color on its screen</string>
     <string name="settings_color_style">Color style</string>
     <string name="settings_color_style_tonal_spot">Tonal spot</string>
     <string name="settings_color_style_vibrant">Vibrant</string>

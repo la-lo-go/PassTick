@@ -50,6 +50,7 @@ import org.ligi.passandroid.ui.compose.PassCodePickerScreen
 import org.ligi.passandroid.ui.compose.PassCustomizationScreen
 import org.ligi.passandroid.ui.compose.PassDetailLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.PassDetailScreen
+import org.ligi.passandroid.ui.theme.PassColorTheme
 import org.ligi.passandroid.ui.compose.PassHomeScreen
 import org.ligi.passandroid.ui.compose.HomeListPosition
 import org.ligi.passandroid.ui.compose.BUG_REPORT_MAIL_URL
@@ -188,34 +189,40 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
                                 lifecycleOwner.lifecycle.addObserver(observer)
                                 onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                             }
-                            PassDetailScreen(
-                                pass = pass,
-                                allPassesProtected = state.settings.lockAllPasses,
-                                categories = state.categories,
-                                passReminderEnabled = state.settings.remindersEnabled &&
-                                    selected.passId !in state.settings.reminderExcludedPassIds,
-                                remindersGloballyEnabled = state.settings.remindersEnabled,
-                                reminderLeadMinutes = state.settings.reminderLeadMinutesByPass[selected.passId],
-                                reminderExactAtEvent = selected.passId in state.settings.reminderExactPassIds,
-                                reminderActionOverride = state.settings.reminderActionsByPass[selected.passId],
-                                initialCodeExpanded = dependencies.expandedCodePassId == selected.passId,
-                                onInitialCodeShown = { dependencies.onExpandedCodeShown() },
-                                enhanceCodeBrightness = state.settings.automaticBrightness,
-                                codeViewOptions = CodeViewOptions(
-                                    sizeStep = state.settings.codeSizeStep,
-                                    whiteSurround = state.settings.codeWhiteSurround,
-                                    extraQuietZone = state.settings.codeExtraQuietZone,
-                                    rotateQuarterTurn = state.settings.codeRotateQuarterTurn,
-                                    keepScreenOn = state.settings.codeKeepScreenOn,
-                                ),
-                                calendarEventPresent = calendarEventPresent,
-                                passDetailSectionOrder = state.settings.passDetailSectionOrder,
-                                hiddenPassDetailSections = state.settings.hiddenPassDetailSections,
-                                documentPages = dependencies.viewModel.documentPages,
-                                onAction = { action ->
-                                    dependencies.onPassDetailAction(selected.passId, action)
-                                },
-                            )
+                            PassColorTheme(
+                                passColor = pass?.accentColor,
+                                enabled = state.settings.dynamicColors && state.settings.passDynamicColors,
+                                amoledBlackBackground = state.settings.amoledBlackBackground,
+                            ) {
+                                PassDetailScreen(
+                                    pass = pass,
+                                    allPassesProtected = state.settings.lockAllPasses,
+                                    categories = state.categories,
+                                    passReminderEnabled = state.settings.remindersEnabled &&
+                                        selected.passId !in state.settings.reminderExcludedPassIds,
+                                    remindersGloballyEnabled = state.settings.remindersEnabled,
+                                    reminderLeadMinutes = state.settings.reminderLeadMinutesByPass[selected.passId],
+                                    reminderExactAtEvent = selected.passId in state.settings.reminderExactPassIds,
+                                    reminderActionOverride = state.settings.reminderActionsByPass[selected.passId],
+                                    initialCodeExpanded = dependencies.expandedCodePassId == selected.passId,
+                                    onInitialCodeShown = { dependencies.onExpandedCodeShown() },
+                                    enhanceCodeBrightness = state.settings.automaticBrightness,
+                                    codeViewOptions = CodeViewOptions(
+                                        sizeStep = state.settings.codeSizeStep,
+                                        whiteSurround = state.settings.codeWhiteSurround,
+                                        extraQuietZone = state.settings.codeExtraQuietZone,
+                                        rotateQuarterTurn = state.settings.codeRotateQuarterTurn,
+                                        keepScreenOn = state.settings.codeKeepScreenOn,
+                                    ),
+                                    calendarEventPresent = calendarEventPresent,
+                                    passDetailSectionOrder = state.settings.passDetailSectionOrder,
+                                    hiddenPassDetailSections = state.settings.hiddenPassDetailSections,
+                                    documentPages = dependencies.viewModel.documentPages,
+                                    onAction = { action ->
+                                        dependencies.onPassDetailAction(selected.passId, action)
+                                    },
+                                )
+                            }
                         }
                     },
                 )
@@ -558,6 +565,10 @@ private fun handleAppearanceSettingsAction(
 ): Boolean = when (action) {
     is SettingsAction.SetTheme -> {
         dependencies.viewModel.onAction(AppAction.SetTheme(action.value))
+        true
+    }
+    is SettingsAction.SetPassDynamicColors -> {
+        dependencies.viewModel.onAction(AppAction.SetPassDynamicColors(action.value))
         true
     }
     is SettingsAction.SetAmoledBlackBackground -> {
