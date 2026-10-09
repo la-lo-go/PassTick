@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,8 +77,9 @@ fun PassCodePreview(
     modifier: Modifier = Modifier,
 ) {
     var zoom by remember { mutableFloatStateOf(1f) }
+    var maxZoom by remember { mutableFloatStateOf(MaxCodeZoom) }
     BoxWithConstraints(
-        modifier.pinchCodeSize(zoom) { zoom = it }.pointerInput(format, message) {
+        modifier.pinchCodeSize(zoom, { maxZoom }) { zoom = it }.pointerInput(format, message) {
             awaitEachGesture {
                 val down = awaitFirstDown()
                 val gestureResult = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
@@ -109,6 +111,8 @@ fun PassCodePreview(
         },
         contentAlignment = Alignment.Center,
     ) {
+        val limit = rememberMaxCodeZoom(format, message, constraints.maxWidth, constraints.maxHeight, options)
+        SideEffect { maxZoom = limit }
         CrispPassCode(
             format = format,
             message = message,
@@ -116,7 +120,7 @@ fun PassCodePreview(
             heightPx = constraints.maxHeight,
             options = options,
             contentDescription = "Pass code. Hold or tap to enlarge",
-            zoom = zoom,
+            zoom = zoom.coerceAtMost(limit),
         )
     }
 }
@@ -184,11 +188,14 @@ fun ExpandedPassCodeDialog(
                 ) {
                     val aspectRatio = if (format.isQuadratic()) 1f else 2.6f
                     var zoom by remember { mutableFloatStateOf(1f) }
+                    var maxZoom by remember { mutableFloatStateOf(MaxCodeZoom) }
                     BoxWithConstraints(
                         Modifier.fillMaxWidth().aspectRatio(aspectRatio / codeSizeStepFactor(options.sizeStep))
-                            .pinchCodeSize(zoom) { zoom = it },
+                            .pinchCodeSize(zoom, { maxZoom }) { zoom = it },
                         contentAlignment = Alignment.Center,
                     ) {
+                        val limit = rememberMaxCodeZoom(format, message, constraints.maxWidth, constraints.maxHeight, options)
+                        SideEffect { maxZoom = limit }
                         CrispPassCode(
                             format = format,
                             message = message,
@@ -196,7 +203,7 @@ fun ExpandedPassCodeDialog(
                             heightPx = constraints.maxHeight,
                             options = options,
                             contentDescription = "Expanded pass code",
-                            zoom = zoom,
+                            zoom = zoom.coerceAtMost(limit),
                         )
                     }
                     alternativeText?.takeIf(String::isNotBlank)?.let { locator ->
@@ -218,12 +225,29 @@ private const val MaxCodeZoom = 1.6f
  * A smaller code leaves a white margin around it, which scanners read as quiet zone.
  */
 @Composable
-private fun Modifier.pinchCodeSize(zoom: Float, onZoom: (Float) -> Unit): Modifier = this
+private fun Modifier.pinchCodeSize(zoom: Float, maxZoom: () -> Float, onZoom: (Float) -> Unit): Modifier = this
     .clipToBounds()
     .then(if (zoom == 1f) Modifier else Modifier.background(Color.White))
     .transformGestures(currentScale = { 1f }, onGesture = { change, _ ->
-        onZoom((zoom * change).coerceIn(MinCodeZoom, MaxCodeZoom))
+        onZoom((zoom * change).coerceIn(MinCodeZoom, maxZoom().coerceAtLeast(MinCodeZoom)))
     })
+
+/**
+ * The zoom at which the code fills the component. The code is drawn at the largest size that fits the component, and
+ * a bigger one would run past its edges and cut off modules, so the pinch stops there.
+ */
+@Composable
+private fun rememberMaxCodeZoom(
+    format: PassBarCodeFormat,
+    message: String,
+    widthPx: Int,
+    heightPx: Int,
+    options: CodeViewOptions,
+): Float = remember(passCodeBitmapKey(format, message, widthPx, heightPx, options)) {
+    renderPassCodeBitmap(format, message, widthPx, heightPx, options)?.let { fitted ->
+        minOf(widthPx / fitted.width.toFloat(), heightPx / fitted.height.toFloat()).coerceIn(1f, MaxCodeZoom)
+    } ?: 1f
+}
 
 @Composable
 private fun CrispPassCode(
