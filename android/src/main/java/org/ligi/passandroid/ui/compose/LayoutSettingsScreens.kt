@@ -94,6 +94,7 @@ fun PassDetailLayoutSettingsScreen(
                     color = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
                     ListItem(
+                        supportingContent = { Text(section.supportingText()) },
                         trailingContent = {
                             Row {
                                 IconButton(
@@ -125,8 +126,9 @@ fun PassDetailLayoutSettingsScreen(
                 )
             }
             item {
+                val previewPass = remember { layoutPreviewPass() }
                 PassDetailSectionList(
-                    pass = remember { layoutPreviewPass() },
+                    pass = previewPass,
                     sectionOrder = order,
                     hiddenSections = hidden,
                     calendarEventPresent = false,
@@ -135,6 +137,7 @@ fun PassDetailLayoutSettingsScreen(
                     onBarcodePin = {},
                     onEditDateRequested = {},
                     modifier = Modifier.padding(horizontal = 8.dp),
+                    quickActions = { PassQuickActions(previewPass, false, {}, {}, {}) },
                 )
             }
         }
@@ -143,13 +146,29 @@ fun PassDetailLayoutSettingsScreen(
 
 @Composable
 private fun PassDetailSection.displayName() = when (this) {
-    PassDetailSection.ARTWORK -> stringResource(R.string.layout_pass_image)
+    PassDetailSection.ARTWORK -> stringResource(R.string.layout_document_pages)
     PassDetailSection.BARCODE -> stringResource(R.string.layout_barcode)
-    PassDetailSection.FIELDS -> stringResource(R.string.layout_pass_details)
+    PassDetailSection.FIELDS -> stringResource(R.string.layout_ticket)
+    PassDetailSection.ACTIONS -> stringResource(R.string.layout_action_buttons)
+    PassDetailSection.BACK_FIELDS -> stringResource(R.string.pass_detail_more_information)
     PassDetailSection.LOCATIONS -> stringResource(R.string.edit_pass_locations)
-    PassDetailSection.CALENDAR -> stringResource(R.string.pass_detail_date_and_time)
+    PassDetailSection.CALENDAR -> stringResource(R.string.layout_date_card)
     PassDetailSection.NOTES -> stringResource(R.string.layout_notes)
 }
+
+@Composable
+private fun PassDetailSection.supportingText() = stringResource(
+    when (this) {
+        PassDetailSection.ARTWORK -> R.string.layout_document_pages_hint
+        PassDetailSection.BARCODE -> R.string.layout_barcode_hint
+        PassDetailSection.FIELDS -> R.string.layout_ticket_hint
+        PassDetailSection.ACTIONS -> R.string.layout_action_buttons_hint
+        PassDetailSection.BACK_FIELDS -> R.string.layout_more_information_hint
+        PassDetailSection.LOCATIONS -> R.string.layout_locations_hint
+        PassDetailSection.CALENDAR -> R.string.layout_date_card_hint
+        PassDetailSection.NOTES -> R.string.layout_notes_hint
+    },
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -301,8 +320,11 @@ private fun layoutPreviewPass(): PassUiModel {
         barcodeMessage = "PASSTICK-PREVIEW",
         barcodeAlternativeText = null,
         fields = listOf(
-            PassFieldUiModel(key = null, label = "Gate", value = "A12", hidden = false, hint = "primaryFields"),
-            PassFieldUiModel(key = null, label = "Seat", value = "12A", hidden = false, hint = null),
+            PassFieldUiModel(key = null, label = "Madrid", value = "MAD", hidden = false, hint = "primaryFields"),
+            PassFieldUiModel(key = null, label = "Barcelona", value = "BCN", hidden = false, hint = "primaryFields"),
+            PassFieldUiModel(key = null, label = "Gate", value = "A12", hidden = false, hint = "headerFields"),
+            PassFieldUiModel(key = null, label = "Seat", value = "12A", hidden = false, hint = "secondaryFields"),
+            PassFieldUiModel(key = null, label = "Baggage", value = "One cabin bag", hidden = true, hint = "backFields"),
         ),
         locations = listOf(PassLocationUiModel(name = "Sample Station", latitude = 52.52, longitude = 13.405)),
         calendarEvent = CalendarEvent(

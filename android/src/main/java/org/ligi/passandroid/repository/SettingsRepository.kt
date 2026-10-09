@@ -55,14 +55,20 @@ internal fun resolveAccentSettings(
 
 enum class PassCategoryRole { INBOX, FAVORITES, ARCHIVE, PAST, TRASH, CUSTOM }
 
+// The declaration order is the default order of the pass screen.
 enum class PassDetailSection {
     ARTWORK,
     BARCODE,
-    CALENDAR,
     FIELDS,
+    ACTIONS,
+    BACK_FIELDS,
+    CALENDAR,
     LOCATIONS,
     NOTES,
 }
+
+// These sections were added after the first release. A stored order without them gets them right after the ticket.
+private val SectionsAddedAfterRelease = setOf(PassDetailSection.ACTIONS, PassDetailSection.BACK_FIELDS)
 
 enum class HomeCardSection {
     ARTWORK,
@@ -83,8 +89,14 @@ fun normalizeHomeCardSectionOrder(sections: List<HomeCardSection>): List<HomeCar
 
 val defaultPassDetailSectionOrder = PassDetailSection.entries
 
-fun normalizePassDetailSectionOrder(sections: List<PassDetailSection>): List<PassDetailSection> =
-    (sections.distinct() + defaultPassDetailSectionOrder).distinct()
+fun normalizePassDetailSectionOrder(sections: List<PassDetailSection>): List<PassDetailSection> {
+    val known = sections.distinct()
+    val added = defaultPassDetailSectionOrder.filter { it in SectionsAddedAfterRelease && it !in known }
+    val afterTicket = known.indexOfLast { it == PassDetailSection.BARCODE || it == PassDetailSection.FIELDS } + 1
+    // Without a ticket section in the saved list, the default order decides where the new sections go.
+    val withAdded = if (afterTicket == 0) known else known.take(afterTicket) + added + known.drop(afterTicket)
+    return (withAdded + defaultPassDetailSectionOrder).distinct()
+}
 
 private fun <T> List<T>.move(item: T, offset: Int): List<T> {
     val from = indexOf(item)

@@ -294,6 +294,11 @@ fun PassDetailScreen(
                         }
                         DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
                             DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_share_pass)) },
+                                leadingIcon = { Icon(Icons.Default.Share, null) },
+                                onClick = { overflowOpen = false; onAction(PassDetailAction.Share) },
+                            )
+                            DropdownMenuItem(
                                 text = { Text(stringResource(R.string.pass_detail_export_as_image)) },
                                 leadingIcon = { Icon(Icons.Default.Image, null) },
                                 onClick = { overflowOpen = false; onAction(PassDetailAction.OpenImageExport) },
@@ -537,7 +542,6 @@ internal fun PassDetailSectionList(
     // Without a banner above it, the code is the main visual and uses the larger size.
     val emphasized = !pass.isDocumentPass || PassDetailSection.ARTWORK in hiddenSections
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (!showTicket) quickActions?.invoke()
         visibleSections.forEach { section ->
                 when (section) {
                     // Issuer strips and logos crop badly as a banner. The ticket header shows the icon instead.
@@ -559,13 +563,14 @@ internal fun PassDetailSectionList(
                                     null
                                 },
                             )
-                            quickActions?.invoke()
-                            BackFields(pass.backFields)
                         }
                         !showTicket && showCode -> BarcodeCard(pass, emphasized, codeViewOptions, onBarcodeHoldChanged, onBarcodePin)
                     }
                     // With one location the Directions quick action already opens it.
-                    PassDetailSection.LOCATIONS -> if (pass.locations.size > if (quickActions != null) 1 else 0) {
+                    PassDetailSection.ACTIONS -> quickActions?.invoke()
+                    PassDetailSection.BACK_FIELDS -> BackFields(pass.backFields)
+                    // With one location the Directions button opens it, unless the action buttons are hidden.
+                    PassDetailSection.LOCATIONS -> if (pass.locations.size > if (PassDetailSection.ACTIONS in visibleSections) 1 else 0) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             pass.locations.forEachIndexed { index, location ->
                                 val label = location.name?.takeIf(String::isNotBlank)
@@ -682,7 +687,7 @@ private fun PassCodes(
 }
 
 @Composable
-private fun PassQuickActions(
+internal fun PassQuickActions(
     pass: PassUiModel,
     calendarEventPresent: Boolean,
     onAction: (PassDetailAction) -> Unit,
