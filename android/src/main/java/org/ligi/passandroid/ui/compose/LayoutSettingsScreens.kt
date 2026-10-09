@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.QrCode
@@ -76,16 +77,22 @@ fun PassDetailLayoutSettingsScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 12.dp, 16.dp, 40.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item(key = "code-header") { LayoutListHeader(stringResource(R.string.layout_code_header)) }
             item(key = "code") {
                 Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                     ListItem(
                         leadingContent = { Icon(Icons.Default.QrCode, null) },
+                        supportingContent = { Text(stringResource(R.string.layout_code_hint)) },
+                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },
                         modifier = Modifier.clickable {
                             onAction(org.ligi.passandroid.ui.state.PassDetailLayoutSettingsAction.OpenCodeSettings)
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    ) { Text(stringResource(R.string.settings_code)) }
+                    ) { Text(stringResource(R.string.layout_customize_code)) }
                 }
+            }
+            item(key = "sections-header") {
+                LayoutListHeader(stringResource(R.string.layout_sections_header), Modifier.padding(top = 16.dp))
             }
             itemsIndexed(order, key = { _, section -> section.name }) { index, section ->
                 Surface(
@@ -94,7 +101,7 @@ fun PassDetailLayoutSettingsScreen(
                     color = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
                     ListItem(
-                        supportingContent = { Text(section.supportingText()) },
+                        supportingContent = section.supportingText()?.let { hint -> { Text(stringResource(hint)) } },
                         trailingContent = {
                             Row {
                                 IconButton(
@@ -131,17 +138,25 @@ fun PassDetailLayoutSettingsScreen(
                     pass = previewPass,
                     sectionOrder = order,
                     hiddenSections = hidden,
-                    calendarEventPresent = false,
                     onAction = {},
                     onBarcodeHoldChanged = {},
                     onBarcodePin = {},
-                    onEditDateRequested = {},
                     modifier = Modifier.padding(horizontal = 8.dp),
                     quickActions = { PassQuickActions(previewPass, false, {}, {}, {}) },
                 )
             }
         }
     }
+}
+
+@Composable
+private fun LayoutListHeader(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+    )
 }
 
 @Composable
@@ -152,23 +167,16 @@ private fun PassDetailSection.displayName() = when (this) {
     PassDetailSection.ACTIONS -> stringResource(R.string.layout_action_buttons)
     PassDetailSection.BACK_FIELDS -> stringResource(R.string.pass_detail_more_information)
     PassDetailSection.LOCATIONS -> stringResource(R.string.edit_pass_locations)
-    PassDetailSection.CALENDAR -> stringResource(R.string.layout_date_card)
     PassDetailSection.NOTES -> stringResource(R.string.layout_notes)
 }
 
-@Composable
-private fun PassDetailSection.supportingText() = stringResource(
-    when (this) {
-        PassDetailSection.ARTWORK -> R.string.layout_document_pages_hint
-        PassDetailSection.BARCODE -> R.string.layout_barcode_hint
-        PassDetailSection.FIELDS -> R.string.layout_ticket_hint
-        PassDetailSection.ACTIONS -> R.string.layout_action_buttons_hint
-        PassDetailSection.BACK_FIELDS -> R.string.layout_more_information_hint
-        PassDetailSection.LOCATIONS -> R.string.layout_locations_hint
-        PassDetailSection.CALENDAR -> R.string.layout_date_card_hint
-        PassDetailSection.NOTES -> R.string.layout_notes_hint
-    },
-)
+// Only the sections whose behavior is not obvious from the name get a line.
+private fun PassDetailSection.supportingText(): Int? = when (this) {
+    PassDetailSection.ARTWORK -> R.string.layout_document_pages_hint
+    PassDetailSection.BARCODE -> R.string.layout_barcode_hint
+    PassDetailSection.LOCATIONS -> R.string.layout_locations_hint
+    else -> null
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

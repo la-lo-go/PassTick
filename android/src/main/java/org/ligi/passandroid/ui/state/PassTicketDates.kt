@@ -57,12 +57,3 @@ fun PassFieldUiModel.repeatsDate(date: LocalDate): Boolean {
     if (!label.mentionsDate(date) && !value.mentionsDate(date)) return false
     return label.isBlank() || label.mentionsDate(date) || DATE_LABEL.containsMatchIn(label)
 }
-
-/** The layouts that print the pass date inside the ticket. */
-fun PassTicketLayout.showsDate(): Boolean = this is PassTicketLayout.Event || this is PassTicketLayout.Boarding
-
-/** True when the ticket already shows the pass date, so a separate date card would repeat it. */
-fun PassUiModel.ticketShowsCalendarDate(layout: PassTicketLayout): Boolean {
-    val date = calendarTimeSpan?.from?.toLocalDate() ?: return false
-    return layout.showsDate() || fields.any { !it.hidden && (it.label.mentionsDate(date) || it.value.mentionsDate(date)) }
-}

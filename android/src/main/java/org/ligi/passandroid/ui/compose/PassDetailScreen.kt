@@ -58,7 +58,6 @@ import androidx.compose.ui.res.pluralStringResource
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.backFields
 import org.ligi.passandroid.ui.state.ticketLayout
-import org.ligi.passandroid.ui.state.ticketShowsCalendarDate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Notifications
@@ -490,12 +489,10 @@ fun PassDetailScreen(
                         sectionOrder = passDetailSectionOrder,
                         hiddenSections = hiddenPassDetailSections,
                         documentPages = documentPages,
-                        calendarEventPresent = calendarEventPresent,
                         codeViewOptions = codeViewOptions,
                         onAction = onAction,
                         onBarcodeHoldChanged = { codeHeld = it },
                         onBarcodePin = { codePinned = true },
-                        onEditDateRequested = { editDateDialog = true },
                         onEditNotesRequested = { editNotesDialog = true },
                         quickActions = {
                             PassQuickActions(
@@ -522,12 +519,10 @@ internal fun PassDetailSectionList(
     sectionOrder: List<PassDetailSection>,
     hiddenSections: Set<PassDetailSection>,
     documentPages: PassDocumentPages? = null,
-    calendarEventPresent: Boolean,
     codeViewOptions: CodeViewOptions = CodeViewOptions(),
     onAction: (PassDetailAction) -> Unit,
     onBarcodeHoldChanged: (Boolean) -> Unit,
     onBarcodePin: () -> Unit,
-    onEditDateRequested: () -> Unit,
     onEditNotesRequested: () -> Unit = {},
     modifier: Modifier = Modifier,
     quickActions: (@Composable () -> Unit)? = null,
@@ -594,31 +589,6 @@ internal fun PassDetailSectionList(
                                     ) { Text(label) }
                                 }
                             }
-                        }
-                    }
-                    // When the ticket already shows the pass date, a separate date card would repeat it.
-                    PassDetailSection.CALENDAR -> if (!(showTicket && pass.ticketShowsCalendarDate(layout))) pass.calendarEvent?.let {
-                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                            ListItem(
-                                leadingContent = { Icon(Icons.Default.CalendarMonth, null) },
-                                supportingContent = {
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        pass.calendarDateTimeLines().forEach { Text(it) }
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Text(if (calendarEventPresent) stringResource(R.string.pass_detail_already_in_calendar) else stringResource(R.string.pass_detail_add_to_calendar))
-                                            if (calendarEventPresent) Icon(Icons.Default.Check, stringResource(R.string.pass_detail_in_calendar), Modifier.size(18.dp))
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().combinedClickable(
-                                    enabled = true,
-                                    onClick = {
-                                        if (!calendarEventPresent) onAction(PassDetailAction.AddToCalendar)
-                                    },
-                                    onLongClick = { onEditDateRequested() },
-                                ),
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            ) { Text(stringResource(R.string.pass_detail_date_and_time)) }
                         }
                     }
                     PassDetailSection.NOTES -> if (pass.notes.isNotBlank()) {
@@ -906,14 +876,5 @@ private fun BarcodePagerArrow(
         colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
     ) {
         Icon(icon, contentDescription)
-    }
-}
-
-internal fun PassUiModel.calendarDateTimeLines(): List<String> {
-    val formatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy · HH:mm z")
-    val span = calendarTimeSpan ?: return emptyList()
-    return buildList {
-        span.from?.let { add("Starts: ${it.format(formatter)}") }
-        span.to?.let { add("Ends: ${it.format(formatter)}") }
     }
 }

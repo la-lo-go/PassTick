@@ -62,7 +62,6 @@ enum class PassDetailSection {
     BARCODE,
     ACTIONS,
     BACK_FIELDS,
-    CALENDAR,
     LOCATIONS,
     NOTES,
 }
@@ -75,7 +74,6 @@ private val SectionsAddedAfterRelease = setOf(PassDetailSection.ACTIONS, PassDet
 private val OrderBeforeTicketOrdering = listOf(
     PassDetailSection.ARTWORK,
     PassDetailSection.BARCODE,
-    PassDetailSection.CALENDAR,
     PassDetailSection.FIELDS,
     PassDetailSection.LOCATIONS,
     PassDetailSection.NOTES,

@@ -58,7 +58,6 @@ import org.ligi.passandroid.ui.state.fitsTicketHeader
 import org.ligi.passandroid.ui.state.gridRows
 import org.ligi.passandroid.ui.state.headerFields
 import org.ligi.passandroid.ui.state.repeatsDate
-import org.ligi.passandroid.ui.state.showsDate
 import org.ligi.passandroid.ui.state.ticketGridFields
 import org.threeten.bp.LocalDate
 import org.threeten.bp.LocalTime
@@ -107,7 +106,7 @@ internal fun PassTicket(
     val colors = ticketColors(pass, layout)
     val issuer = pass.issuerName()
     val typeLabel = stringResource(getHumanCategoryString(pass.type))
-    val ticketDate = pass.calendarTimeSpan?.from?.toLocalDate()?.takeIf { layout.showsDate() }
+    val ticketDate = pass.calendarTimeSpan?.from?.toLocalDate()
     // Drop fields that only repeat what the ticket already shows: the date, the issuer name, or the pass type.
     fun PassFieldUiModel.repeatsTicket() =
         (ticketDate != null && repeatsDate(ticketDate)) ||
@@ -172,7 +171,9 @@ internal fun PassTicket(
                     is PassTicketLayout.Generic -> PrimaryValue(layout.primary, issuer, colors)
                     PassTicketLayout.Simple -> SimpleTitle(pass, colors)
                 }
-                if (gridFields.isNotEmpty()) {
+                // Event and boarding layouts place the date in their own block.
+            if (layout !is PassTicketLayout.Event && layout !is PassTicketLayout.Boarding) DateCells(pass, colors)
+            if (gridFields.isNotEmpty()) {
                     when (layout) {
                         PassTicketLayout.Simple -> FieldList(gridFields, colors)
                         is PassTicketLayout.Event -> FieldGrid(gridFields, colors, EventColumns, columnGap = 2.dp, cellPadding = 12.dp)
@@ -304,17 +305,7 @@ private fun EventMain(pass: PassUiModel, layout: PassTicketLayout.Event, issuer:
             fontWeight = FontWeight.ExtraBold,
         )
     }
-    val from = pass.calendarTimeSpan?.from
-    if (from != null) {
-        val locale = LocalConfiguration.current.locales[0]
-        // Midnight usually means the issuer gave a day without a time.
-        val time = from.toLocalTime().takeIf { it != LocalTime.MIDNIGHT }?.format(DateTimeFormatter.ofPattern("HH:mm", locale))
-        TonalCells(
-            stringResource(R.string.pass_detail_ticket_date) to dateLabel(from, pass.calendarTimeSpan?.to),
-            listOfNotNull(time?.let { stringResource(R.string.pass_detail_ticket_time) to it }),
-            colors,
-        )
-    }
+    DateCells(pass, colors)
     layout.seat?.fields?.map { it.label to it.value }?.let { cells ->
         // Three cells do not fit in one row on a phone. The section takes its own row; row and seat keep the columns.
         if (cells.size == 3) {
@@ -324,6 +315,19 @@ private fun EventMain(pass: PassUiModel, layout: PassTicketLayout.Event, issuer:
             TonalCells(cells.first(), cells.drop(1), colors)
         }
     }
+}
+
+@Composable
+private fun DateCells(pass: PassUiModel, colors: TicketColors) {
+    val from = pass.calendarTimeSpan?.from ?: return
+    val locale = LocalConfiguration.current.locales[0]
+    // Midnight usually means the issuer gave a day without a time.
+    val time = from.toLocalTime().takeIf { it != LocalTime.MIDNIGHT }?.format(DateTimeFormatter.ofPattern("HH:mm", locale))
+    TonalCells(
+        stringResource(R.string.pass_detail_ticket_date) to dateLabel(from, pass.calendarTimeSpan?.to),
+        listOfNotNull(time?.let { stringResource(R.string.pass_detail_ticket_time) to it }),
+        colors,
+    )
 }
 
 @Composable

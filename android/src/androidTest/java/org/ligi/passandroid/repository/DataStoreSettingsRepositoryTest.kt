@@ -95,7 +95,6 @@ class DataStoreSettingsRepositoryTest {
                         PassDetailSection.ARTWORK,
                         PassDetailSection.FIELDS,
                         PassDetailSection.LOCATIONS,
-                        PassDetailSection.CALENDAR,
                     ) && it.hiddenPassDetailSections == setOf(PassDetailSection.ARTWORK)
             }
 
@@ -134,7 +133,6 @@ class DataStoreSettingsRepositoryTest {
                         PassDetailSection.ARTWORK,
                         PassDetailSection.FIELDS,
                         PassDetailSection.LOCATIONS,
-                        PassDetailSection.CALENDAR,
                     ),
                     hiddenPassDetailSections = setOf(PassDetailSection.ARTWORK),
                     hiddenHomeCardSections = setOf(HomeCardSection.CREATOR),
