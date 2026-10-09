@@ -36,6 +36,21 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.semantics.Role
+import org.ligi.passandroid.ui.state.PassTicketLayout
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.res.pluralStringResource
+import org.ligi.passandroid.ui.state.PassFieldUiModel
+import org.ligi.passandroid.ui.state.backFields
+import org.ligi.passandroid.ui.state.ticketLayout
+import org.ligi.passandroid.ui.state.ticketShowsCalendarDate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Notifications
@@ -259,7 +274,8 @@ fun PassDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(pass?.description ?: stringResource(R.string.pass_detail_fallback_title)) },
+                // The ticket shows the pass name, so the bar only names the screen when there is no pass.
+                title = { if (pass == null) Text(stringResource(R.string.pass_detail_fallback_title)) },
                 navigationIcon = {
                     FilledTonalIconButton(onClick = { onAction(PassDetailAction.Back) }, shape = CircleShape) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.pass_detail_back))
@@ -480,6 +496,17 @@ fun PassDetailScreen(
                         onBarcodePin = { codePinned = true },
                         onEditDateRequested = { editDateDialog = true },
                         onEditNotesRequested = { editNotesDialog = true },
+                        quickActions = {
+                            PassQuickActions(
+                                pass = pass,
+                                calendarEventPresent = calendarEventPresent,
+                                onAction = onAction,
+                                onEditDate = { editDateDialog = true },
+                                onConfigureReminder = {
+                                    if (remindersGloballyEnabled) configureReminder = true else onAction(PassDetailAction.OpenReminderSettings)
+                                },
+                            )
+                        },
                     )
                 }
                 }
@@ -502,56 +529,47 @@ internal fun PassDetailSectionList(
     onEditDateRequested: () -> Unit,
     onEditNotesRequested: () -> Unit = {},
     modifier: Modifier = Modifier,
-    artworkFallback: (@Composable () -> Unit)? = null,
+    quickActions: (@Composable () -> Unit)? = null,
 ) {
-    val artwork = pass.artwork.firstOrNull { it.kind == PassArtworkKind.STRIP }
-        ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.LOGO }
-        ?: pass.artwork.firstOrNull { it.kind == PassArtworkKind.THUMBNAIL }
-    val visibleFields = pass.fields.filterNot { field ->
-        field.hidden || (pass.calendarEvent != null && field.value.containsDateAndTime())
-    }
+    val layout = remember(pass) { pass.ticketLayout() }
+    val visibleSections = sectionOrder.filterNot(hiddenSections::contains)
+    // A pass without a code gets no empty code area.
+    val showCode = PassDetailSection.BARCODE in visibleSections && pass.hasDisplayableCode()
+    val showTicket = PassDetailSection.FIELDS in visibleSections
+    // The ticket joins the details and the code, so it takes the place of whichever comes first.
+    val ticketAnchor = visibleSections.firstOrNull { it == PassDetailSection.FIELDS || it == PassDetailSection.BARCODE }
+    // Without a banner above it, the code is the main visual and uses the larger size.
+    val emphasized = !pass.isDocumentPass || PassDetailSection.ARTWORK in hiddenSections
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        sectionOrder
-            .filterNot(hiddenSections::contains)
-            .forEach { section ->
+        if (!showTicket) quickActions?.invoke()
+        visibleSections.forEach { section ->
                 when (section) {
+                    // Issuer strips and logos crop badly as a banner. The ticket header shows the icon instead.
                     PassDetailSection.ARTWORK -> if (pass.isDocumentPass) {
                         DocumentViewer(
                             pass = pass,
                             documentPages = documentPages,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                    } else if (artwork != null) {
-                        Box(Modifier.fillMaxWidth().height(160.dp)) {
-                            PassArtwork(pass, listOf(artwork.kind), Modifier.fillMaxSize())
-                        }
-                    } else artworkFallback?.let { fallback ->
-                        Box(Modifier.fillMaxWidth().height(160.dp)) { fallback() }
                     }
-                    PassDetailSection.BARCODE -> {
-                        if (pass.hasDisplayableCode() || !pass.isDocumentPass) {
-                            BarcodeCard(
+                    PassDetailSection.BARCODE, PassDetailSection.FIELDS -> when {
+                        showTicket && section == ticketAnchor -> {
+                            PassTicket(
                                 pass = pass,
-                                emphasized = artwork == null || PassDetailSection.ARTWORK in hiddenSections,
-                                codeViewOptions = codeViewOptions,
-                                onHoldChanged = onBarcodeHoldChanged,
-                                onPin = onBarcodePin,
+                                layout = layout,
+                                code = if (showCode) {
+                                    { PassCodes(pass, emphasized, codeViewOptions, onBarcodeHoldChanged, onBarcodePin) }
+                                } else {
+                                    null
+                                },
                             )
+                            quickActions?.invoke()
+                            BackFields(pass.backFields)
                         }
+                        !showTicket && showCode -> BarcodeCard(pass, emphasized, codeViewOptions, onBarcodeHoldChanged, onBarcodePin)
                     }
-                    PassDetailSection.FIELDS -> if (visibleFields.isNotEmpty()) {
-                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                            Column(Modifier.padding(vertical = 8.dp)) {
-                                visibleFields.forEach { field ->
-                                    ListItem(
-                                        supportingContent = { Text(field.label) },
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    ) { Text(field.value) }
-                                }
-                            }
-                        }
-                    }
-                    PassDetailSection.LOCATIONS -> if (pass.locations.isNotEmpty()) {
+                    // With one location the Directions quick action already opens it.
+                    PassDetailSection.LOCATIONS -> if (pass.locations.size > if (quickActions != null) 1 else 0) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             pass.locations.forEachIndexed { index, location ->
                                 val label = location.name?.takeIf(String::isNotBlank)
@@ -573,7 +591,8 @@ internal fun PassDetailSectionList(
                             }
                         }
                     }
-                    PassDetailSection.CALENDAR -> pass.calendarEvent?.let {
+                    // When the ticket already shows the pass date, a separate date card would repeat it.
+                    PassDetailSection.CALENDAR -> if (!(showTicket && pass.ticketShowsCalendarDate(layout))) pass.calendarEvent?.let {
                         Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                             ListItem(
                                 leadingContent = { Icon(Icons.Default.CalendarMonth, null) },
@@ -629,17 +648,6 @@ private fun ReminderActionSetting(action: NotificationAction, enabled: Boolean, 
     }
 }
 
-@Composable
-private fun PassArtwork(pass: PassUiModel, preferredKinds: List<PassArtworkKind>, modifier: Modifier) {
-    val artwork = pass.displayArtwork(preferredKinds) ?: return
-    AdaptivePassArtwork(
-        bytes = artwork.bytes,
-        kind = artwork.kind,
-        accentColor = pass.accentColor,
-        contentDescription = stringResource(R.string.pass_detail_pass_artwork),
-        modifier = modifier,
-    )
-}
 
 @Composable
 private fun BarcodeCard(
@@ -650,15 +658,122 @@ private fun BarcodeCard(
     onPin: () -> Unit,
 ) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = Color.White, contentColor = Color.Black) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Box(Modifier.padding(8.dp)) { PassCodes(pass, emphasized, codeViewOptions, onHoldChanged, onPin) }
+    }
+}
+
+@Composable
+private fun PassCodes(
+    pass: PassUiModel,
+    emphasized: Boolean,
+    codeViewOptions: CodeViewOptions,
+    onHoldChanged: (Boolean) -> Unit,
+    onPin: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        val codes = pass.displayableCodes()
+        when {
+            codes.isEmpty() -> Text(
+                stringResource(R.string.pass_detail_no_barcode),
+                Modifier.padding(vertical = 8.dp),
+                color = Color.Black,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            codes.size == 1 -> SinglePassCode(codes.first(), emphasized, codeViewOptions, onHoldChanged, onPin)
+            else -> BarcodePager(codes, emphasized, codeViewOptions, onHoldChanged, onPin)
+        }
+    }
+}
+
+@Composable
+private fun PassQuickActions(
+    pass: PassUiModel,
+    calendarEventPresent: Boolean,
+    onAction: (PassDetailAction) -> Unit,
+    onEditDate: () -> Unit,
+    onConfigureReminder: () -> Unit,
+) {
+    val hasDate = pass.calendarEvent != null
+    val hasLocation = pass.locations.isNotEmpty()
+    // Unavailable actions are left out, so a pass without a date or a place shows no inactive buttons.
+    if (!hasDate && !hasLocation) return
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (hasDate) {
+            QuickAction(
+                icon = if (calendarEventPresent) Icons.Default.Check else Icons.Default.CalendarMonth,
+                label = stringResource(if (calendarEventPresent) R.string.pass_detail_in_calendar else R.string.pass_detail_action_calendar),
+                selected = calendarEventPresent,
+                onClick = { if (!calendarEventPresent) onAction(PassDetailAction.AddToCalendar) },
+                onLongClick = onEditDate,
+            )
+        }
+        if (hasLocation) {
+            QuickAction(
+                icon = Icons.Default.Directions,
+                label = stringResource(R.string.pass_detail_directions),
+                onClick = { onAction(PassDetailAction.OpenLocation(0)) },
+            )
+        }
+        if (hasDate) {
+            QuickAction(
+                icon = Icons.Default.Notifications,
+                label = stringResource(R.string.pass_detail_action_reminder),
+                onClick = onConfigureReminder,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowScope.QuickAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        Modifier.weight(1f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(18.dp))
+                .background(if (selected) colors.primary else colors.secondaryContainer)
+                .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = onLongClick),
+            contentAlignment = Alignment.Center,
         ) {
-            val codes = pass.displayableCodes()
-            when {
-                codes.isEmpty() -> Text(stringResource(R.string.pass_detail_no_barcode), style = MaterialTheme.typography.titleMedium)
-                codes.size == 1 -> SinglePassCode(codes.first(), emphasized, codeViewOptions, onHoldChanged, onPin)
-                else -> BarcodePager(codes, emphasized, codeViewOptions, onHoldChanged, onPin)
+            Icon(icon, label, tint = if (selected) colors.onPrimary else colors.onSecondaryContainer)
+        }
+        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+    }
+}
+
+@Composable
+private fun BackFields(fields: List<PassFieldUiModel>) {
+    if (fields.isEmpty()) return
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val shape = RoundedCornerShape(28.dp)
+    Surface(
+        Modifier.fillMaxWidth().clip(shape).clickable { expanded = !expanded },
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Column(Modifier.padding(vertical = 4.dp)) {
+            ListItem(
+                leadingContent = { Icon(Icons.Default.Info, null) },
+                supportingContent = { Text(pluralStringResource(R.plurals.pass_detail_back_fields, fields.size, fields.size)) },
+                trailingContent = { Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            ) { Text(stringResource(R.string.pass_detail_more_information)) }
+            if (expanded) {
+                fields.forEach { field ->
+                    ListItem(
+                        overlineContent = { Text(field.label) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    ) { SelectionContainer { Text(field.value) } }
+                }
             }
         }
     }
@@ -789,9 +904,3 @@ internal fun PassUiModel.calendarDateTimeLines(): List<String> {
         span.to?.let { add("Ends: ${it.format(formatter)}") }
     }
 }
-
-private fun String.containsDateAndTime(): Boolean = DATE_AND_TIME_PATTERN.containsMatchIn(this)
-
-private val DATE_AND_TIME_PATTERN = Regex(
-    "\\d{1,4}[-/.]\\d{1,2}[-/.]\\d{1,4}.*?\\d{1,2}:\\d{2}",
-)

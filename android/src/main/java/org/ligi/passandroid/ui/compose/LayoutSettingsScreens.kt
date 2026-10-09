@@ -135,7 +135,6 @@ fun PassDetailLayoutSettingsScreen(
                     onBarcodePin = {},
                     onEditDateRequested = {},
                     modifier = Modifier.padding(horizontal = 8.dp),
-                    artworkFallback = { PreviewBannerArtwork(PreviewAccentColor) },
                 )
             }
         }
@@ -273,20 +272,6 @@ private val samplePreviewTag = PassCategory(
     role = PassCategoryRole.CUSTOM,
 )
 
-@Composable
-private fun PreviewBannerArtwork(accentColor: Int) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color(accentColor),
-        contentColor = Color.White,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(painterResource(R.drawable.ic_notification_pass), null, Modifier.size(56.dp))
-        }
-    }
-}
 
 @Composable
 private fun PreviewThumbnailArtwork(modifier: Modifier, accentColor: Int) {

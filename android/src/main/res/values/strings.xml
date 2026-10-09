@@ -60,6 +60,15 @@
     <string name="pass_detail_open_in_maps">Open in Maps</string>
     <string name="pass_detail_date_and_time">Date</string>
     <string name="pass_detail_note">Note</string>
+    <string name="pass_detail_ticket_date">Date</string>
+    <string name="pass_detail_ticket_time">Time</string>
+    <string name="pass_detail_action_calendar">Calendar</string>
+    <string name="pass_detail_action_reminder">Reminder</string>
+    <string name="pass_detail_more_information">More information</string>
+    <plurals name="pass_detail_back_fields">
+        <item quantity="one">%d field from the back of the pass</item>
+        <item quantity="other">%d fields from the back of the pass</item>
+    </plurals>
     <string name="pass_detail_add_note">Add note</string>
     <string name="pass_detail_remove_note">Remove note</string>
     <string name="pass_detail_save_note">Save note</string>
