@@ -3,8 +3,6 @@ package org.ligi.passandroid.reader
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
-import androidx.core.graphics.toColorInt
 import org.json.JSONException
 import org.json.JSONObject
 import org.ligi.passandroid.R
@@ -15,6 +13,9 @@ import org.ligi.passandroid.model.ApplePassbookQuirkCorrector
 import org.ligi.passandroid.model.AppleStylePassTranslation
 import org.ligi.passandroid.model.PassBitmapDefinitions
 import org.ligi.passandroid.model.PassDefinitions
+import org.ligi.passandroid.model.dominantArtworkColor
+import org.ligi.passandroid.model.parsePassColor
+import org.ligi.passandroid.model.resolvePassAccentColor
 import org.ligi.passandroid.model.pass.*
 import org.threeten.bp.DateTimeException
 import org.threeten.bp.ZonedDateTime
@@ -23,6 +24,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.charset.Charset
 import java.util.*
+
+// The icon shows the brand best; the logo is the fallback.
+private val ARTWORK_COLOR_FILES = listOf("icon@2x.png", "icon.png", "logo@2x.png", "logo.png")
+private const val ARTWORK_SAMPLE_EDGE = 64
 
 object AppleStylePassReader {
 
@@ -62,6 +67,8 @@ object AppleStylePassReader {
 
         readTextFields(passJSON, pass, translation)
 
+        readAccentColor(passJSON, passFile)?.let { pass.accentColor = it }
+
         applyPassType(passJSON, pass)
 
         readPassFields(passJSON, pass, translation, context)
@@ -79,6 +86,33 @@ object AppleStylePassReader {
         copyBitmapFile(passFile, localizedPath, PassBitmapDefinitions.BITMAP_STRIP)
         copyBitmapFile(passFile, localizedPath, PassBitmapDefinitions.BITMAP_THUMBNAIL)
         copyBitmapFile(passFile, localizedPath, PassBitmapDefinitions.BITMAP_FOOTER)
+    }
+
+    /** Reads the pass color of a stored pass directory. Returns null when the directory has no readable pass.json. */
+    fun readAccentColor(passDirectory: File): Int? =
+        readPassJson(File(passDirectory, "pass.json"))?.let { readAccentColor(it, passDirectory) }
+
+    private fun readAccentColor(passJSON: JSONObject, passDirectory: File): Int? {
+        fun color(key: String) = passJSON.optString(key).takeIf(String::isNotBlank)?.let(::parsePassColor)
+        return resolvePassAccentColor(color("backgroundColor"), color("labelColor"), color("foregroundColor")) {
+            ARTWORK_COLOR_FILES.asSequence()
+                .map { File(passDirectory, it) }
+                .filter(File::exists)
+                .firstNotNullOfOrNull { file -> runCatching { artworkPixels(file) }.getOrNull()?.let(::dominantArtworkColor) }
+        }
+    }
+
+    private fun artworkPixels(file: File): IntArray? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        var sampleSize = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sampleSize * 2) >= ARTWORK_SAMPLE_EDGE) sampleSize *= 2
+        val bitmap = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sampleSize }) ?: return null
+        return try {
+            IntArray(bitmap.width * bitmap.height).also { bitmap.getPixels(it, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height) }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun readPassJson(file: File): JSONObject? {
@@ -161,12 +195,6 @@ object AppleStylePassReader {
     }
 
     private fun readTextFields(passJSON: JSONObject, pass: PassImpl, translation: AppleStylePassTranslation) {
-        readJsonSafe(passJSON, "backgroundColor", object : JsonStringReadCallback {
-            override fun onString(string: String) {
-                pass.accentColor = runCatching { string.toColorInt() }.getOrDefault(Color.BLACK)
-            }
-        })
-
         readJsonSafe(passJSON, "description", object : JsonStringReadCallback {
             override fun onString(string: String) {
                 pass.description = translation.translate(string)

@@ -1,6 +1,7 @@
 package org.ligi.passandroid.model
 
 import android.content.Context
+import android.graphics.Color
 import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -99,8 +100,8 @@ class AndroidFileSystemPassStore(
         }
 
         if (result != null) {
-            val corrected = (result as? PassImpl)?.let { ApplePassbookQuirkCorrector(tracker).correctQuirks(it) } == true
-            if (dirty || corrected) {
+            val repaired = repairLoadedPass(result, pathForID)
+            if (dirty || repaired) {
                 save(result)
             }
             passMap[id] = result
@@ -108,6 +109,23 @@ class AndroidFileSystemPassStore(
         }
 
         return result
+    }
+
+    /** Applies the date and color repairs. Returns true when the pass changed and needs saving. */
+    private fun repairLoadedPass(pass: Pass, directory: File): Boolean {
+        val impl = pass as? PassImpl ?: return false
+        val corrected = ApplePassbookQuirkCorrector(tracker).correctQuirks(impl)
+        return recolorUnparsedAccent(impl, directory) || corrected
+    }
+
+    // Older versions could not parse Apple's rgb() colors and stored black or no color. This fixes those passes once.
+    private fun recolorUnparsedAccent(pass: PassImpl, directory: File): Boolean {
+        if (pass.accentColor != 0 && pass.accentColor != Color.BLACK) return false
+        if (!File(directory, "pass.json").exists()) return false
+        val color = AppleStylePassReader.readAccentColor(directory) ?: return false
+        if (color == pass.accentColor) return false
+        pass.accentColor = color
+        return true
     }
 
     override fun getPassbookForId(id: String): Pass? {
