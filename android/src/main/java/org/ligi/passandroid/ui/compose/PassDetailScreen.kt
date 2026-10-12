@@ -110,10 +110,12 @@ import org.ligi.passandroid.repository.PassCategoryRole
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.reminder.NotificationAction
 import org.ligi.passandroid.repository.defaultPassDetailSectionOrder
-import org.ligi.passandroid.ui.state.PassBarcodeUiModel
 import org.ligi.passandroid.ui.state.PassDetailAction
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.state.displayArtwork
+import org.ligi.passandroid.repository.ticketCodeOnTop
+import org.ligi.passandroid.ui.state.DisplayableCode
+import org.ligi.passandroid.ui.state.displayableCodes
 import org.ligi.passandroid.ui.state.hasDisplayableCode
 import org.ligi.passandroid.ui.barcode.CodeViewOptions
 import org.ligi.passandroid.ui.barcode.ExpandedPassCodeDialog
@@ -537,8 +539,7 @@ internal fun PassDetailSectionList(
     val ticketAnchor = visibleSections.firstOrNull { it == PassDetailSection.FIELDS || it == PassDetailSection.BARCODE }
     // Without a banner above it, the code is the main visual and uses the larger size.
     // The order of the two ticket parts in the pass view settings decides which one is on top.
-    val codeOnTop = PassDetailSection.BARCODE in visibleSections && PassDetailSection.FIELDS in visibleSections &&
-        visibleSections.indexOf(PassDetailSection.BARCODE) < visibleSections.indexOf(PassDetailSection.FIELDS)
+    val codeOnTop = ticketCodeOnTop(sectionOrder, hiddenSections)
     val emphasized = !pass.isDocumentPass || PassDetailSection.ARTWORK in hiddenSections
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         visibleSections.forEach { section ->
@@ -760,21 +761,6 @@ private fun BackFields(fields: List<PassFieldUiModel>) {
                 }
             }
         }
-    }
-}
-
-private data class DisplayableCode(val format: PassBarCodeFormat, val message: String)
-
-private fun PassUiModel.displayableCodes(): List<DisplayableCode> {
-    val candidates = if (barcodes.isNotEmpty()) {
-        barcodes
-    } else {
-        listOf(PassBarcodeUiModel(barcodeFormat, barcodeMessage, barcodeAlternativeText))
-    }
-    return candidates.mapNotNull { barcode ->
-        val format = barcode.format ?: return@mapNotNull null
-        val message = barcode.message?.takeIf(String::isNotBlank) ?: return@mapNotNull null
-        DisplayableCode(format, message)
     }
 }
 

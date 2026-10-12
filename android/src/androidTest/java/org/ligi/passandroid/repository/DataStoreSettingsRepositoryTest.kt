@@ -65,7 +65,13 @@ class DataStoreSettingsRepositoryTest {
                 orientation = PassImageOrientation.LANDSCAPE,
                 content = PassImageContent(artwork = false, barcode = false),
             )
-            repository.setImageExportOptions(imageExportOptions)
+            val sheetOptions = PassExportTemplate.SHEET.defaultOptions.copy(
+                aspectRatio = PassImageAspectRatio.LETTER,
+                monochrome = true,
+            )
+            repository.setImageExportOptions(PassExportTemplate.TICKET, imageExportOptions)
+            repository.setImageExportOptions(PassExportTemplate.SHEET, sheetOptions)
+            repository.setImageExportTemplate(PassExportTemplate.SHEET)
             repository.setCodePassId("pass-1")
 
             val restored = repository.settings.first {
@@ -88,7 +94,10 @@ class DataStoreSettingsRepositoryTest {
                     it.lockAllPasses && it.showProtectedPassLockIcon &&
                     it.blurProtectedPassCards && it.separateProtectedPasses && it.blockScreenshots &&
                     !it.trashEnabled &&
-                    it.imageExportOptions == imageExportOptions &&
+                    it.imageExport.template == PassExportTemplate.SHEET &&
+                    it.imageExport.optionsFor(PassExportTemplate.TICKET) == imageExportOptions &&
+                    it.imageExport.optionsFor(PassExportTemplate.SHEET) == sheetOptions &&
+                    it.imageExport.optionsFor(PassExportTemplate.CODE) == PassExportTemplate.CODE.defaultOptions &&
                     it.codePassId == "pass-1" &&
                     it.passDetailSectionOrder == listOf(
                         PassDetailSection.BARCODE,
@@ -142,7 +151,11 @@ class DataStoreSettingsRepositoryTest {
                     separateProtectedPasses = true,
                     blockScreenshots = true,
                     trashEnabled = false,
-                    imageExportOptions = imageExportOptions,
+                    imageExport = PassExportSettings(
+                        PassExportTemplate.SHEET,
+                        PassExportTemplate.entries.associateWith { it.defaultOptions } +
+                            mapOf(PassExportTemplate.TICKET to imageExportOptions, PassExportTemplate.SHEET to sheetOptions),
+                    ),
                     codePassId = "pass-1",
                 ),
             )
@@ -208,7 +221,8 @@ class DataStoreSettingsRepositoryTest {
             repository.setSeparateProtectedPasses(false)
             repository.setBlockScreenshots(false)
             repository.setTrashEnabled(true)
-            repository.setImageExportOptions(PassImageExportOptions())
+            PassExportTemplate.entries.forEach { repository.setImageExportOptions(it, it.defaultOptions) }
+            repository.setImageExportTemplate(PassExportTemplate.TICKET)
             repository.setCodePassId(null)
         }
     }

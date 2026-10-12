@@ -43,6 +43,8 @@ import org.ligi.passandroid.repository.SettingsRepository
 import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassCategory
 import org.ligi.passandroid.repository.PassCategoryRole
+import org.ligi.passandroid.export.PassExportRequest
+import org.ligi.passandroid.repository.PassExportTemplate
 import org.ligi.passandroid.repository.PassImageExportOptions
 import org.threeten.bp.ZonedDateTime
 
@@ -1003,10 +1005,11 @@ private class FakePlatformActions : PlatformActions {
     override fun share(uri: Uri, mimeType: String) {
         shares += uri to mimeType
     }
-    override fun printImage(jobName: String, bitmap: android.graphics.Bitmap) = Unit
+    override fun printDocument(jobName: String, pdf: java.io.File) = Unit
     override fun openLocation(location: PlatformLocation) = Unit
     override fun openUrl(url: String) = Unit
-    override fun shareImage(pass: PassUiModel, options: PassImageExportOptions) = Unit
+    override fun exportFile(pass: PassUiModel, request: PassExportRequest) = java.io.File("unused")
+    override fun shareExport(pass: PassUiModel, request: PassExportRequest) = Unit
 }
 
 private class FakeSettingsRepository(initial: AppSettings = AppSettings()) : SettingsRepository {
@@ -1135,8 +1138,13 @@ private class FakeSettingsRepository(initial: AppSettings = AppSettings()) : Set
     override suspend fun setTrashEnabled(value: Boolean) {
         settings.value = settings.value.copy(trashEnabled = value)
     }
-    override suspend fun setImageExportOptions(value: PassImageExportOptions) {
-        settings.value = settings.value.copy(imageExportOptions = value)
+    override suspend fun setImageExportTemplate(value: PassExportTemplate) {
+        settings.value = settings.value.copy(imageExport = settings.value.imageExport.copy(template = value))
+    }
+
+    override suspend fun setImageExportOptions(template: PassExportTemplate, value: PassImageExportOptions) {
+        val export = settings.value.imageExport
+        settings.value = settings.value.copy(imageExport = export.copy(options = export.options + (template to value)))
     }
     override suspend fun setCodePassId(value: String?) {
         settings.value = settings.value.copy(codePassId = value)

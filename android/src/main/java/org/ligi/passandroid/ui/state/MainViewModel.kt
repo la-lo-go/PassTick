@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.withContext
 import org.ligi.passandroid.platform.PlatformActions
-import org.ligi.passandroid.platform.PassImageExporter
+import org.ligi.passandroid.repository.PassExportFormat
 import org.ligi.passandroid.R
 import org.ligi.passandroid.imports.DocumentImportProcessor
 import org.ligi.passandroid.imports.ImportDraft
@@ -261,15 +261,17 @@ class MainViewModel(
         is AppAction.ShareImage -> {
             launchOperation(strings.resolve(R.string.message_image_ready_to_share)) {
                 val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
-                withContext(Dispatchers.IO) { platformActions.shareImage(pass, action.options) }
+                withContext(Dispatchers.IO) { platformActions.shareExport(pass, action.request) }
             }
             true
         }
         is AppAction.PrintImage -> {
             launchOperation(null) {
                 val pass = uiState.value.passes.firstOrNull { it.id == action.id } ?: error("Pass not found")
-                val bitmap = withContext(Dispatchers.Default) { PassImageExporter.renderBitmap(pass, action.options) }
-                platformActions.printImage(pass.description.ifBlank { "Pass" }, bitmap)
+                // Print always uses the vector PDF, whatever the selected file format.
+                val pdfRequest = action.request.copy(options = action.request.options.copy(format = PassExportFormat.PDF))
+                val pdf = withContext(Dispatchers.IO) { platformActions.exportFile(pass, pdfRequest) }
+                platformActions.printDocument(pass.description.ifBlank { "Pass" }, pdf)
             }
             true
         }
@@ -760,10 +762,12 @@ class MainViewModel(
             }
             true
         }
+        is AppAction.SetImageExportTemplate -> {
+            viewModelScope.launch { settingsRepository.setImageExportTemplate(action.value) }
+            true
+        }
         is AppAction.SetImageExportOptions -> {
-            viewModelScope.launch {
-                settingsRepository.setImageExportOptions(action.value)
-            }
+            viewModelScope.launch { settingsRepository.setImageExportOptions(action.template, action.value) }
             true
         }
         else -> false

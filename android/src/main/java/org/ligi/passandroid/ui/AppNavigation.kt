@@ -42,6 +42,8 @@ import org.ligi.passandroid.ui.compose.CategorySettingsScreen
 import org.ligi.passandroid.ui.compose.CodeSettingsScreen
 import org.ligi.passandroid.ui.compose.EditPassScreen
 import org.ligi.passandroid.ui.compose.ExportImageScreen
+import org.ligi.passandroid.export.PassExportRequest
+import org.ligi.passandroid.repository.ticketCodeOnTop
 import org.ligi.passandroid.ui.compose.HomeAction
 import org.ligi.passandroid.ui.compose.HomeCardLayoutSettingsScreen
 import org.ligi.passandroid.ui.compose.ImportReviewScreen
@@ -92,7 +94,7 @@ internal class AppNavigationDependencies(
     val passAuthenticator: PassAuthenticator,
     val onPassAuthenticated: (passId: String) -> Unit,
     val onResetProtectedState: () -> Unit,
-    val onExportImage: (PassUiModel, Boolean, Boolean) -> Unit,
+    val onExportImage: (PassUiModel, PassExportRequest) -> Unit,
     val imageExporting: Boolean,
     val onExportArchive: () -> Unit,
     val onImportArchive: () -> Unit,
@@ -358,27 +360,29 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
             entry<AppDestination.ExportImage> { destination ->
                 ExportImageScreen(
                     pass = state.passes.firstOrNull { it.id == destination.passId },
-                    options = state.settings.imageExportOptions,
+                    settings = state.settings.imageExport,
+                    codeOnTop = ticketCodeOnTop(state.settings.passDetailSectionOrder, state.settings.hiddenPassDetailSections),
                     isBusy = state.isBusy || dependencies.imageExporting,
                     onAction = { action ->
                         when (action) {
                             PassImageExportAction.Back -> dependencies.onBack()
-                            is PassImageExportAction.SetOptions -> dependencies.viewModel.onAction(
-                                AppAction.SetImageExportOptions(action.value),
+                            is PassImageExportAction.SelectTemplate -> dependencies.viewModel.onAction(
+                                AppAction.SetImageExportTemplate(action.value),
                             )
-                            PassImageExportAction.Save -> {
+                            is PassImageExportAction.SetOptions -> dependencies.viewModel.onAction(
+                                AppAction.SetImageExportOptions(action.template, action.value),
+                            )
+                            is PassImageExportAction.Save -> {
                                 state.passes.firstOrNull { it.id == destination.passId }?.let { pass ->
-                                    dependencies.onExportImage(pass, false, true)
+                                    dependencies.onExportImage(pass, action.request)
                                 }
                             }
-                            PassImageExportAction.Share -> {
-                                dependencies.viewModel.onAction(
-                                    AppAction.ShareImage(destination.passId, state.settings.imageExportOptions),
-                                )
+                            is PassImageExportAction.Share -> {
+                                dependencies.viewModel.onAction(AppAction.ShareImage(destination.passId, action.request))
                                 dependencies.onBack()
                             }
-                            PassImageExportAction.Print -> dependencies.viewModel.onAction(
-                                AppAction.PrintImage(destination.passId, state.settings.imageExportOptions),
+                            is PassImageExportAction.Print -> dependencies.viewModel.onAction(
+                                AppAction.PrintImage(destination.passId, action.request),
                             )
                         }
                     },

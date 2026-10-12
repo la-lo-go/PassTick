@@ -6,6 +6,8 @@ import org.ligi.passandroid.repository.ThemeMode
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
 import org.ligi.passandroid.navigation.PassDateField
+import org.ligi.passandroid.export.PassExportRequest
+import org.ligi.passandroid.repository.PassExportTemplate
 import org.ligi.passandroid.repository.PassImageExportOptions
 
 sealed interface PassDetailAction {
@@ -51,10 +53,11 @@ sealed interface EditPassAction {
 
 sealed interface PassImageExportAction {
     data object Back : PassImageExportAction
-    data class SetOptions(val value: PassImageExportOptions) : PassImageExportAction
-    data object Save : PassImageExportAction
-    data object Share : PassImageExportAction
-    data object Print : PassImageExportAction
+    data class SelectTemplate(val value: PassExportTemplate) : PassImageExportAction
+    data class SetOptions(val template: PassExportTemplate, val value: PassImageExportOptions) : PassImageExportAction
+    data class Save(val request: PassExportRequest) : PassImageExportAction
+    data class Share(val request: PassExportRequest) : PassImageExportAction
+    data class Print(val request: PassExportRequest) : PassImageExportAction
 }
 
 sealed interface SettingsAction {

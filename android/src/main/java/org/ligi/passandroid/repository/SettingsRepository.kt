@@ -1,6 +1,7 @@
 package org.ligi.passandroid.repository
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -95,6 +96,13 @@ val defaultHiddenHomeCardSections = setOf(HomeCardSection.CREATOR, HomeCardSecti
 fun normalizeHomeCardSectionOrder(sections: List<HomeCardSection>): List<HomeCardSection> =
     listOf(HomeCardSection.ARTWORK) +
         (sections + defaultHomeCardSectionOrder).distinct().filterNot { it == HomeCardSection.ARTWORK }
+
+/** True when the pass view shows the code before the details, so the ticket is upside down. */
+fun ticketCodeOnTop(order: List<PassDetailSection>, hidden: Set<PassDetailSection>): Boolean {
+    val visible = order.filterNot(hidden::contains)
+    return PassDetailSection.BARCODE in visible && PassDetailSection.FIELDS in visible &&
+        visible.indexOf(PassDetailSection.BARCODE) < visible.indexOf(PassDetailSection.FIELDS)
+}
 
 val defaultPassDetailSectionOrder = PassDetailSection.entries
 
@@ -206,7 +214,7 @@ data class AppSettings(
     val separateProtectedPasses: Boolean = false,
     val blockScreenshots: Boolean = false,
     val trashEnabled: Boolean = true,
-    val imageExportOptions: PassImageExportOptions = PassImageExportOptions(),
+    val imageExport: PassExportSettings = PassExportSettings(),
     /** The pass pinned to the code widget and the Quick Settings tile. Null means automatic. */
     val codePassId: String? = null,
 ) {
@@ -264,7 +272,8 @@ interface SettingsRepository {
     suspend fun setSeparateProtectedPasses(value: Boolean)
     suspend fun setBlockScreenshots(value: Boolean)
     suspend fun setTrashEnabled(value: Boolean)
-    suspend fun setImageExportOptions(value: PassImageExportOptions)
+    suspend fun setImageExportTemplate(value: PassExportTemplate)
+    suspend fun setImageExportOptions(template: PassExportTemplate, value: PassImageExportOptions)
     suspend fun setCodePassId(value: String?)
 }
 
@@ -338,14 +347,22 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
             separateProtectedPasses = preferences[SEPARATE_PROTECTED_PASSES] ?: false,
             blockScreenshots = preferences[BLOCK_SCREENSHOTS] ?: false,
             trashEnabled = preferences[TRASH_ENABLED] ?: true,
-            imageExportOptions = PassImageExportOptions(
-                aspectRatio = preferences[IMAGE_EXPORT_ASPECT_RATIO]?.let {
-                    runCatching { PassImageAspectRatio.valueOf(it) }.getOrNull()
-                } ?: PassImageAspectRatio.AUTO_HEIGHT,
-                orientation = preferences[IMAGE_EXPORT_ORIENTATION]?.let {
-                    runCatching { PassImageOrientation.valueOf(it) }.getOrNull()
-                } ?: PassImageOrientation.PORTRAIT,
-                content = decodePassImageContent(preferences[IMAGE_EXPORT_CONTENT]),
+            imageExport = PassExportSettings(
+                template = preferences[IMAGE_EXPORT_TEMPLATE]
+                    ?.let { runCatching { PassExportTemplate.valueOf(it) }.getOrNull() }
+                    ?: PassExportTemplate.TICKET,
+                options = PassExportTemplate.entries.associateWith { template ->
+                    val keys = imageExportKeys(template)
+                    decodePassExportOptions(
+                        template,
+                        StoredPassExportOptions(
+                            preferences[keys.aspectRatio],
+                            preferences[keys.orientation],
+                            preferences[keys.content],
+                            preferences[keys.style],
+                        ),
+                    )
+                },
             ),
             codePassId = preferences[CODE_PASS_ID],
         )
@@ -529,11 +546,17 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
     override suspend fun setBlockScreenshots(value: Boolean) = update(BLOCK_SCREENSHOTS, value)
     override suspend fun setTrashEnabled(value: Boolean) = update(TRASH_ENABLED, value)
 
-    override suspend fun setImageExportOptions(value: PassImageExportOptions) {
+    override suspend fun setImageExportTemplate(value: PassExportTemplate) {
+        context.settingsDataStore.edit { it[IMAGE_EXPORT_TEMPLATE] = value.name }
+    }
+
+    override suspend fun setImageExportOptions(template: PassExportTemplate, value: PassImageExportOptions) {
+        val keys = imageExportKeys(template)
         context.settingsDataStore.edit {
-            it[IMAGE_EXPORT_ASPECT_RATIO] = value.aspectRatio.name
-            it[IMAGE_EXPORT_ORIENTATION] = value.orientation.name
-            it[IMAGE_EXPORT_CONTENT] = encodePassImageContent(value.content)
+            it[keys.aspectRatio] = value.aspectRatio.name
+            it[keys.orientation] = value.orientation.name
+            it[keys.content] = encodePassImageContent(value.content)
+            it[keys.style] = encodePassExportStyle(value)
         }
     }
 
@@ -596,9 +619,25 @@ class DataStoreSettingsRepository(private val context: Context) : SettingsReposi
         val SEPARATE_PROTECTED_PASSES = booleanPreferencesKey("separate_protected_passes")
         val BLOCK_SCREENSHOTS = booleanPreferencesKey("block_screenshots")
         val TRASH_ENABLED = booleanPreferencesKey("trash_enabled")
-        val IMAGE_EXPORT_ASPECT_RATIO = stringPreferencesKey("image_export_aspect_ratio")
-        val IMAGE_EXPORT_ORIENTATION = stringPreferencesKey("image_export_orientation")
-        val IMAGE_EXPORT_CONTENT = stringSetPreferencesKey("image_export_content")
+        val IMAGE_EXPORT_TEMPLATE = stringPreferencesKey("image_export_template")
+
+        private class ImageExportKeys(
+            val aspectRatio: Preferences.Key<String>,
+            val orientation: Preferences.Key<String>,
+            val content: Preferences.Key<Set<String>>,
+            val style: Preferences.Key<Set<String>>,
+        )
+
+        // The Ticket template keeps the keys of the single export layout from older versions, so stored options survive.
+        private fun imageExportKeys(template: PassExportTemplate): ImageExportKeys {
+            val prefix = if (template == PassExportTemplate.TICKET) "image_export" else "image_export_${template.name.lowercase()}"
+            return ImageExportKeys(
+                stringPreferencesKey("${prefix}_aspect_ratio"),
+                stringPreferencesKey("${prefix}_orientation"),
+                stringSetPreferencesKey("${prefix}_content"),
+                stringSetPreferencesKey("${prefix}_style"),
+            )
+        }
         val CODE_PASS_ID = stringPreferencesKey("code_pass_id")
     }
 }

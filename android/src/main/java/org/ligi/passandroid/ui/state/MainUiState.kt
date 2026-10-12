@@ -8,6 +8,8 @@ import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ColorStyle
+import org.ligi.passandroid.export.PassExportRequest
+import org.ligi.passandroid.repository.PassExportTemplate
 import org.ligi.passandroid.repository.PassImageExportOptions
 import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.HomeCardSection
@@ -177,6 +179,18 @@ fun PassUiModel.hasDisplayableCode(): Boolean =
     barcodes.any { it.format != null && !it.message.isNullOrBlank() } ||
         (barcodeFormat != null && !barcodeMessage.isNullOrBlank())
 
+data class DisplayableCode(val format: PassBarCodeFormat, val message: String, val alternativeText: String? = null)
+
+/** The codes that a code surface can render. The code list wins; older passes only have the single code fields. */
+fun PassUiModel.displayableCodes(): List<DisplayableCode> {
+    val candidates = barcodes.ifEmpty { listOf(PassBarcodeUiModel(barcodeFormat, barcodeMessage, barcodeAlternativeText)) }
+    return candidates.mapNotNull { barcode ->
+        val format = barcode.format ?: return@mapNotNull null
+        val message = barcode.message?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+        DisplayableCode(format, message, barcode.alternativeText?.takeIf(String::isNotBlank))
+    }
+}
+
 /** Expired means the validity end is in the past. The Expired filter and badge share this rule. */
 fun PassUiModel.isExpired(now: ZonedDateTime = ZonedDateTime.now()): Boolean =
     expiresAt?.isBefore(now) == true
@@ -233,8 +247,8 @@ sealed interface AppAction {
     data class ExportArchive(val destination: Uri) : AppAction
     data class ImportArchive(val source: Uri) : AppAction
     data class SharePass(val id: String) : AppAction
-    data class ShareImage(val id: String, val options: PassImageExportOptions) : AppAction
-    data class PrintImage(val id: String, val options: PassImageExportOptions) : AppAction
+    data class ShareImage(val id: String, val request: PassExportRequest) : AppAction
+    data class PrintImage(val id: String, val request: PassExportRequest) : AppAction
     data class AddToCalendar(val id: String) : AppAction
     data class OpenLocation(val id: String, val locationIndex: Int) : AppAction
     data class OpenUrl(val url: String) : AppAction
@@ -289,7 +303,8 @@ sealed interface AppAction {
     data class SetSeparateProtectedPasses(val value: Boolean) : AppAction
     data class SetBlockScreenshots(val value: Boolean) : AppAction
     data class SetTrashEnabled(val value: Boolean) : AppAction
-    data class SetImageExportOptions(val value: PassImageExportOptions) : AppAction
+    data class SetImageExportTemplate(val value: PassExportTemplate) : AppAction
+    data class SetImageExportOptions(val template: PassExportTemplate, val value: PassImageExportOptions) : AppAction
     data class MovePassDetailSection(val section: PassDetailSection, val offset: Int) : AppAction
     data class SetPassDetailSectionVisible(val section: PassDetailSection, val visible: Boolean) : AppAction
     data class MoveHomeCardSection(val section: HomeCardSection, val offset: Int) : AppAction

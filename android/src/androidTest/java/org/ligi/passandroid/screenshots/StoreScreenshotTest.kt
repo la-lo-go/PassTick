@@ -67,7 +67,7 @@ import org.ligi.passandroid.ui.state.PassTimeSpanUiModel
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.repository.PassArtworkKind
-import org.ligi.passandroid.repository.PassImageExportOptions
+import org.ligi.passandroid.repository.PassExportSettings
 import org.threeten.bp.Instant
 import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId
@@ -170,7 +170,8 @@ class StoreScreenshotTest {
             PassTheme(ThemeMode.DARK, dynamicColors = false, accentColor = CORAL, colorStyle = ColorStyle.FIDELITY) {
                 ExportImageScreen(
                     pass = coastalExpressPass(),
-                    options = PassImageExportOptions(),
+                    settings = PassExportSettings(),
+                    codeOnTop = false,
                     isBusy = false,
                     onAction = {},
                 )

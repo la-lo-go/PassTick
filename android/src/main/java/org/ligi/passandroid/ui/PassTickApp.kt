@@ -84,8 +84,11 @@ import org.ligi.passandroid.ui.state.hasDisplayableCode
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.repository.StartupAppearanceStore
 import org.ligi.passandroid.platform.PassAuthenticator
+import org.ligi.passandroid.export.PassExportRequest
 import org.ligi.passandroid.platform.PassImageExporter
-import org.ligi.passandroid.repository.PassImageContent
+import org.ligi.passandroid.platform.exportLabels
+import org.ligi.passandroid.repository.PassExportFormat
+import org.ligi.passandroid.repository.PassExportTemplate
 import org.ligi.passandroid.reminder.reminderNotificationsAvailable
 import androidx.compose.runtime.Composable
 import org.ligi.passandroid.MainActivity
@@ -310,41 +313,50 @@ fun PassTickApp(
         uri?.let { viewModel.onAction(AppAction.ImportArchive(it)) }
     }
     var imageExporting by remember { mutableStateOf(false) }
-    fun exportImageToGallery(pass: PassUiModel, barcodeOnly: Boolean, returnToPass: Boolean) {
-        val options = if (barcodeOnly) {
-            state.settings.imageExportOptions.copy(
-                content = PassImageContent(
-                    artwork = false,
-                    details = false,
-                    notes = false,
-                    barcode = true,
-                    dateTime = false,
-                    location = false,
-                ),
-            )
-        } else {
-            state.settings.imageExportOptions
-        }
+    fun runExport(returnToPass: Boolean, savedMessage: Int, write: () -> Unit) {
         coroutineScope.launch {
             imageExporting = true
             try {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        PassImageExporter.writeToGallery(
-                            activity.contentResolver,
-                            imageExportFileName(pass.description),
-                            pass,
-                            options,
-                        )
+                runCatching { withContext(Dispatchers.IO) { write() } }
+                    .onSuccess {
+                        if (returnToPass) popBackStack()
+                        snackbarHostState.showSnackbar(activity.getString(savedMessage))
+                    }.onFailure { error ->
+                        snackbarHostState.showSnackbar(activity.getString(R.string.app_image_export_failed, error.message.orEmpty()))
                     }
-                }.onSuccess {
-                    if (returnToPass) popBackStack()
-                                            snackbarHostState.showSnackbar(activity.getString(R.string.app_image_saved_to_gallery))
-                }.onFailure { error ->
-                    snackbarHostState.showSnackbar(activity.getString(R.string.app_image_export_failed, error.message.orEmpty()))
-                }
             } finally {
                 imageExporting = false
+            }
+        }
+    }
+    var pendingPdfExport by remember { mutableStateOf<Pair<String, PassExportRequest>?>(null) }
+    val exportPdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(PassImageExporter.mimeType(PassExportFormat.PDF)),
+    ) { uri ->
+        val (passId, request) = pendingPdfExport ?: return@rememberLauncherForActivityResult
+        pendingPdfExport = null
+        val pass = state.passes.firstOrNull { it.id == passId }
+        if (uri != null && pass != null) {
+            runExport(returnToPass = true, R.string.app_pdf_saved) {
+                PassImageExporter.write(activity.contentResolver, uri, pass, request, exportLabels(activity, pass))
+            }
+        }
+    }
+    // A PNG goes to the gallery. A PDF is a document, so the user picks its place.
+    fun saveExport(pass: PassUiModel, request: PassExportRequest, returnToPass: Boolean) {
+        when (request.options.format) {
+            PassExportFormat.PNG -> runExport(returnToPass, R.string.app_image_saved_to_gallery) {
+                PassImageExporter.writeToGallery(
+                    activity.contentResolver,
+                    exportedFileName(pass.description, PassExportFormat.PNG),
+                    pass,
+                    request,
+                    exportLabels(activity, pass),
+                )
+            }
+            PassExportFormat.PDF -> {
+                pendingPdfExport = pass.id to request
+                exportPdfLauncher.launch(exportedFileName(pass.description, PassExportFormat.PDF))
             }
         }
     }
@@ -518,7 +530,8 @@ fun PassTickApp(
             PassDetailAction.OpenImageExport -> backStack.add(AppDestination.ExportImage(passId))
             PassDetailAction.SaveBarcodeImage -> {
                 state.passes.firstOrNull { it.id == passId }?.let { pass ->
-                    exportImageToGallery(pass, barcodeOnly = true, returnToPass = false)
+                    val options = state.settings.imageExport.optionsFor(PassExportTemplate.CODE).copy(format = PassExportFormat.PNG)
+                    saveExport(pass, PassExportRequest(PassExportTemplate.CODE, options), returnToPass = false)
                 }
             }
             PassDetailAction.AddToCalendar -> {
@@ -713,7 +726,7 @@ fun PassTickApp(
                         protectedSectionUnlocked = false
                         authenticatedPassIds = emptySet()
                     },
-                    onExportImage = ::exportImageToGallery,
+                    onExportImage = { pass, request -> saveExport(pass, request, returnToPass = true) },
                     imageExporting = imageExporting,
                     onExportArchive = { exportArchiveLauncher.launch(backupArchiveFileName()) },
                     onImportArchive = { importArchiveLauncher.launch(arrayOf(backupMimeType, "application/zip")) },
@@ -770,13 +783,13 @@ fun PassTickApp(
     }
 }
 
-private fun imageExportFileName(description: String?): String {
+private fun exportedFileName(description: String?, format: PassExportFormat): String {
     val base = description.orEmpty()
         .replace(Regex("[^A-Za-z0-9 _-]"), "")
         .replace(Regex("\\s+"), " ")
         .trim()
         .ifBlank { "pass" }
-    return "$base ${org.threeten.bp.LocalDate.now()}.png"
+    return "$base ${org.threeten.bp.LocalDate.now()}.${PassImageExporter.extension(format)}"
 }
 
 private fun backupArchiveFileName(): String =

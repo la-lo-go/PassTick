@@ -4,7 +4,6 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.provider.CalendarContract
@@ -13,7 +12,7 @@ import androidx.core.content.FileProvider
 import org.ligi.passandroid.R
 import org.ligi.passandroid.functions.createIntent
 import org.ligi.passandroid.functions.CalendarEvent
-import org.ligi.passandroid.repository.PassImageExportOptions
+import org.ligi.passandroid.export.PassExportRequest
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.printing.doPrint
 import androidx.core.net.toUri
@@ -33,10 +32,12 @@ interface PlatformActions {
     fun addToCalendarAutomatically(event: CalendarEvent): Boolean
     fun isCalendarEventPresent(event: CalendarEvent): Boolean = false
     fun share(uri: Uri, mimeType: String)
-    fun printImage(jobName: String, bitmap: Bitmap)
+    fun printDocument(jobName: String, pdf: File)
     fun openLocation(location: PlatformLocation)
     fun openUrl(url: String)
-    fun shareImage(pass: PassUiModel, options: PassImageExportOptions)
+    /** Writes the export into the share cache and returns the file. */
+    fun exportFile(pass: PassUiModel, request: PassExportRequest): File
+    fun shareExport(pass: PassUiModel, request: PassExportRequest)
 
     // Wallpaper-derived accent color, or null when the platform has no dynamic colors.
     fun systemAccentColor(): Long? = null
@@ -91,8 +92,8 @@ class AndroidPlatformActions(
         context.startActivity(Intent.createChooser(shareIntent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    override fun printImage(jobName: String, bitmap: Bitmap) =
-        doPrint(activityProvider() ?: context, jobName, bitmap)
+    override fun printDocument(jobName: String, pdf: File) =
+        doPrint(activityProvider() ?: context, jobName, pdf)
 
     override fun openLocation(location: PlatformLocation) {
         context.startActivity(createLocationIntent(location).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -102,18 +103,16 @@ class AndroidPlatformActions(
         context.startActivity(createUrlIntent(url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    override fun shareImage(pass: PassUiModel, options: PassImageExportOptions) {
+    override fun exportFile(pass: PassUiModel, request: PassExportRequest): File {
         val directory = File(context.cacheDir, "share").apply { mkdirs() }
-        val file = File(directory, "${pass.id}.png")
-        val bitmap = PassImageExporter.renderBitmap(pass, options)
-        try {
-            FileOutputStream(file).use { output ->
-                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) { "Could not encode PNG" }
-            }
-        } finally {
-            bitmap.recycle()
-        }
-        share(FileProvider.getUriForFile(context, context.getString(R.string.authority_fileprovider), file), "image/png")
+        val file = File(directory, "${pass.id}.${PassImageExporter.extension(request.options.format)}")
+        FileOutputStream(file).use { output -> PassImageExporter.write(output, pass, request, exportLabels(context, pass)) }
+        return file
+    }
+
+    override fun shareExport(pass: PassUiModel, request: PassExportRequest) {
+        val file = exportFile(pass, request)
+        share(FileProvider.getUriForFile(context, context.getString(R.string.authority_fileprovider), file), PassImageExporter.mimeType(request.options.format))
     }
 
     override fun systemAccentColor(): Long? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

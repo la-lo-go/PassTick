@@ -4,16 +4,23 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.ligi.passandroid.export.PassExportRequest
 import org.ligi.passandroid.functions.decodeBarCode
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.repository.CODE_ONLY_CONTENT
 import org.ligi.passandroid.repository.PassArtworkKind
+import org.ligi.passandroid.repository.PassExportFormat
+import org.ligi.passandroid.repository.PassExportTemplate
 import org.ligi.passandroid.repository.PassImageAspectRatio
 import org.ligi.passandroid.repository.PassImageContent
 import org.ligi.passandroid.repository.PassImageExportOptions
@@ -30,6 +37,8 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class PassImageExporterTest {
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+
     private val pass = PassUiModel(
         id = "export-test",
         description = "A very long pass title used to verify wrapped output",
@@ -48,27 +57,22 @@ class PassImageExporterTest {
         ),
     )
 
-    private val barcodeOnly = PassImageContent(
-        artwork = false,
-        details = false,
-        barcode = true,
-        dateTime = false,
-        location = false,
-    )
+    private val labels = exportLabels(context, pass)
+
+    private fun request(
+        template: PassExportTemplate = PassExportTemplate.TICKET,
+        options: PassImageExportOptions = template.defaultOptions,
+    ) = PassExportRequest(template, options)
+
+    private fun render(request: PassExportRequest, model: PassUiModel = pass) = PassImageExporter.renderBitmap(model, request, labels)
 
     @Test
-    fun barcodePngRoundTripsThroughDecoder() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+    fun codeTemplatePngRoundTripsThroughDecoder() {
         val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
         val output = File(shareDir, "export-test-${System.currentTimeMillis()}.png")
         val uri = FileProvider.getUriForFile(context, "dev.lalogo.passtick.fileprovider", output)
         try {
-            PassImageExporter.write(
-                context.contentResolver,
-                uri,
-                pass,
-                PassImageExportOptions(content = barcodeOnly),
-            )
+            PassImageExporter.write(context.contentResolver, uri, pass, request(PassExportTemplate.CODE), labels)
             val bitmap = BitmapFactory.decodeFile(output.absolutePath)
             assertThat(bitmap.decodeBarCode()).isEqualTo("export-round-trip")
             bitmap.recycle()
@@ -78,25 +82,40 @@ class PassImageExporterTest {
     }
 
     @Test
-    fun fullOptionsRenderTransparentBackgroundAndWhiteCardCenter() {
-        val bitmap = PassImageExporter.renderBitmap(pass, PassImageExportOptions())
+    fun everyTemplateDrawsADecodableCode() {
+        PassExportTemplate.entries.forEach { template ->
+            val options = template.defaultOptions.copy(opaqueBackground = true)
+            val bitmap = render(request(template, options))
+            assertThat(bitmap.decodeBarCode()).describedAs(template.name).isEqualTo("export-round-trip")
+            bitmap.recycle()
+        }
+    }
+
+    @Test
+    fun ticketHasATransparentBackgroundAndOpaqueContent() {
+        val bitmap = render(request())
         assertThat(alphaAt(bitmap, 0, 0)).isEqualTo(0)
         assertThat(alphaAt(bitmap, bitmap.width - 1, 0)).isEqualTo(0)
-        assertThat(hasOpaqueWhiteInCenter(bitmap)).isTrue()
+        assertThat(alphaAt(bitmap, bitmap.width / 2, bitmap.height / 2)).isEqualTo(255)
+        assertThat(hasWhite(bitmap)).isTrue()
         bitmap.recycle()
     }
 
     @Test
-    fun artworkRoundTripsWhenPreferredArtworkIsPresent() {
-        val artwork = Bitmap.createBitmap(300, 100, Bitmap.Config.ARGB_8888)
+    fun opaqueBackgroundFillsTheCorners() {
+        val bitmap = render(request(options = PassImageExportOptions(opaqueBackground = true)))
+        assertThat(alphaAt(bitmap, 0, 0)).isEqualTo(255)
+        bitmap.recycle()
+    }
+
+    @Test
+    fun artworkRendersAtTheExportWidth() {
+        val artwork = createBitmap(300, 100)
         val bytes = ByteArrayOutputStream().also {
             artwork.compress(Bitmap.CompressFormat.PNG, 100, it)
             artwork.recycle()
         }.toByteArray()
-        val bitmap = PassImageExporter.renderBitmap(
-            pass.copy(artwork = listOf(PassArtworkUiModel(PassArtworkKind.LOGO, bytes))),
-            PassImageExportOptions(),
-        )
+        val bitmap = render(request(), pass.copy(artwork = listOf(PassArtworkUiModel(PassArtworkKind.LOGO, bytes))))
         assertThat(bitmap.width).isEqualTo(PassImageExporter.EXPORT_WIDTH)
         bitmap.recycle()
     }
@@ -109,12 +128,9 @@ class PassImageExporterTest {
             calendarTimeSpan = null,
             barcodeMessage = null,
         )
-        val sparseBitmap = PassImageExporter.renderBitmap(sparse, PassImageExportOptions())
-        val richBitmap = PassImageExporter.renderBitmap(pass, PassImageExportOptions())
-        val squareBitmap = PassImageExporter.renderBitmap(
-            pass,
-            PassImageExportOptions(aspectRatio = PassImageAspectRatio.SQUARE, orientation = PassImageOrientation.PORTRAIT),
-        )
+        val sparseBitmap = render(request(), sparse)
+        val richBitmap = render(request())
+        val squareBitmap = render(request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.SQUARE)))
         assertThat(richBitmap.height).isGreaterThan(sparseBitmap.height)
         assertThat(richBitmap.height).isGreaterThan(squareBitmap.height)
         sparseBitmap.recycle()
@@ -124,32 +140,18 @@ class PassImageExporterTest {
 
     @Test
     fun squarePortraitProducesEqualWidthAndHeight() {
-        val bitmap = PassImageExporter.renderBitmap(
-            pass,
-            PassImageExportOptions(
-                aspectRatio = PassImageAspectRatio.SQUARE,
-                orientation = PassImageOrientation.PORTRAIT,
-            ),
-        )
+        val bitmap = render(request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.SQUARE)))
         assertThat(bitmap.width).isEqualTo(bitmap.height)
         bitmap.recycle()
     }
 
     @Test
     fun landscapeFlipsSixteenNineToWiderThanTall() {
-        val landscape = PassImageExporter.renderBitmap(
-            pass,
-            PassImageExportOptions(
-                aspectRatio = PassImageAspectRatio.RATIO_16_9,
-                orientation = PassImageOrientation.LANDSCAPE,
-            ),
+        val landscape = render(
+            request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.RATIO_16_9, orientation = PassImageOrientation.LANDSCAPE)),
         )
-        val portrait = PassImageExporter.renderBitmap(
-            pass,
-            PassImageExportOptions(
-                aspectRatio = PassImageAspectRatio.RATIO_16_9,
-                orientation = PassImageOrientation.PORTRAIT,
-            ),
+        val portrait = render(
+            request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.RATIO_16_9, orientation = PassImageOrientation.PORTRAIT)),
         )
         assertThat(landscape.width).isGreaterThan(landscape.height)
         assertThat(portrait.height).isGreaterThan(portrait.width)
@@ -158,53 +160,80 @@ class PassImageExporterTest {
     }
 
     @Test
-    fun barcodeOnlyContentWithNoTextStillDecodes() {
-        val bitmap = PassImageExporter.renderBitmap(pass, PassImageExportOptions(content = barcodeOnly))
+    fun storyIsNineBySixteen() {
+        val bitmap = render(request(PassExportTemplate.STORY))
+        assertThat(bitmap.height.toFloat() / bitmap.width).isCloseTo(16f / 9f, org.assertj.core.data.Offset.offset(0.01f))
+        bitmap.recycle()
+    }
+
+    @Test
+    fun sheetPngHasThePageRatio() {
+        val a4 = render(request(PassExportTemplate.SHEET, PassExportTemplate.SHEET.defaultOptions.copy(format = PassExportFormat.PNG)))
+        assertThat(a4.height.toFloat() / a4.width).isCloseTo(842f / 595f, org.assertj.core.data.Offset.offset(0.01f))
+        a4.recycle()
+    }
+
+    @Test
+    fun ticketWithOnlyTheCodeStillDecodes() {
+        val bitmap = render(request(options = PassImageExportOptions(content = CODE_ONLY_CONTENT, opaqueBackground = true)))
         assertThat(bitmap.decodeBarCode()).isEqualTo("export-round-trip")
         bitmap.recycle()
     }
 
     @Test
-    fun notesRenderAsTheirOwnBlockWhenEnabled() {
+    fun notesMakeTheTicketTaller() {
         val options = PassImageExportOptions(
             content = PassImageContent(artwork = false, details = false, barcode = false, dateTime = false, location = false),
         )
-        val withoutNotes = PassImageExporter.renderBitmap(pass, options)
-        val withNotes = PassImageExporter.renderBitmap(pass.copy(notes = "Gate opens at six\nRow 1, seat 12A"), options)
-
+        val withoutNotes = render(request(options = options))
+        val withNotes = render(request(options = options), pass.copy(notes = "Gate opens at six\nRow 1, seat 12A"))
         assertThat(withNotes.height).isGreaterThan(withoutNotes.height)
         withoutNotes.recycle()
         withNotes.recycle()
     }
 
     @Test
-    fun emptyContentStillRendersACard() {
-        val bitmap = PassImageExporter.renderBitmap(
-            pass,
-            PassImageExportOptions(
-                content = PassImageContent(
-                    artwork = false,
-                    details = false,
-                    barcode = false,
-                    dateTime = false,
-                    location = false,
-                ),
-            ),
-        )
+    fun emptyContentStillRendersATicket() {
+        val nothing = PassImageContent(artwork = false, details = false, notes = false, barcode = false, dateTime = false, location = false)
+        val bitmap = render(request(options = PassImageExportOptions(content = nothing)))
         assertThat(bitmap.width).isEqualTo(PassImageExporter.EXPORT_WIDTH)
-        assertThat(bitmap.height).isGreaterThan(0)
-        assertThat(hasOpaqueWhiteInCenter(bitmap)).isTrue()
+        assertThat(bitmap.height).isGreaterThan(PassImageExporter.EXPORT_WIDTH / 10)
         bitmap.recycle()
     }
 
     @Test
+    fun pdfHasADecodableVectorCode() {
+        val file = File(context.cacheDir, "export-test.pdf")
+        try {
+            file.outputStream().use {
+                PassImageExporter.write(it, pass, request(options = PassImageExportOptions(format = PassExportFormat.PDF)), labels)
+            }
+            assertThat(file.readBytes().decodeToString(0, 4)).isEqualTo("%PDF")
+            val page = renderPdfPage(file, 0, 1600)
+            assertThat(page.decodeBarCode()).isEqualTo("export-round-trip")
+            page.recycle()
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun longSheetPdfContinuesOnMorePages() {
+        val longNotes = (1..60).joinToString("\n\n") { "Paragraph $it. " + "Some long note text. ".repeat(8) }
+        val sheet = request(PassExportTemplate.SHEET)
+        val short = pass.copy(fields = emptyList(), description = "Short pass")
+        assertThat(PassImageExporter.pageCount(short, sheet, labels)).isEqualTo(1)
+        assertThat(PassImageExporter.pageCount(short.copy(notes = longNotes), sheet, labels)).isGreaterThan(1)
+    }
+
+    @Test
     fun writesPngIntoTheGallery() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
         val uri = PassImageExporter.writeToGallery(
             context.contentResolver,
             "pass-tick-export-test.png",
             pass,
-            PassImageExportOptions(content = barcodeOnly),
+            request(PassExportTemplate.CODE),
+            labels,
         )
         try {
             val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
@@ -215,21 +244,29 @@ class PassImageExporterTest {
         }
     }
 
+    private fun renderPdfPage(file: File, index: Int, width: Int): Bitmap =
+        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+            PdfRenderer(descriptor).use { renderer ->
+                renderer.openPage(index).use { page ->
+                    val bitmap = createBitmap(width, width * page.height / page.width)
+                    bitmap.eraseColor(Color.WHITE)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    bitmap
+                }
+            }
+        }
+
     private fun alphaAt(bitmap: Bitmap, x: Int, y: Int): Int = Color.alpha(bitmap.getPixel(x, y))
 
-    private fun hasOpaqueWhiteInCenter(bitmap: Bitmap): Boolean {
-        val left = bitmap.width / 4
-        val right = bitmap.width * 3 / 4
-        val top = bitmap.height / 4
-        val bottom = bitmap.height * 3 / 4
-        var y = top
-        while (y < bottom) {
-            var x = left
-            while (x < right) {
+    private fun hasWhite(bitmap: Bitmap): Boolean {
+        var y = 0
+        while (y < bitmap.height) {
+            var x = 0
+            while (x < bitmap.width) {
                 if (bitmap.getPixel(x, y) == Color.WHITE) return true
-                x += 8
+                x += 16
             }
-            y += 8
+            y += 16
         }
         return false
     }
