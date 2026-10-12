@@ -1,6 +1,6 @@
 [versions]
 agp = "9.3.2"
-assertj = "3.27.6"
+assertj = "3.27.7"
 activity = "1.13.0"
 annotation = "1.10.0"
 compose-bom = "2026.08.00"
