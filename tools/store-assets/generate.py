@@ -57,12 +57,12 @@ THEME_TILE_ORDER = (
 # Sources in listing order with their framed headline.
 CAPTIONS = (
     ("hero", "Every pass in one place"),
+    ("themes", "Material You. Any color."),
+    ("import-detail", "Import any PDF or photo\nand easily find the codes"),
     ("timeline", "Every date on one timeline"),
     ("export-image", "Export passes as images"),
-    ("themes", "Material You. Any color."),
     ("settings-privacy", "Private by design"),
     ("edit-pass", "Edit every detail"),
-    ("import-detail", "Import any PDF or photo\nand easily find the codes"),
 )
 
 HERO_DAY = "hero-day"

@@ -67,7 +67,12 @@ import org.ligi.passandroid.ui.state.PassTimeSpanUiModel
 import org.ligi.passandroid.ui.state.PassUiModel
 import org.ligi.passandroid.ui.theme.PassTheme
 import org.ligi.passandroid.repository.PassArtworkKind
+import org.ligi.passandroid.repository.PassDetailSection
 import org.ligi.passandroid.repository.PassExportSettings
+import org.ligi.passandroid.repository.PassExportTemplate
+import org.ligi.passandroid.repository.PassImageAspectRatio
+import org.ligi.passandroid.repository.PassImageExportOptions
+import org.ligi.passandroid.repository.PassImageOrientation
 import org.threeten.bp.Instant
 import org.threeten.bp.LocalDate
 import org.threeten.bp.ZoneId
@@ -134,14 +139,23 @@ class StoreScreenshotTest {
                 categories = defaultPassCategories,
                 calendarEventPresent = false,
                 documentPages = PassDocumentPages { _, _, _ -> importPagePng() },
+                // The code goes before the details, so the document page sits above the code.
+                passDetailSectionOrder = listOf(
+                    PassDetailSection.ARTWORK,
+                    PassDetailSection.BARCODE,
+                    PassDetailSection.FIELDS,
+                    PassDetailSection.ACTIONS,
+                    PassDetailSection.BACK_FIELDS,
+                    PassDetailSection.LOCATIONS,
+                    PassDetailSection.NOTES,
+                ),
                 onAction = {},
             )
         }
 
         val codeBadge = hasText("Code 1 of 3")
         val scroller = composeRule.onNode(hasScrollAction() and hasAnyDescendant(codeBadge))
-        scroller.performScrollToNode(codeBadge)
-        scroller.performSemanticsAction(SemanticsActions.ScrollBy) { scrollBy -> scrollBy(0f, 350f) }
+        scroller.performSemanticsAction(SemanticsActions.ScrollBy) { scrollBy -> scrollBy(0f, 420f) }
         capture("import-detail")
     }
 
@@ -170,7 +184,15 @@ class StoreScreenshotTest {
             PassTheme(ThemeMode.DARK, dynamicColors = false, accentColor = CORAL, colorStyle = ColorStyle.FIDELITY) {
                 ExportImageScreen(
                     pass = coastalExpressPass(),
-                    settings = PassExportSettings(),
+                    // The landscape ratio fills the width of the preview.
+                    settings = PassExportSettings(
+                        options = mapOf(
+                            PassExportTemplate.TICKET to PassImageExportOptions(
+                                aspectRatio = PassImageAspectRatio.RATIO_3_4,
+                                orientation = PassImageOrientation.LANDSCAPE,
+                            ),
+                        ),
+                    ),
                     codeOnTop = false,
                     isBusy = false,
                     onAction = {},
