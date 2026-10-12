@@ -23,6 +23,8 @@ internal class TicketPainter(
     private val locale: Locale,
     /** The largest square code. The sheet uses a smaller code, so the ticket and its details fit one page. */
     private val codeMaxHeight: Float = CODE_MAX_HEIGHT,
+    /** The most codes in one row. The sheet puts more codes side by side, so the ticket leaves room on the page. */
+    private val codeColumns: Int = 2,
 ) {
     fun ticket(width: Float): Block {
         val inner = width - 2 * EDGE
@@ -43,7 +45,8 @@ internal class TicketPainter(
         if (!document.hasDetails || document.codes.isEmpty()) return null
         val detailsWidth = width - 2 * EDGE - PERFORATION_HEIGHT - STUB_WIDTH
         val details = detailsBlock(detailsWidth - 2 * PADDING)
-        val codes = codeArea(document.codes, STUB_WIDTH)
+        // The stub is narrow, so it never takes more than two codes in a row.
+        val codes = codeArea(document.codes, STUB_WIDTH, minOf(codeColumns, 2))
         val innerHeight = maxOf(details.height + PADDING_TOP + PADDING, codes.height)
         val height = innerHeight + 2 * EDGE
         // The code stub follows the pass view order: first means on the left.
@@ -310,9 +313,9 @@ internal class TicketPainter(
         4f,
     )
 
-    private fun codeArea(codes: List<DisplayableCode>, width: Float): Block {
+    private fun codeArea(codes: List<DisplayableCode>, width: Float, columns: Int = codeColumns): Block {
         val codeWidth = width - 2 * CODE_PADDING
-        val content = codeGrid(codes, codeWidth, codeMaxHeight, CODE_GAP)
+        val content = codeGrid(codes, codeWidth, codeMaxHeight, CODE_GAP, columns)
         return Block(content.height + 2 * CODE_PADDING_VERTICAL) { left, top ->
             content.draw(this, left + CODE_PADDING, top + CODE_PADDING_VERTICAL)
         }

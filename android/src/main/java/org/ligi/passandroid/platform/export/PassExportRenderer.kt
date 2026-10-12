@@ -147,7 +147,9 @@ internal class PassExportRenderer(
         val inner = pageWidth - 2 * SHEET_MARGIN
         val available = pageHeight - 2 * SHEET_MARGIN - SHEET_FOOTER
         val blocks = SheetLayout(document, options.monochrome, images, locale).blocks(inner)
-        val pages = if (paginate) paginate(blocks, available) else listOf(blocks)
+        // Content that fits one page after a small shrink stays on one page. A second page with one short section is worse.
+        val fitsOnePage = blocks.totalHeight(SHEET_GAP) * MIN_SHEET_SCALE <= available
+        val pages = if (paginate && !fitsOnePage) paginate(blocks, available) else listOf(blocks)
         return pages.mapIndexed { index, pageBlocks ->
             ExportPage(pageWidth, pageHeight) {
                 drawColor(Color.WHITE)
@@ -221,6 +223,7 @@ internal class PassExportRenderer(
         private const val SHEET_GAP = 16f
         private const val SHEET_FOOTER = 24f
         private const val SHEET_FOOTER_SIZE = 9f
+        private const val MIN_SHEET_SCALE = 0.8f
         private val A4_SIZE = 595f to 842f
         private val LETTER_SIZE = 612f to 792f
     }
@@ -259,7 +262,7 @@ private class SheetLayout(
         val ticketDocument = document.copy(backFields = emptyList(), notes = null, locations = emptyList())
         if (!ticketDocument.hasDetails && document.codes.isEmpty()) return emptyList()
         val colors = ExportColors.of(document.accentColor, document.neutral, monochrome)
-        val painter = TicketPainter(ticketDocument, colors, images, locale, SHEET_CODE_MAX_HEIGHT)
+        val painter = TicketPainter(ticketDocument, colors, images, locale, SHEET_CODE_MAX_HEIGHT, SHEET_CODE_COLUMNS)
         // A landscape page has room for the landscape ticket.
         val wide = if (width >= TicketPainter.WIDE_WIDTH) painter.wideTicket(TicketPainter.WIDE_WIDTH) else null
         val ticketWidth = if (wide != null) TicketPainter.WIDE_WIDTH else minOf(TicketPainter.WIDTH, width)
@@ -320,6 +323,7 @@ private class SheetLayout(
     companion object {
         // About six centimeters: large enough for any scanner, small enough to leave room for the details.
         private const val SHEET_CODE_MAX_HEIGHT = 170f
+        private const val SHEET_CODE_COLUMNS = 4
         private const val TABLE_LABEL_WIDTH = 120f
         private const val TABLE_GAP = 12f
         private const val TABLE_ROW_GAP = 5f

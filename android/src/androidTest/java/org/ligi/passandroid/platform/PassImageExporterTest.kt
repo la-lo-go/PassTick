@@ -160,6 +160,34 @@ class PassImageExporterTest {
     }
 
     @Test
+    fun everyTemplateRatioAndOrientationHasTheExpectedShapeInPngAndPdf() {
+        PassExportTemplate.entries.forEach { template ->
+            template.aspectRatios.filter { it != PassImageAspectRatio.AUTO_HEIGHT }.forEach { ratio ->
+                val orientations = if (template.hasOrientation(ratio)) PassImageOrientation.entries else listOf(PassImageOrientation.PORTRAIT)
+                orientations.forEach { orientation ->
+                    val long = maxOf(ratio.ratioWidth, ratio.ratioHeight)
+                    val short = minOf(ratio.ratioWidth, ratio.ratioHeight)
+                    val expected = if (orientation == PassImageOrientation.PORTRAIT) short / long else long / short
+                    val options = template.defaultOptions.copy(aspectRatio = ratio, orientation = orientation)
+                    val name = "$template $ratio $orientation"
+
+                    val bitmap = render(request(template, options.copy(format = PassExportFormat.PNG)))
+                    assertThat(bitmap.width.toFloat() / bitmap.height).describedAs(name).isCloseTo(expected, org.assertj.core.data.Offset.offset(0.01f))
+                    bitmap.recycle()
+
+                    val file = File(context.cacheDir, "ratio-test.pdf")
+                    file.outputStream().use { PassImageExporter.write(it, pass, request(template, options.copy(format = PassExportFormat.PDF)), labels) }
+                    val (width, height) = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                        PdfRenderer(descriptor).use { renderer -> renderer.openPage(0).use { it.width to it.height } }
+                    }
+                    file.delete()
+                    assertThat(width.toFloat() / height).describedAs("$name PDF").isCloseTo(expected, org.assertj.core.data.Offset.offset(0.01f))
+                }
+            }
+        }
+    }
+
+    @Test
     fun storyIsNineBySixteen() {
         val bitmap = render(request(PassExportTemplate.STORY))
         assertThat(bitmap.height.toFloat() / bitmap.width).isCloseTo(16f / 9f, org.assertj.core.data.Offset.offset(0.01f))

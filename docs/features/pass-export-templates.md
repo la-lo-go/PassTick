@@ -29,7 +29,8 @@ The export draws a white card with the fields as a plain list. The labels are fi
 - One Canvas painter per template draws the document in design units (the ticket is 360 units wide, like the pass view in dp). The same painter draws a `Bitmap` for PNG and a `PdfDocument` page for PDF.
 - Codes are drawn as module rectangles from `CrispBarcodeRenderer.renderMatrix`, so they stay sharp in a PDF at any scale.
 - The ticket order follows the pass view order: the code is on top when the Code section comes before the Details section.
-- A fixed ratio scales the content down to fit, as before. A PNG of a sheet fits all content on one page. A PDF of a sheet paginates at block boundaries.
+- A fixed ratio scales the content down to fit, as before. A PNG of a sheet fits all content on one page. A PDF of a sheet stays on one page when the content fits after a shrink to 80 % or more. Longer content paginates at block boundaries.
+- The upright ticket on a sheet puts up to four codes in one row, so a pass with many codes fits one page. The narrow stub of the landscape ticket keeps two codes per row.
 - Field selection is transient: the export screen keeps excluded field keys only for the current export. The fields show as toggle chips in a folded "Fields" section. The folded section shows the count of included fields.
 - A wide frame (a landscape ratio) gets a landscape ticket: the details on one side, the code stub on the other, and an upright perforation. A landscape sheet uses the same ticket.
 - Several square codes share a grid. The Code template selects the column count that gives the largest codes in the frame.
@@ -55,4 +56,4 @@ The export draws a white card with the fields as a plain list. The labels are fi
 
 - Settings: per-template round trip, legacy keys decode to the Ticket options, unknown values fall back to defaults.
 - Document model: layout per pass type, label resolution, hidden fields, codes with alternative text, notes, locations, excluded fields, and the content toggles.
-- Instrumented: PNG and PDF output per template, code round trip through the decoder, PDF page count for a long sheet, gallery write, and print adapter output.
+- Instrumented: the shape of the PNG and of the PDF page for every template, ratio, and orientation; PNG and PDF output per template, code round trip through the decoder, PDF page count for a long sheet, gallery write, and print adapter output.
