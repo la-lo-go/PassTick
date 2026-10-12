@@ -1,10 +1,14 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["google-api-python-client>=2.140", "google-auth>=2.30"]
+# ///
 """Publishes the PassTick store listing and the release bundle to Google Play.
 
 Every run validates only and discards its edit, unless it gets --upload.
 
 Usage:
-    python tools/play/publish.py [--track internal] [--skip-bundle] [--skip-listing] [--upload]
-Requires: google-api-python-client and google-auth (see requirements.txt).
+    uv run tools/play/publish.py [--track internal] [--skip-bundle] [--skip-listing] [--upload]
+uv installs the dependencies listed in the script header.
 The service account key path comes from --json-key or PASSTICK_PLAY_JSON_KEY.
 """
 
