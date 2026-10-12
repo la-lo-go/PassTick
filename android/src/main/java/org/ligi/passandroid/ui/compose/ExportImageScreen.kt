@@ -10,11 +10,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -448,6 +450,8 @@ private fun aspectRatioLabel(ratio: PassImageAspectRatio, orientation: PassImage
     return "${width.toInt()}:${height.toInt()}"
 }
 
+private val CanvasShape = RoundedCornerShape(6.dp)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ExportPreview(pass: PassUiModel, request: PassExportRequest, modifier: Modifier) {
@@ -459,6 +463,7 @@ private fun ExportPreview(pass: PassUiModel, request: PassExportRequest, modifie
         val density = LocalDensity.current
         val maxWidthPx = constraints.maxWidth
         val targetWidth = remember(maxWidthPx) { maxWidthPx.coerceIn(1, with(density) { 1000.dp.toPx() }.toInt()) }
+        val boxAspect = maxWidth / maxHeight
         val preview by produceState<ImageBitmap?>(null, pass, request, targetWidth) {
             value = withContext(Dispatchers.Default) {
                 runCatching {
@@ -478,21 +483,29 @@ private fun ExportPreview(pass: PassUiModel, request: PassExportRequest, modifie
             if (image == null) {
                 LoadingIndicator()
             } else {
-                Image(
-                    bitmap = image,
-                    contentDescription = stringResource(R.string.export_preview),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                        .transformable(transformState)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
-                        },
-                )
+                // The canvas shows its real shape on a tonal surface, so a change of ratio or orientation is visible
+                // even when the export background is transparent.
+                val canvasColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                val canvasEdge = MaterialTheme.colorScheme.outlineVariant
+                val aspect = image.width.toFloat() / image.height
+                Box(Modifier.fillMaxSize().padding(12.dp).transformable(transformState), contentAlignment = Alignment.Center) {
+                    Image(
+                        bitmap = image,
+                        contentDescription = stringResource(R.string.export_preview),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .aspectRatio(aspect, matchHeightConstraintsFirst = aspect < boxAspect)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            }
+                            .clip(CanvasShape)
+                            .background(canvasColor)
+                            .border(1.dp, canvasEdge, CanvasShape),
+                    )
+                }
             }
         }
     }
