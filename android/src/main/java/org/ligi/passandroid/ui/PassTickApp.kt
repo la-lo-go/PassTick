@@ -28,7 +28,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
@@ -70,6 +69,7 @@ import org.ligi.passandroid.repository.backupMimeType
 import org.ligi.passandroid.repository.isBackupUri
 import org.ligi.passandroid.repository.passFileImportMimeTypes
 import org.ligi.passandroid.ui.compose.HomeAction
+import org.ligi.passandroid.ui.compose.AppSnackbarHost
 import org.ligi.passandroid.ui.compose.ImportReviewScreen
 import org.ligi.passandroid.ui.compose.ImportSourceSheet
 import org.ligi.passandroid.ui.compose.rememberHomeListPosition
@@ -462,9 +462,23 @@ fun PassTickApp(
         }
     }
 
+    // A finished import shows its passes: one pass opens, several scroll into view on the home list. The import can
+    // come from another app while any screen is open, so the home list becomes the base of the back stack.
+    LaunchedEffect(state.importFocus, state.passes) {
+        val ids = state.importFocus?.passIds ?: return@LaunchedEffect
+        // The pass list can update after the import result; the effect runs again when it does.
+        if (ids.none { id -> state.passes.any { it.id == id } }) return@LaunchedEffect
+        while (backStack.size > 1) backStack.removeLastOrNull()
+        if (ids.size == 1) {
+            openPass(ids.single())
+            viewModel.onAction(AppAction.ConsumeImportFocus)
+        }
+    }
+
     fun handleHomeAction(action: HomeAction) {
         when (action) {
             is HomeAction.OpenPass -> openPass(action.id)
+            HomeAction.ImportFocusShown -> viewModel.onAction(AppAction.ConsumeImportFocus)
             HomeAction.UnlockProtectedPasses -> {
                 if (!passAuthenticator.canAuthenticate()) {
                     coroutineScope.launch {
@@ -772,11 +786,9 @@ fun PassTickApp(
                     LoadingIndicator()
                 }
             }
-            SnackbarHost(
+            AppSnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(16.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 8.dp),
             )
             }
         }

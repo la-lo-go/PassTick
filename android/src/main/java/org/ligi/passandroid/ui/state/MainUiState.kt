@@ -237,10 +237,16 @@ data class MainUiState(
     val isPreparingImport: Boolean = false,
     /** Passes imported in the last moments; the home list animates them into view. */
     val recentlyImportedIds: Set<String> = emptySet(),
+    /** The passes of the last import, until the user interface shows them: one opens, several scroll into view. */
+    val importFocus: ImportFocus? = null,
     val codePassPickerRows: List<CodePassPickerRow> = emptyList(),
 )
 
+/** The passes of one finished import, in import order. */
+data class ImportFocus(val passIds: List<String>)
+
 sealed interface AppAction {
+    data object ConsumeImportFocus : AppAction
     data class Import(val uri: Uri) : AppAction
     data class ImportFiles(val uris: List<Uri>) : AppAction
     data class Export(val id: String, val destination: Uri) : AppAction

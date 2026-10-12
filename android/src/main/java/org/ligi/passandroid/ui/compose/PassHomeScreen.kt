@@ -33,6 +33,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,7 +75,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
@@ -92,6 +93,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -159,6 +161,9 @@ sealed interface HomeAction {
     data object OpenPassViewSettings : HomeAction
     data object OpenHomeCardSettings : HomeAction
     data object UnlockProtectedPasses : HomeAction
+
+    /** The list scrolled to the passes of the last import. */
+    data object ImportFocusShown : HomeAction
 }
 
 sealed interface UndoOperation {
@@ -213,6 +218,28 @@ internal fun PassHomeScreen(
     var pinnedExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var otherExpanded by rememberSaveable(state.selectedCategoryId) { mutableStateOf(true) }
     var collapsedTagIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val listIndex = remember { HomeListIndex() }
+    // The pass that brings itself into view after the list scrolled to its section.
+    var focusPassId by remember { mutableStateOf<String?>(null) }
+    val importFocusIds = state.importFocus?.passIds?.takeIf { it.size > 1 }
+    // Several imported passes: the list opens every section and scrolls to the highest imported pass.
+    LaunchedEffect(importFocusIds) {
+        val ids = importFocusIds?.toSet() ?: return@LaunchedEffect
+        todayExpanded = true
+        pinnedExpanded = true
+        otherExpanded = true
+        collapsedTagIds = emptyList()
+        // One frame lets the list lay out the opened sections and record their items.
+        withFrameNanos { }
+        val target = listIndex.firstShown(ids)
+        if (target != null) {
+            val (index, passId) = target
+            // The item before the feed is its heading, so the section stays recognizable.
+            listState.animateScrollToItem((index - 1).coerceAtLeast(0))
+            focusPassId = passId
+        }
+        onAction(HomeAction.ImportFocusShown)
+    }
     val protectedPassIds = remember(state.passes, state.trashedPasses, state.selectedCategoryId, state.settings.lockAllPasses) {
         val source = if (state.selectedCategoryId == TRASHED_PASSES_CATEGORY_ID) {
             state.passes + state.trashedPasses
@@ -497,7 +524,7 @@ internal fun PassHomeScreen(
             if (previewPass != null) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.48f)))
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { AppSnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(scaffoldPadding)) {
             val expanded = maxWidth >= 840.dp
@@ -505,6 +532,7 @@ internal fun PassHomeScreen(
                 TicketFeed(
                     passes = feedPasses,
                     recentlyImportedIds = recentlyImportedIds,
+                    focusPassId = focusPassId,
                     categories = state.categories,
                     columns = if (expanded) 2 else 1,
                     hero = false,
@@ -542,8 +570,10 @@ internal fun PassHomeScreen(
                 contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                listIndex.reset()
+                with(listIndex) {
                 if (!state.isContentLoading && !searchExpanded && !trashSelected) {
-                    item(key = "sort") {
+                    homeItem("sort") {
                         HomeSortSelector(
                             selectedSort = state.settings.sortOrder,
                             onSort = { onAction(HomeAction.SetSortOrder(it)) },
@@ -551,14 +581,14 @@ internal fun PassHomeScreen(
                     }
                 }
                 if (state.isContentLoading || state.isBusy) {
-                    item(key = "loading") {
+                    homeItem("loading") {
                         Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
                             LoadingIndicator(Modifier.semantics { contentDescription = "Loading passes" })
                         }
                     }
                 }
                 if (trashSelected) {
-                    item(key = "trash") {
+                    homeItem("trash") {
                         TrashSection(
                             passes = state.trashedPasses,
                             trashEnabled = state.settings.trashEnabled,
@@ -582,7 +612,7 @@ internal fun PassHomeScreen(
                 val emptyStateAllowed = !hiddenProtectedPassesExist || searchExpanded
                 val emptyStateVisible = hasNoVisiblePasses && emptyStateAllowed
                 if (emptyStateVisible && !state.isContentLoading && !state.isBusy) {
-                    item(key = "empty") {
+                    homeItem("empty") {
                         when {
                             searchTerms.isNotEmpty() -> EmptySearch(searchQuery)
                             state.selectedCategoryId != null -> EmptyFilter { onAction(HomeAction.SelectCategory(null)) }
@@ -591,16 +621,17 @@ internal fun PassHomeScreen(
                     }
                 }
                 if (showLockedSection) {
-                    item(key = "locked-passes") {
+                    homeItem("locked-passes") {
                         LockedPassSection(protectedPassIds.size) { onAction(HomeAction.UnlockProtectedPasses) }
                     }
                 }
                 if (todayPasses.isNotEmpty()) {
-                    item(key = "today-heading") { SectionHeading(stringResource(R.string.home_today), todayExpanded) { todayExpanded = !todayExpanded } }
-                    if (todayExpanded) item(key = "today-feed") {
+                    homeItem("today-heading") { SectionHeading(stringResource(R.string.home_today), todayExpanded) { todayExpanded = !todayExpanded } }
+                    if (todayExpanded) homeItem("today-feed", todayPasses.map(PassUiModel::id)) {
                         TicketFeed(
                             passes = todayPasses,
                             recentlyImportedIds = recentlyImportedIds,
+                            focusPassId = focusPassId,
                             categories = state.categories,
                             columns = if (expanded) 2 else 1,
                             hero = true,
@@ -626,11 +657,12 @@ internal fun PassHomeScreen(
                     }
                 }
                 if (pinnedPasses.isNotEmpty()) {
-                    item(key = "pinned-heading") { SectionHeading(stringResource(R.string.home_pinned), pinnedExpanded) { pinnedExpanded = !pinnedExpanded } }
-                    if (pinnedExpanded) item(key = "pinned-feed") {
+                    homeItem("pinned-heading") { SectionHeading(stringResource(R.string.home_pinned), pinnedExpanded) { pinnedExpanded = !pinnedExpanded } }
+                    if (pinnedExpanded) homeItem("pinned-feed", pinnedPasses.map(PassUiModel::id)) {
                         TicketFeed(
                             passes = pinnedPasses,
                             recentlyImportedIds = recentlyImportedIds,
+                            focusPassId = focusPassId,
                             categories = state.categories,
                             columns = if (expanded) 2 else 1,
                             hero = false,
@@ -676,22 +708,23 @@ internal fun PassHomeScreen(
                     grouping.groups.forEach { (tagId, groupPasses) ->
                         val tag = state.categories.firstOrNull { it.id == tagId } ?: return@forEach
                         val collapsed = tagId in collapsedTagIds
-                        item(key = "tag-heading-$tagId") {
+                        homeItem("tag-heading-$tagId") {
                             SectionHeading(tag.name, !collapsed) {
                                 collapsedTagIds = if (collapsed) collapsedTagIds - tagId else collapsedTagIds + tagId
                             }
                         }
-                        if (!collapsed) item(key = "tag-feed-$tagId") { remainingFeed(groupPasses) }
+                        if (!collapsed) homeItem("tag-feed-$tagId", groupPasses.map(PassUiModel::id)) { remainingFeed(groupPasses) }
                     }
                     if (grouping.rest.isNotEmpty()) {
                         // The heading only labels the leftover group; without other sections it has no contrast.
                         val showOtherPassesHeading = todayPasses.isNotEmpty() || pinnedPasses.isNotEmpty() ||
                             showLockedSection || grouping.groups.isNotEmpty()
                         if (showOtherPassesHeading) {
-                            item(key = "passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
+                            homeItem("passes-heading") { SectionHeading(stringResource(R.string.home_other_passes), otherExpanded) { otherExpanded = !otherExpanded } }
                         }
-                        if (otherExpanded || !showOtherPassesHeading) item(key = "pass-feed") { remainingFeed(grouping.rest) }
+                        if (otherExpanded || !showOtherPassesHeading) homeItem("pass-feed", grouping.rest.map(PassUiModel::id)) { remainingFeed(grouping.rest) }
                     }
+                }
                 }
                 }
             }
@@ -1152,4 +1185,28 @@ private fun trashDeletedLabel(trashedAtEpochMillis: Long?): String {
     } else {
         pluralStringResource(R.plurals.home_trash_deleted_days, days.toInt(), days.toInt())
     }
+}
+
+/** The index and the passes of each home list item, so the list can scroll to a pass. */
+private class HomeListIndex {
+    private val indexByKey = HashMap<String, Int>()
+    private val passIdsByKey = HashMap<String, List<String>>()
+    private var next = 0
+
+    fun reset() {
+        indexByKey.clear()
+        passIdsByKey.clear()
+        next = 0
+    }
+
+    fun LazyListScope.homeItem(key: String, passIds: List<String> = emptyList(), content: @Composable LazyItemScope.() -> Unit) {
+        indexByKey[key] = next++
+        if (passIds.isNotEmpty()) passIdsByKey[key] = passIds
+        item(key = key, content = content)
+    }
+
+    /** The index of the highest item that shows one of [ids], and the first of those passes in it. */
+    fun firstShown(ids: Set<String>): Pair<Int, String>? = passIdsByKey.entries
+        .sortedBy { indexByKey[it.key] }
+        .firstNotNullOfOrNull { (key, passIds) -> passIds.firstOrNull { it in ids }?.let { indexByKey.getValue(key) to it } }
 }

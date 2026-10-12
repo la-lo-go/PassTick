@@ -706,6 +706,40 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `importing files focuses the imported passes until the focus is consumed`() = runTest(dispatcher) {
+        val repository = FakePassRepository(listOf(snapshot("old", "Old pass")))
+        repository.importResults += listOf(snapshot("new-1", "First"), snapshot("new-2", "Second"))
+        val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.ImportFiles(listOf(Uri.EMPTY, Uri.EMPTY, Uri.EMPTY)))
+        // The highlight clears after a delay, so stop at the current virtual time.
+        runCurrent()
+
+        // The third file fails; only the imported passes are focused.
+        assertThat(viewModel.uiState.value.importFocus).isEqualTo(ImportFocus(listOf("new-1", "new-2")))
+        assertThat(viewModel.uiState.value.recentlyImportedIds).containsExactlyInAnyOrder("new-1", "new-2")
+
+        viewModel.onAction(AppAction.ConsumeImportFocus)
+        runCurrent()
+
+        assertThat(viewModel.uiState.value.importFocus).isNull()
+    }
+
+    @Test
+    fun `a failed import sets no focus`() = runTest(dispatcher) {
+        val viewModel = MainViewModel(FakePassRepository(emptyList()), FakeSettingsRepository(), FakePlatformActions())
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+        advanceUntilIdle()
+
+        viewModel.onAction(AppAction.ImportFiles(listOf(Uri.EMPTY)))
+        runCurrent()
+
+        assertThat(viewModel.uiState.value.importFocus).isNull()
+    }
+
+    @Test
     fun `creating a pass stores the draft and highlights the new pass`() = runTest(dispatcher) {
         val repository = FakePassRepository(emptyList())
         val viewModel = MainViewModel(repository, FakeSettingsRepository(), FakePlatformActions())
@@ -899,7 +933,13 @@ private class FakePassRepository(initial: List<PassSnapshot>) : PassRepository {
     val discardedDraftIds = mutableListOf<String>()
 
     override fun observePasses() = passes.asStateFlow()
-    override suspend fun import(uri: Uri) = Result.failure<PassSnapshot>(UnsupportedOperationException())
+    /** Passes that the next imports return, in order. Without one, an import fails. */
+    val importResults = ArrayDeque<PassSnapshot>()
+    override suspend fun import(uri: Uri): Result<PassSnapshot> {
+        val imported = importResults.removeFirstOrNull() ?: return Result.failure(UnsupportedOperationException())
+        passes.value = passes.value + imported
+        return Result.success(imported)
+    }
     override suspend fun prepareDocumentImport(uri: Uri, source: ImportSource): Result<ImportDraft> {
         preparedRequest = uri to source
         val draft = preparedDraft ?: return Result.failure(UnsupportedOperationException())

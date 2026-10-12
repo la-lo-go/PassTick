@@ -231,9 +231,13 @@ internal fun AppNavDisplay(dependencies: AppNavigationDependencies) {
             }
             entry<AppDestination.ImportReview> {
                 val review = state.importReview
-                if (review == null) {
-                    LaunchedEffect(Unit) { dependencies.onBack() }
-                } else {
+                // A committed import leaves through the import focus, which replaces the back stack. The entry stays
+                // composed during its exit animation, so it only steps back while it is still the top destination.
+                if (review == null && state.importFocus == null) {
+                    LaunchedEffect(Unit) {
+                        if (backStack.lastOrNull() == AppDestination.ImportReview) dependencies.onBack()
+                    }
+                } else if (review != null) {
                     ImportReviewScreen(
                         state = review,
                         onAction = dependencies.viewModel::onImportReviewAction,

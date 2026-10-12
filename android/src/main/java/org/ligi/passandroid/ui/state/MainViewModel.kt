@@ -75,6 +75,7 @@ class MainViewModel(
     private val preparingImport = MutableStateFlow(false)
     private val recentlyImportedIds = MutableStateFlow<Set<String>>(emptySet())
     private var recentlyImportedClearJob: Job? = null
+    private val importFocus = MutableStateFlow<ImportFocus?>(null)
     private var pendingImportDraft: ImportDraft? = null
     private val systemAccentColor = platformActions.systemAccentColor()
     private val categoryMoves = Channel<AppAction.MovePass>(Channel.UNLIMITED)
@@ -128,6 +129,8 @@ class MainViewModel(
         currentState.copy(isPreparingImport = preparing)
     }.combine(recentlyImportedIds) { currentState, importedIds ->
         currentState.copy(recentlyImportedIds = importedIds)
+    }.combine(importFocus) { currentState, focus ->
+        currentState.copy(importFocus = focus)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
     init {
@@ -238,11 +241,16 @@ class MainViewModel(
                 val imported = passRepository.import(action.uri).getOrThrow()
                 addCalendarEventsAfterImport(listOf(imported))
                 highlightImported(listOf(imported.id))
+                focusImported(listOf(imported.id))
             }
             true
         }
         is AppAction.ImportFiles -> {
             importFiles(action.uris)
+            true
+        }
+        AppAction.ConsumeImportFocus -> {
+            importFocus.value = null
             true
         }
         is AppAction.Export -> {
@@ -285,7 +293,9 @@ class MainViewModel(
             val failedCount = results.count { it.isFailure }
             addCalendarEventsAfterImport(imported)
             highlightImported(imported.map(PassSnapshot::id))
+            focusImported(imported.map(PassSnapshot::id))
             message.value = when {
+                failedCount == 0 && imported.size == 1 -> strings.resolve(R.string.message_pass_imported)
                 failedCount == 0 -> strings.resolve(R.string.message_passes_imported)
                 imported.isEmpty() -> results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
                     ?: strings.resolve(R.string.message_operation_failed)
@@ -448,6 +458,8 @@ class MainViewModel(
             )
             passRepository.commitDocumentImport(draft, edits)
                 .onSuccess { imported ->
+                    // The focus comes first: the review screen leaves through it instead of a plain back step.
+                    focusImported(listOf(imported.id))
                     pendingImportDraft = null
                     importReview.value = null
                     message.value = strings.resolve(R.string.message_pass_imported)
@@ -988,6 +1000,10 @@ class MainViewModel(
         event.copy(title = resolvePassCardTitle(this, settings.homeCardSectionOrder, settings.hiddenHomeCardSections, settings.categories))
     }
 
+    private fun focusImported(ids: List<String>) {
+        if (ids.isNotEmpty()) importFocus.value = ImportFocus(ids)
+    }
+
     private fun highlightImported(ids: List<String>) {
         if (ids.isEmpty()) return
         recentlyImportedIds.value = recentlyImportedIds.value + ids
@@ -1014,7 +1030,7 @@ class MainViewModel(
     }
 }
 
-private const val RECENT_IMPORT_HIGHLIGHT_MILLIS = 2_600L
+private const val RECENT_IMPORT_HIGHLIGHT_MILLIS = 3_600L
 
 private const val ESPASS_SHARE_MIME_TYPE = "application/vnd.espass-espass+zip"
 private const val PKPASS_SHARE_MIME_TYPE = "application/vnd.apple.pkpass"

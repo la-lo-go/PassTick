@@ -1,5 +1,12 @@
 package org.ligi.passandroid.ui.compose
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
@@ -139,6 +146,7 @@ internal fun TicketFeed(
     openSwipePassId: androidx.compose.runtime.MutableState<String?>,
     tagCategories: List<PassCategory>,
     recentlyImportedIds: Set<String> = emptySet(),
+    focusPassId: String? = null,
 ) {
     val feeds = remember(passes, columns) {
         List(columns) { column -> passes.filterIndexed { index, _ -> index % columns == column } }
@@ -167,6 +175,7 @@ internal fun TicketFeed(
                     openSwipePassId = openSwipePassId,
                     tagCategories = tagCategories,
                     recentlyImportedIds = recentlyImportedIds,
+                    focusPassId = focusPassId,
                 )
             } else {
                 Spacer(Modifier.weight(1f))
@@ -201,6 +210,7 @@ private fun ReorderableTicketColumn(
     openSwipePassId: androidx.compose.runtime.MutableState<String?>,
     tagCategories: List<PassCategory>,
     recentlyImportedIds: Set<String>,
+    focusPassId: String?,
 ) {
     var visualPasses by remember { mutableStateOf(passes) }
     var measuredBounds by remember { mutableStateOf<Map<String, FeedItemBounds>>(emptyMap()) }
@@ -287,6 +297,17 @@ private fun ReorderableTicketColumn(
                     label = "reorderSiblingOffset",
                 )
                 val highlighted = pass.id in recentlyImportedIds
+                // Several imported cards arrive one after the other, top to bottom.
+                val arrivalOrder = visualPasses.filter { it.id in recentlyImportedIds }.indexOf(pass)
+                val bringIntoView = remember { BringIntoViewRequester() }
+                if (pass.id == focusPassId) {
+                    val topMargin = with(LocalDensity.current) { FOCUS_TOP_MARGIN.toPx() }
+                    LaunchedEffect(focusPassId) {
+                        // A request taller than any screen aligns its top edge, so the card lands near the top of the
+                        // list instead of at the bottom edge.
+                        bringIntoView.bringIntoView(Rect(0f, -topMargin, 1f, FOCUS_REQUEST_HEIGHT))
+                    }
+                }
                 val isDragged = pass.id == draggedId
                 val isSettling = pass.id == settlingId
                 val visualOffset = when {
@@ -300,12 +321,14 @@ private fun ReorderableTicketColumn(
                     pass = pass,
                     category = category,
                     highlighted = highlighted,
+                    arrivalOrder = arrivalOrder,
                     hero = hero,
                     sectionOrder = sectionOrder,
                     hiddenSections = hiddenSections,
                     showProtectedPassLockIcon = showProtectedPassLockIcon,
                     blurProtectedPassCards = blurProtectedPassCards,
                     modifier = Modifier.fillMaxWidth()
+                        .bringIntoViewRequester(bringIntoView)
                         .onGloballyPositioned { coordinates ->
                             if (draggedId == null) {
                                 measuredBounds = measuredBounds + (
@@ -413,6 +436,7 @@ private fun TicketSwipeContainer(
     pass: PassUiModel,
     category: PassCategory?,
     highlighted: Boolean,
+    arrivalOrder: Int,
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
@@ -633,6 +657,7 @@ private fun TicketSwipeContainer(
                 pass = pass,
                 category = category,
                 highlighted = highlighted,
+                arrivalOrder = arrivalOrder,
                 hero = hero,
                 sectionOrder = sectionOrder,
                 hiddenSections = hiddenSections,
@@ -703,6 +728,7 @@ private fun TicketRow(
     pass: PassUiModel,
     category: PassCategory?,
     highlighted: Boolean,
+    arrivalOrder: Int,
     hero: Boolean,
     sectionOrder: List<HomeCardSection>,
     hiddenSections: Set<HomeCardSection>,
@@ -722,36 +748,13 @@ private fun TicketRow(
 ) {
     val interactionSource = remember(pass.id) { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
-    val windowInfo = LocalWindowInfo.current
-    val entranceDistancePx = remember(windowInfo.containerSize) {
-        windowInfo.containerSize.width.toFloat()
-    }
-    val slideIn = remember(pass.id) { Animatable(0f) }
-    LaunchedEffect(pass.id, highlighted) {
-        if (highlighted) {
-            slideIn.snapTo(1f)
-            slideIn.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
-        } else {
-            slideIn.snapTo(0f)
-        }
-    }
-    val settleGlow by animateFloatAsState(
-        targetValue = if (highlighted) 1f else 0f,
-        animationSpec = tween(durationMillis = 900, delayMillis = 250),
-        label = "settleGlow",
-    )
+    val arrival = rememberImportArrival(pass.id, highlighted, arrivalOrder)
+    val baseColor = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer
     Surface(
-        color = if (hero) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+        color = lerp(baseColor, MaterialTheme.colorScheme.secondaryContainer, ARRIVAL_TINT * arrival.glow),
         contentColor = if (hero) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = shape,
-        border = BorderStroke(
-            2.dp * settleGlow,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f * settleGlow),
-        ),
-        modifier = modifier.fillMaxWidth().clip(shape).graphicsLayer {
-            translationX = slideIn.value * entranceDistancePx
-            alpha = 1f - slideIn.value * 0.35f
-        }.animateContentSize()
+        modifier = modifier.fillMaxWidth().importArrival(arrival).clip(shape).animateContentSize()
             .indication(interactionSource, LocalIndication.current),
     ) {
         Box {
@@ -1105,3 +1108,46 @@ private fun CategoryDot(colorArgb: Long) {
 private const val MAX_CARD_TAG_DOTS = 6
 
 private const val FULL_SWIPE_COMMIT_FRACTION = 0.62f
+
+private const val ARRIVAL_TINT = 0.45f
+private val FOCUS_TOP_MARGIN = 96.dp
+private const val FOCUS_REQUEST_HEIGHT = 1_000_000f
+private const val ARRIVAL_STAGGER_MILLIS = 90L
+private const val ARRIVAL_START_SCALE = 0.86f
+private const val ARRIVAL_TILT_DEGREES = 14f
+
+/** The arrival of an imported card: [progress] lands the card and [glow] tints it. */
+private class ImportArrival(val progress: Float, val glow: Float)
+
+/**
+ * An imported card drops into place like a ticket laid on a table: it starts smaller, tilted, and transparent, and
+ * lands with a soft bounce. Its color tint then fades back to the usual card color.
+ */
+@Composable
+private fun rememberImportArrival(passId: String, highlighted: Boolean, order: Int): ImportArrival {
+    val progress = remember(passId) { Animatable(1f) }
+    LaunchedEffect(passId, highlighted) {
+        if (!highlighted) return@LaunchedEffect
+        progress.snapTo(0f)
+        delay(order.coerceAtLeast(0) * ARRIVAL_STAGGER_MILLIS)
+        progress.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow))
+    }
+    val glow by animateFloatAsState(
+        targetValue = if (highlighted) 1f else 0f,
+        animationSpec = if (highlighted) tween(400) else tween(1_200, easing = FastOutSlowInEasing),
+        label = "importGlow",
+    )
+    return ImportArrival(progress.value, glow)
+}
+
+private fun Modifier.importArrival(arrival: ImportArrival): Modifier = graphicsLayer {
+    val landed = arrival.progress
+    val scale = ARRIVAL_START_SCALE + (1f - ARRIVAL_START_SCALE) * landed
+    scaleX = scale
+    scaleY = scale
+    alpha = landed.coerceIn(0f, 1f)
+    translationY = (1f - landed) * 40.dp.toPx()
+    rotationX = (1f - landed) * ARRIVAL_TILT_DEGREES
+    cameraDistance = 12f * density
+}
+
