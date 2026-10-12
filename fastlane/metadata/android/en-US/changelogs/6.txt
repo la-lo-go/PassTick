@@ -1,4 +1,5 @@
 - Each pass type has its own ticket layout, colored from the pass color.
+- New pass editor with folded sections. Saving keeps every code of a pass.
 - Pinch to resize a pass code, and choose which ticket part is on top.
 - Pin tags and group the All view by pinned tag.
 - Separate reminder channels with notification text that stays current.
