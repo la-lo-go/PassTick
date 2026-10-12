@@ -26,14 +26,24 @@ internal class TicketPainter(
     /** The most codes in one row. The sheet puts more codes side by side, so the ticket leaves room on the page. */
     private val codeColumns: Int = 2,
 ) {
-    fun ticket(width: Float): Block {
+    /**
+     * The upright ticket. With a [height] taller than the content, the ticket stretches to it: the code part takes the
+     * extra space and its codes grow to fill it, so the ticket uses the whole frame.
+     */
+    fun ticket(width: Float, height: Float? = null): Block {
         val inner = width - 2 * EDGE
-        val parts = listOfNotNull(detailsPart(inner), codePart(inner)).let { if (document.codeOnTop) it.reversed() else it }
+        val details = detailsPart(inner)
+        val perforationSpace = if (details != null && document.codes.isNotEmpty()) PERFORATION_HEIGHT else 0f
+        val codeSpace = height?.let { it - 2 * EDGE - (details?.height ?: 0f) - perforationSpace }
+        val codes = codePart(inner, codeSpace)
+        // Without codes, the details part takes the extra space.
+        val stretchedDetails = if (codes == null && height != null) details?.stretched(height - 2 * EDGE) else details
+        val parts = listOfNotNull(stretchedDetails, codes).let { if (document.codeOnTop) it.reversed() else it }
         val perforation = if (parts.size == 2) PERFORATION_HEIGHT else 0f
-        val height = 2 * EDGE + parts.sumOf { it.height.toDouble() }.toFloat() + perforation
+        val ticketHeight = 2 * EDGE + parts.sumOf { it.height.toDouble() }.toFloat() + perforation
         val tearLine = if (parts.size == 2) EDGE + parts[0].height + perforation / 2f else null
-        return Block(height) { left, top ->
-            withTranslation(left, top) { drawTicket(width, height, parts, tearLine, perforation) }
+        return Block(ticketHeight) { left, top ->
+            withTranslation(left, top) { drawTicket(width, ticketHeight, parts, tearLine, perforation) }
         }
     }
 
@@ -41,28 +51,32 @@ internal class TicketPainter(
      * A landscape ticket: the details on one side and the code stub on the other, with an upright perforation.
      * Null when the ticket has only one part, because a single part has no stub to separate.
      */
-    fun wideTicket(width: Float): Block? {
+    fun wideTicket(width: Float, height: Float? = null): Block? {
         if (!document.hasDetails || document.codes.isEmpty()) return null
-        val detailsWidth = width - 2 * EDGE - PERFORATION_HEIGHT - STUB_WIDTH
+        // A taller frame gets a wider stub, so its codes can grow with the height.
+        val stubWidth = stubWidth(width, height)
+        val detailsWidth = width - 2 * EDGE - PERFORATION_HEIGHT - stubWidth
         val details = detailsBlock(detailsWidth - 2 * PADDING)
+        val detailsHeight = details.height + PADDING_TOP + PADDING
+        val stubHeight = maxOf(detailsHeight, height?.let { it - 2 * EDGE } ?: 0f)
         // The stub is narrow, so it never takes more than two codes in a row.
-        val codes = codeArea(document.codes, STUB_WIDTH, minOf(codeColumns, 2))
-        val innerHeight = maxOf(details.height + PADDING_TOP + PADDING, codes.height)
-        val height = innerHeight + 2 * EDGE
+        val codes = growingCodeArea(document.codes, stubWidth, minOf(codeColumns, 2), stubHeight)
+        val innerHeight = maxOf(detailsHeight, codes.height, stubHeight)
+        val ticketHeight = innerHeight + 2 * EDGE
         // The code stub follows the pass view order: first means on the left.
-        val detailsLeft = if (document.codeOnTop) EDGE + STUB_WIDTH + PERFORATION_HEIGHT else EDGE
+        val detailsLeft = if (document.codeOnTop) EDGE + stubWidth + PERFORATION_HEIGHT else EDGE
         val codesLeft = if (document.codeOnTop) EDGE else EDGE + detailsWidth + PERFORATION_HEIGHT
-        val tear = EDGE + (if (document.codeOnTop) STUB_WIDTH else detailsWidth) + PERFORATION_HEIGHT / 2f
-        return Block(height) { left, top ->
+        val tear = EDGE + (if (document.codeOnTop) stubWidth else detailsWidth) + PERFORATION_HEIGHT / 2f
+        return Block(ticketHeight) { left, top ->
             withTranslation(left, top) {
                 // The shape is built for an upright ticket and mirrored across the diagonal, so the tear line stands up.
-                val holes = perforationHoles(height, tear)
-                drawPath(shape(RectF(0f, 0f, height, width), CORNER, tear, NOTCH, holes).transposed(), fill(colors.edge))
-                withClip(shape(RectF(EDGE, EDGE, height - EDGE, width - EDGE), CORNER - EDGE, tear, NOTCH + EDGE, holes).transposed()) {
+                val holes = perforationHoles(ticketHeight, tear)
+                drawPath(shape(RectF(0f, 0f, ticketHeight, width), CORNER, tear, NOTCH, holes).transposed(), fill(colors.edge))
+                withClip(shape(RectF(EDGE, EDGE, ticketHeight - EDGE, width - EDGE), CORNER - EDGE, tear, NOTCH + EDGE, holes).transposed()) {
                     // Each color reaches the tear line, like a paper ticket torn at its perforation.
                     val (leftColor, rightColor) = if (document.codeOnTop) Color.WHITE to colors.container else colors.container to Color.WHITE
-                    drawRect(EDGE, EDGE, tear, height - EDGE, fill(leftColor))
-                    drawRect(tear, EDGE, width - EDGE, height - EDGE, fill(rightColor))
+                    drawRect(EDGE, EDGE, tear, ticketHeight - EDGE, fill(leftColor))
+                    drawRect(tear, EDGE, width - EDGE, ticketHeight - EDGE, fill(rightColor))
                     details.draw(this, detailsLeft + PADDING, EDGE + PADDING_TOP)
                     codes.draw(this, codesLeft, EDGE + (innerHeight - codes.height) / 2f)
                 }
@@ -71,7 +85,10 @@ internal class TicketPainter(
     }
 
     /** One side of the perforation: its background color and its content. */
-    private class TicketPart(val height: Float, val color: Int, val draw: Canvas.(top: Float) -> Unit)
+    private class TicketPart(val height: Float, val color: Int, val draw: Canvas.(top: Float) -> Unit) {
+        /** The same part with at least [minHeight]. The content stays at the top. */
+        fun stretched(minHeight: Float) = TicketPart(maxOf(height, minHeight), color, draw)
+    }
 
     private fun detailsPart(width: Float): TicketPart? {
         if (!document.hasDetails) return null
@@ -79,10 +96,17 @@ internal class TicketPainter(
         return TicketPart(details.height + PADDING_TOP + PADDING, colors.container) { top -> details.draw(this, EDGE + PADDING, top + PADDING_TOP) }
     }
 
-    private fun codePart(width: Float): TicketPart? {
-        val codes = document.codes.takeIf { it.isNotEmpty() }?.let { codeArea(it, width) } ?: return null
-        return TicketPart(codes.height, Color.WHITE) { top -> codes.draw(this, EDGE, top) }
+    /** The white code part. With [space], the codes grow to fill it and stay centered in it. */
+    private fun codePart(width: Float, space: Float?): TicketPart? {
+        if (document.codes.isEmpty()) return null
+        val codes = if (space == null) codeArea(document.codes, width) else growingCodeArea(document.codes, width, codeColumns, space)
+        val height = maxOf(codes.height, space ?: 0f)
+        return TicketPart(height, Color.WHITE) { top -> codes.draw(this, EDGE, top + (height - codes.height) / 2f) }
     }
+
+    /** The code area with the largest codes that fit [height], never smaller than the usual size. */
+    private fun growingCodeArea(codes: List<DisplayableCode>, width: Float, columns: Int, height: Float): Block =
+        largestFitting(codeMaxHeight, width, height) { codeArea(codes, width, columns, it) }
 
     private fun Canvas.drawTicket(width: Float, height: Float, parts: List<TicketPart>, tearLine: Float?, perforation: Float) {
         val holes = tearLine?.let { perforationHoles(width, it) } ?: Path()
@@ -313,9 +337,9 @@ internal class TicketPainter(
         4f,
     )
 
-    private fun codeArea(codes: List<DisplayableCode>, width: Float, columns: Int = codeColumns): Block {
+    private fun codeArea(codes: List<DisplayableCode>, width: Float, columns: Int = codeColumns, maxQuadratic: Float = codeMaxHeight): Block {
         val codeWidth = width - 2 * CODE_PADDING
-        val content = codeGrid(codes, codeWidth, codeMaxHeight, CODE_GAP, columns)
+        val content = codeGrid(codes, codeWidth, maxQuadratic, CODE_GAP, columns)
         return Block(content.height + 2 * CODE_PADDING_VERTICAL) { left, top ->
             content.draw(this, left + CODE_PADDING, top + CODE_PADDING_VERTICAL)
         }
@@ -369,9 +393,18 @@ internal class TicketPainter(
         private const val CODE_MAX_HEIGHT = 264f
         const val WIDE_WIDTH = 640f
         private const val STUB_WIDTH = 250f
+        private const val STUB_HEIGHT_RATIO = 0.8f
+        private const val MAX_STUB_SHARE = 0.45f
         private val TRANSPOSE = android.graphics.Matrix().apply { setValues(floatArrayOf(0f, 1f, 0f, 1f, 0f, 0f, 0f, 0f, 1f)) }
 
         private fun Path.transposed(): Path = apply { transform(TRANSPOSE) }
+
+        /** The code stub of a landscape ticket. A taller ticket gets a wider stub, so its codes grow with the height. */
+        fun stubWidth(width: Float, height: Float?): Float =
+            height?.let { (it * STUB_HEIGHT_RATIO).coerceAtMost(width * MAX_STUB_SHARE).coerceAtLeast(STUB_WIDTH) } ?: STUB_WIDTH
+
+        /** The width that the codes of an upright ticket share. */
+        fun uprightCodeWidth(width: Float): Float = width - 2 * EDGE - 2 * CODE_PADDING
 
         /** A rounded rectangle with notches at the tear line and perforation holes cut out. */
         private fun shape(bounds: RectF, radius: Float, tearLine: Float?, notch: Float, holes: Path): Path {
@@ -399,6 +432,30 @@ internal class TicketPainter(
             }
         }
     }
+}
+
+private const val FIT_STEPS = 8
+
+/**
+ * The block from [build] with the largest size between [min] and [max] whose height fits [height]. The height must
+ * grow with the size. When even [min] does not fit, the block at [min] is returned.
+ */
+internal fun largestFitting(min: Float, max: Float, height: Float, build: (Float) -> Block): Block {
+    var best = build(min)
+    if (best.height >= height || max <= min) return best
+    var low = min
+    var high = max
+    repeat(FIT_STEPS) {
+        val size = (low + high) / 2f
+        val block = build(size)
+        if (block.height <= height) {
+            best = block
+            low = size
+        } else {
+            high = size
+        }
+    }
+    return best
 }
 
 private const val ALT_TEXT_SIZE = 13f

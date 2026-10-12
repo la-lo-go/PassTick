@@ -45,15 +45,65 @@ internal class PassExportRenderer(
         // An empty selection still draws a ticket, with the header that names the pass.
         val shown = if (document.hasDetails || document.codes.isNotEmpty()) document else document.copy(showHeader = true)
         val colors = ExportColors.of(document.accentColor, document.neutral, options.monochrome)
-        val painter = TicketPainter(shown, colors, images, locale)
         val background = if (options.opaqueBackground) BACKDROP else Color.TRANSPARENT
-        // A wide frame gets a landscape ticket. A tall ticket in a wide frame would shrink to a strip.
-        val wide = if (isWideFrame()) painter.wideTicket(TicketPainter.WIDE_WIDTH) else null
-        return if (wide != null) {
-            framed(wide, TicketPainter.WIDE_WIDTH, FRAME_MARGIN, background)
-        } else {
-            framed(painter.ticket(TicketPainter.WIDTH), TicketPainter.WIDTH, FRAME_MARGIN, background)
+        if (options.aspectRatio == PassImageAspectRatio.AUTO_HEIGHT) {
+            val ticket = TicketPainter(shown, colors, images, locale).ticket(TicketPainter.WIDTH)
+            return framed(ticket, TicketPainter.WIDTH, FRAME_MARGIN, background)
         }
+        val fit = fittedTicket(shown, colors)
+        return framed(fit.build(fit.width, fit.frameHeight), fit.width, FRAME_MARGIN, background)
+    }
+
+    /** A ticket layout for a fixed frame: its painter, layout width, and the frame height at that width. */
+    private class TicketFit(
+        val width: Float,
+        val frameHeight: Float,
+        val codeWidth: Float,
+        /** Below 1 when the content is taller than the frame and the whole ticket must shrink. */
+        val shrink: Float,
+        val build: (Float, Float?) -> Block,
+    ) {
+        /**
+         * Text and codes both shrink as the layout gets wider, and codes shrink as they share less room. The product of
+         * the two scales balances them, so neither the text nor the codes end up tiny.
+         */
+        val score: Float get() {
+            val scale = shrink / (width + 2 * FRAME_MARGIN)
+            return codeWidth * scale * scale
+        }
+    }
+
+    /**
+     * The ticket fills the frame. A wide frame takes the landscape ticket. Otherwise the upright layouts (two codes per
+     * row, or all codes in one row) compete. Each layout takes the narrowest width whose content fits the frame height,
+     * which keeps its text largest, and then stretches to the frame height. Content that never fits takes the widest
+     * layout and shrinks. The layout with the best balance of text and code size wins.
+     */
+    private fun fittedTicket(shown: PassExportDocument, colors: ExportColors): TicketFit {
+        fun frameHeight(width: Float) = (width + 2 * FRAME_MARGIN) * heightFactor() - 2 * FRAME_MARGIN
+        fun fit(widths: List<Float>, codeWidth: (Float) -> Float, build: (Float, Float?) -> Block): TicketFit {
+            val width = widths.firstOrNull { build(it, null).height <= frameHeight(it) } ?: widths.last()
+            val shrink = minOf(1f, frameHeight(width) / build(width, null).height)
+            return TicketFit(width, frameHeight(width), codeWidth(width), shrink, build)
+        }
+        val rows = if (shown.codes.size <= 2) listOf(2) else listOf(2, minOf(shown.codes.size, MAX_CODE_COLUMNS))
+        val upright = rows.map { count ->
+            val painter = TicketPainter(shown, colors, images, locale, codeColumns = count)
+            fit(UPRIGHT_TICKET_WIDTHS, { TicketPainter.uprightCodeWidth(it) / minOf(count, shown.codes.size.coerceAtLeast(1)) }) { width, height ->
+                painter.ticket(width, height)
+            }
+        }
+        val painter = TicketPainter(shown, colors, images, locale)
+        // A wide frame takes the landscape ticket: an upright ticket stretched across it leaves the code lost in white.
+        val landscape = if (!isWideFrame() || painter.wideTicket(TicketPainter.WIDE_WIDTH) == null) {
+            null
+        } else {
+            val perRow = minOf(shown.codes.size, 2)
+            fit(WIDE_TICKET_WIDTHS, { TicketPainter.stubWidth(it, frameHeight(it)) / perRow }) { width, height ->
+                painter.wideTicket(width, height)!!
+            }
+        }
+        return landscape ?: upright.maxBy { it.score }
     }
 
     private fun codePage(): ExportPage {
@@ -207,6 +257,9 @@ internal class PassExportRenderer(
         private const val BACKDROP = 0xFFF2F2F5.toInt()
         private const val MUTED = 0xFF5F5E66.toInt()
         private const val FRAME_MARGIN = 12f
+        private val UPRIGHT_TICKET_WIDTHS = (280..840 step 40).map(Int::toFloat)
+        // The landscape ticket starts at its usual width, so the details column never breaks words.
+        private val WIDE_TICKET_WIDTHS = (640..1240 step 60).map(Int::toFloat)
         private const val CODE_MARGIN = 5.4f
         private const val CODE_PADDING = 7.2f
         private const val CODE_CORNER = 14.4f

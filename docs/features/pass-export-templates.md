@@ -33,6 +33,8 @@ The export draws a white card with the fields as a plain list. The labels are fi
 - The upright ticket on a sheet puts up to four codes in one row, so a pass with many codes fits one page. The narrow stub of the landscape ticket keeps two codes per row.
 - Field selection is transient: the export screen keeps excluded field keys only for the current export. The fields show as toggle chips in a folded "Fields" section. The folded section shows the count of included fields.
 - A wide frame (a landscape ratio) gets a landscape ticket: the details on one side, the code stub on the other, and an upright perforation. A landscape sheet uses the same ticket.
+- In a fixed frame the ticket fills the frame. The layout width is the narrowest that lets the content fit the frame height, so the text stays as large as possible. Then the ticket stretches to the frame height, and the code part takes the extra space with larger codes. An upright frame tries two codes per row and all codes in one row, and keeps the layout with the best balance of text size and code size.
+- The preview shows the export canvas on a tonal surface with a hairline edge, so a change of ratio or orientation is visible with a transparent background.
 - Several square codes share a grid. The Code template selects the column count that gives the largest codes in the frame.
 - The format is a segmented single choice. Styles and content are toggle chips with a check mark.
 - The options panel uses at most half of the screen and scrolls, so the preview always stays visible.
