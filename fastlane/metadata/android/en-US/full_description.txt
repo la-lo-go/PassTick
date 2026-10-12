@@ -1,6 +1,6 @@
-PassTick is a fast, free, open source wallet for your tickets.
+PassTick is a free ticket and pass wallet for Android. Keep your boarding passes, event tickets, memberships, and loyalty cards in one place, and show the code when you need it.
 
-Keep your boarding passes, event tickets, memberships, and loyalty cards on your phone. Open the app, show the code, and go. No account, no ads, and no subscriptions. It just works at any time!
+Free forever: no account, no ads, no subscriptions, and no in-app purchases. It works at any time, even offline.
 
 ORGANIZE YOUR LIFE
 
@@ -23,9 +23,10 @@ ALWAYS READY
 
 - Your tickets live on your phone. No login, no connection, no waiting.
 - The code shows full screen at maximum brightness, so the scanner reads it on the first try.
-- Add tickets in seconds from a file, an email attachment, or the share button.
+- Add tickets in seconds from a file, an email attachment, or the share button. Open .pkpass and esPass files, or add a PDF or a photo of a ticket.
+- Back up all your tickets in one file and restore them on a new phone.
 - Private by default. No account, no ads, no trackers. Nothing is sent anywhere.
 
 FREE AND OPEN SOURCE
 
-PassTick is free software under GPL-3.0, and it stays free. It is an independent modern version of the PassAndroid project. You can read the code and help improve it at https://github.com/la-lo-go/PassTick
+PassTick is free software under GPL-3.0. It costs nothing and it stays free. It is an independent modern version of the PassAndroid project. You can read the code and help improve it at https://github.com/la-lo-go/PassTick
