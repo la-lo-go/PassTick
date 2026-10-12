@@ -1,6 +1,10 @@
 package org.ligi.passandroid.ui.state
 
 import org.threeten.bp.LocalDate
+import org.threeten.bp.LocalTime
+import org.threeten.bp.ZonedDateTime
+import org.threeten.bp.format.DateTimeFormatter
+import java.util.Locale
 
 private const val TWO_DIGIT_YEAR_BASE = 2000
 private const val MONTH_PREFIX_LENGTH = 3
@@ -57,3 +61,22 @@ fun PassFieldUiModel.repeatsDate(date: LocalDate): Boolean {
     if (!label.mentionsDate(date) && !value.mentionsDate(date)) return false
     return label.isBlank() || label.mentionsDate(date) || DATE_LABEL.containsMatchIn(label)
 }
+
+/**
+ * The ticket date. The year only appears when it is not the current one, so old and future passes stay unambiguous.
+ * An end two or more days after the start makes the label a range.
+ */
+fun ticketDateLabel(from: ZonedDateTime, to: ZonedDateTime?, locale: Locale, today: LocalDate = LocalDate.now(from.zone)): String {
+    val pattern = if (from.year == today.year) "EEE d MMM" else "EEE d MMM yyyy"
+    val day = DateTimeFormatter.ofPattern(pattern, locale)
+    val end = to?.withZoneSameInstant(from.zone)
+    return if (end != null && end.toLocalDate() != from.toLocalDate() && end.toLocalDate() != from.toLocalDate().plusDays(1)) {
+        "${from.format(day)} – ${end.format(day)}"
+    } else {
+        from.format(day)
+    }
+}
+
+/** The ticket time, or null at midnight: midnight usually means the issuer gave a day without a time. */
+fun ticketTimeLabel(from: ZonedDateTime, locale: Locale): String? =
+    from.toLocalTime().takeIf { it != LocalTime.MIDNIGHT }?.format(DateTimeFormatter.ofPattern("HH:mm", locale))

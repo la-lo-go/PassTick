@@ -54,16 +54,12 @@ import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.displayArtwork
 import org.ligi.passandroid.ui.state.PassTicketLayout
 import org.ligi.passandroid.ui.state.PassUiModel
-import org.ligi.passandroid.ui.state.fitsTicketHeader
 import org.ligi.passandroid.ui.state.gridRows
-import org.ligi.passandroid.ui.state.headerFields
-import org.ligi.passandroid.ui.state.repeatsDate
-import org.ligi.passandroid.ui.state.ticketGridFields
-import org.threeten.bp.LocalDate
-import org.threeten.bp.LocalTime
-import org.threeten.bp.ZonedDateTime
-import org.threeten.bp.format.DateTimeFormatter
-import java.util.Locale
+import org.ligi.passandroid.ui.state.issuerName
+import org.ligi.passandroid.ui.state.ticketDateLabel
+import org.ligi.passandroid.ui.state.ticketFields
+import org.ligi.passandroid.ui.state.ticketTimeLabel
+import org.ligi.passandroid.ui.state.unlessIssuer
 
 private val TicketCornerRadius = 28.dp
 private val TicketEdgeWidth = 2.dp
@@ -106,16 +102,7 @@ internal fun PassTicket(
     val colors = ticketColors(pass, layout)
     val issuer = pass.issuerName()
     val typeLabel = stringResource(getHumanCategoryString(pass.type))
-    val ticketDate = pass.calendarTimeSpan?.from?.toLocalDate()
-    // Drop fields that only repeat what the ticket already shows: the date, the issuer name, or the pass type.
-    fun PassFieldUiModel.repeatsTicket() =
-        (ticketDate != null && repeatsDate(ticketDate)) ||
-            value.equals(issuer, ignoreCase = true) ||
-            (hint == null && (value.equals(typeLabel, ignoreCase = true) || value.equals(pass.type.name, ignoreCase = true)))
-    val allHeaderFields = pass.headerFields.filterNot { it.repeatsTicket() }
-    // Header fields that do not fit next to the issuer name open the grid instead.
-    val headerFields = allHeaderFields.takeIf { layout !is PassTicketLayout.Simple && it.fitsTicketHeader() }.orEmpty()
-    val gridFields = (allHeaderFields - headerFields.toSet()) + pass.ticketGridFields(layout).filterNot { it.repeatsTicket() }
+    val (headerFields, gridFields) = pass.ticketFields(layout, typeLabel)
     // A thin edge in the pass color outlines the white code area. A white pass uses the outline color instead.
     val edgeColor = if (colors.outlined) MaterialTheme.colorScheme.outlineVariant else colors.container
     var ticketTop by remember { mutableFloatStateOf(0f) }
@@ -152,7 +139,11 @@ internal fun PassTicket(
                     is PassTicketLayout.Boarding -> {
                         Route(layout.origin, layout.destination, colors)
                         pass.calendarTimeSpan?.from?.let { from ->
-                            TonalCells(stringResource(R.string.pass_detail_ticket_date) to dateLabel(from, null), emptyList(), colors)
+                            TonalCells(
+                                stringResource(R.string.pass_detail_ticket_date) to ticketDateLabel(from, null, LocalConfiguration.current.locales[0]),
+                                emptyList(),
+                                colors,
+                            )
                         }
                     }
                     is PassTicketLayout.Event -> EventMain(pass, layout, issuer, colors)
@@ -264,11 +255,6 @@ private fun TicketHeader(
     }
 }
 
-private fun PassUiModel.issuerName() = creator?.takeIf(String::isNotBlank) ?: description
-
-// Some issuers repeat the event name as the label of the main field. The header already shows it.
-private fun String.unlessIssuer(issuer: String) = takeUnless { it.equals(issuer, ignoreCase = true) }.orEmpty()
-
 @Composable
 private fun Route(origin: PassFieldUiModel, destination: PassFieldUiModel, colors: TicketColors) {
     // Airport codes and departure times read best large. Station names need the smaller size.
@@ -321,27 +307,12 @@ private fun EventMain(pass: PassUiModel, layout: PassTicketLayout.Event, issuer:
 private fun DateCells(pass: PassUiModel, colors: TicketColors) {
     val from = pass.calendarTimeSpan?.from ?: return
     val locale = LocalConfiguration.current.locales[0]
-    // Midnight usually means the issuer gave a day without a time.
-    val time = from.toLocalTime().takeIf { it != LocalTime.MIDNIGHT }?.format(DateTimeFormatter.ofPattern("HH:mm", locale))
+    val time = ticketTimeLabel(from, locale)
     TonalCells(
-        stringResource(R.string.pass_detail_ticket_date) to dateLabel(from, pass.calendarTimeSpan?.to),
+        stringResource(R.string.pass_detail_ticket_date) to ticketDateLabel(from, pass.calendarTimeSpan?.to, locale),
         listOfNotNull(time?.let { stringResource(R.string.pass_detail_ticket_time) to it }),
         colors,
     )
-}
-
-@Composable
-private fun dateLabel(from: ZonedDateTime, to: ZonedDateTime?): String {
-    val locale = LocalConfiguration.current.locales[0]
-    // The year only appears when it is not the current one, so old and future passes stay unambiguous.
-    val pattern = if (from.year == LocalDate.now(from.zone).year) "EEE d MMM" else "EEE d MMM yyyy"
-    val day = DateTimeFormatter.ofPattern(pattern, locale)
-    val end = to?.withZoneSameInstant(from.zone)
-    return if (end != null && end.toLocalDate() != from.toLocalDate() && end.toLocalDate() != from.toLocalDate().plusDays(1)) {
-        "${from.format(day)} – ${end.format(day)}"
-    } else {
-        from.format(day)
-    }
 }
 
 /** Every row of the event ticket splits at the same point, so cells and fields line up vertically. */

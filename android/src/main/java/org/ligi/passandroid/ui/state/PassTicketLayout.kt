@@ -82,6 +82,32 @@ fun List<PassFieldUiModel>.gridRows(columns: Int): List<List<PassFieldUiModel>> 
     return rows
 }
 
+/** The issuer name in the ticket header: the creator, or the description when the pass has no creator. */
+fun PassUiModel.issuerName(): String = creator?.takeIf(String::isNotBlank) ?: description
+
+// Some issuers repeat the event name as the label of the main field. The header already shows it.
+fun String.unlessIssuer(issuer: String): String = takeUnless { it.equals(issuer, ignoreCase = true) }.orEmpty()
+
+/** The header row fields and the grid fields of a ticket. */
+data class TicketFields(val header: List<PassFieldUiModel>, val grid: List<PassFieldUiModel>)
+
+/**
+ * Splits the front fields between the header row and the grid. Fields that only repeat what the ticket already
+ * shows (the date, the issuer name, or the pass type) are dropped. Header fields that do not fit open the grid.
+ */
+fun PassUiModel.ticketFields(layout: PassTicketLayout, typeLabel: String): TicketFields {
+    val issuer = issuerName()
+    val ticketDate = calendarTimeSpan?.from?.toLocalDate()
+    fun PassFieldUiModel.repeatsTicket() =
+        (ticketDate != null && repeatsDate(ticketDate)) ||
+            value.equals(issuer, ignoreCase = true) ||
+            (hint == null && (value.equals(typeLabel, ignoreCase = true) || value.equals(type.name, ignoreCase = true)))
+    val allHeaderFields = headerFields.filterNot { it.repeatsTicket() }
+    val header = allHeaderFields.takeIf { layout !is PassTicketLayout.Simple && it.fitsTicketHeader() }.orEmpty()
+    val grid = (allHeaderFields - header.toSet()) + ticketGridFields(layout).filterNot { it.repeatsTicket() }
+    return TicketFields(header, grid)
+}
+
 /** Header fields share the row with the issuer name, so only a few short ones fit there. */
 fun List<PassFieldUiModel>.fitsTicketHeader(): Boolean =
     size <= MAX_HEADER_FIELDS && all { it.value.length <= HEADER_VALUE_LENGTH && it.label.length <= HEADER_LABEL_LENGTH }
