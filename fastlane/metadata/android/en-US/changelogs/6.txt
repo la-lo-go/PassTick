@@ -1,0 +1,6 @@
+- Each pass type has its own ticket layout, colored from the pass color.
+- Pinch to resize a pass code, and choose which ticket part is on top.
+- Pin tags and group the All view by pinned tag.
+- Separate reminder channels with notification text that stays current.
+- Deleting a pass moves it to Trash at once, and undo restores it.
+- Fixes for Apple rgb() pass colors, zoomed documents, and AMOLED cards.
