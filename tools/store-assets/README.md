@@ -15,8 +15,8 @@ The script starts the `passandroid_api37` emulator when no emulator is connected
 ## Generate the assets
 
 ```powershell
-python tools/store-assets/generate.py            # framed set into fastlane
-python tools/store-assets/generate.py --set clean  # clean set into fastlane
+uv run tools/store-assets/generate.py            # framed set into fastlane
+uv run tools/store-assets/generate.py --set clean  # clean set into fastlane
 ```
 
 The generator imports new captures from `build/screenshots-raw` into `docs/assets/screenshots` as WebP sources, renders the icon and the feature graphic, and writes both sets to `build/store-assets`. The selected set goes to `fastlane/metadata/android/en-US/images/phoneScreenshots` for Play and F-Droid.

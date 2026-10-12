@@ -1,11 +1,15 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pillow", "svglib", "reportlab", "pycairo", "rlpycairo"]
+# ///
 """Generates the store assets from the PassTick wordmark and screenshots.
 
 Imports new captures from build/screenshots-raw when the capture script has written them,
 exports the clean 2:1 set and the framed 9:16 set, and publishes one set to fastlane.
 
 Usage:
-    python tools/store-assets/generate.py [--set framed|clean]
-Requires: pillow, svglib, reportlab.
+    uv run tools/store-assets/generate.py [--set framed|clean]
+uv installs the dependencies listed in the script header.
 """
 
 from __future__ import annotations

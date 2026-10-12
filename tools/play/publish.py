@@ -7,7 +7,7 @@
 Every run validates only and discards its edit, unless it gets --upload.
 
 Usage:
-    uv run tools/play/publish.py [--track internal] [--skip-bundle] [--skip-listing] [--upload]
+    uv run tools/play/publish.py [--track alpha] [--skip-bundle] [--skip-listing] [--upload]
 uv installs the dependencies listed in the script header.
 The service account key path comes from --json-key or PASSTICK_PLAY_JSON_KEY.
 """
@@ -134,7 +134,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json-key", default=os.environ.get("PASSTICK_PLAY_JSON_KEY"))
     parser.add_argument("--package", default=PACKAGE)
-    parser.add_argument("--track", default="internal", help="internal, alpha, beta, or production")
+    parser.add_argument("--track", default="alpha", help="alpha (closed testing), internal, beta, or production")
     parser.add_argument("--skip-bundle", action="store_true")
     parser.add_argument("--skip-listing", action="store_true")
     parser.add_argument("--upload", action="store_true", help="commit the edit. Without it the edit is discarded.")
