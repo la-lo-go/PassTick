@@ -1089,7 +1089,6 @@ class PassScreensTest {
         composeRule.onNodeWithText("Note").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Pass actions").performClick()
         composeRule.onNodeWithText("Edit note").assertDoesNotExist()
-        composeRule.onNodeWithText("Remove note").assertDoesNotExist()
         composeRule.onNodeWithText("Add note").assertIsDisplayed()
     }
 
@@ -1110,7 +1109,7 @@ class PassScreensTest {
     }
 
     @Test
-    fun notesOverflowCanRemoveTheNote() {
+    fun noteDialogCanDeleteTheNote() {
         val actions = mutableListOf<PassDetailAction>()
         val notedPass = pass("one", "Boarding pass", PassType.BOARDING).copy(notes = "Gate opens at 6")
         composeRule.setContent {
@@ -1118,9 +1117,61 @@ class PassScreensTest {
         }
 
         composeRule.onNodeWithContentDescription("Pass actions").performClick()
-        composeRule.onNodeWithText("Remove note").performClick()
+        composeRule.onNodeWithText("Add note").assertDoesNotExist()
+        composeRule.onNodeWithText("Edit pass").assertIsDisplayed()
+        composeRule.onNodeWithText("Gate opens at 6").performClick()
+        composeRule.onNodeWithText("Delete note").performClick()
 
         assertThat(actions).containsExactly(PassDetailAction.SetNotes(""))
+    }
+
+    @Test
+    fun passActionsOpenTheEditor() {
+        val actions = mutableListOf<PassDetailAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add)
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Edit pass").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Edit pass").performClick()
+
+        assertThat(actions).containsExactly(PassDetailAction.Edit)
+    }
+
+    @Test
+    fun passActionsLeaveSharingToTheQuickActions() {
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = {})
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Share pass").assertDoesNotExist()
+        composeRule.onNodeWithText("Configure reminder").assertDoesNotExist()
+        composeRule.onNodeWithText("Save code").assertDoesNotExist()
+    }
+
+    @Test
+    fun passActionsOfferSharingWhenTheQuickActionsAreHidden() {
+        val actions = mutableListOf<PassDetailAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) {
+                PassDetailScreen(
+                    pass("one", "Boarding pass", PassType.BOARDING),
+                    hiddenPassDetailSections = setOf(org.ligi.passandroid.repository.PassDetailSection.ACTIONS),
+                    onAction = actions::add,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Pass actions").performClick()
+        composeRule.onNodeWithText("Share pass").performClick()
+
+        assertThat(actions).containsExactly(PassDetailAction.Share)
     }
 
     @Test

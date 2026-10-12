@@ -542,12 +542,6 @@ fun PassTickApp(
                 exportPassLauncher.launch(exportFileName(description))
             }
             PassDetailAction.OpenImageExport -> backStack.add(AppDestination.ExportImage(passId))
-            PassDetailAction.SaveBarcodeImage -> {
-                state.passes.firstOrNull { it.id == passId }?.let { pass ->
-                    val options = state.settings.imageExport.optionsFor(PassExportTemplate.CODE).copy(format = PassExportFormat.PNG)
-                    saveExport(pass, PassExportRequest(PassExportTemplate.CODE, options), returnToPass = false)
-                }
-            }
             PassDetailAction.AddToCalendar -> {
                 if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
                     viewModel.onAction(AppAction.AddToCalendar(passId))

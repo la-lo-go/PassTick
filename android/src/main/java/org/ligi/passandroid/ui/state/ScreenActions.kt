@@ -17,7 +17,6 @@ sealed interface PassDetailAction {
     data object Share : PassDetailAction
     data object Export : PassDetailAction
     data object OpenImageExport : PassDetailAction
-    data object SaveBarcodeImage : PassDetailAction
     data object AddToCalendar : PassDetailAction
     data object OpenReminderSettings : PassDetailAction
     data object OpenPassViewSettings : PassDetailAction

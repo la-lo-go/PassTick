@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.AddAlert
 import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.ui.graphics.Shape
 import androidx.annotation.StringRes
 import androidx.compose.ui.text.style.TextAlign
@@ -255,6 +254,8 @@ fun PassDetailScreen(
             },
         )
     }
+    val quickActionsVisible = PassDetailSection.ACTIONS in passDetailSectionOrder &&
+        PassDetailSection.ACTIONS !in hiddenPassDetailSections
     if (editNotesDialog) {
         var noteDraft by remember(pass?.id) { mutableStateOf(pass?.notes.orEmpty()) }
         AlertDialog(
@@ -275,7 +276,15 @@ fun PassDetailScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { editNotesDialog = false }) { Text(stringResource(R.string.pass_detail_cancel)) }
+                Row {
+                    // The overflow menu has no remove entry, so an existing note is deleted here.
+                    if (!pass?.notes.isNullOrBlank()) {
+                        TextButton(onClick = { editNotesDialog = false; onAction(PassDetailAction.SetNotes("")) }) {
+                            Text(stringResource(R.string.pass_detail_delete_note))
+                        }
+                    }
+                    TextButton(onClick = { editNotesDialog = false }) { Text(stringResource(R.string.pass_detail_cancel)) }
+                }
             },
         )
     }
@@ -295,82 +304,65 @@ fun PassDetailScreen(
                             Icon(Icons.Default.MoreVert, stringResource(R.string.pass_detail_pass_actions))
                         }
                         DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                            fun close() { overflowOpen = false }
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_share_pass)) },
-                                leadingIcon = { Icon(Icons.Default.Share, null) },
-                                onClick = { overflowOpen = false; onAction(PassDetailAction.Share) },
+                                text = { Text(stringResource(R.string.pass_detail_edit_pass)) },
+                                leadingIcon = { Icon(Icons.Default.Edit, null) },
+                                onClick = { close(); onAction(PassDetailAction.Edit) },
                             )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_export_as_image)) },
-                                leadingIcon = { Icon(Icons.Default.Image, null) },
-                                onClick = { overflowOpen = false; onAction(PassDetailAction.OpenImageExport) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_save_pass_file)) },
-                                leadingIcon = { Icon(Icons.Default.SaveAlt, null) },
-                                onClick = { overflowOpen = false; onAction(PassDetailAction.Export) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_save_code)) },
-                                leadingIcon = { Icon(Icons.Default.QrCode, null) },
-                                enabled = pass?.hasDisplayableCode() == true,
-                                onClick = { overflowOpen = false; onAction(PassDetailAction.SaveBarcodeImage) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_duplicate)) },
-                                leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
-                                enabled = pass != null,
-                                onClick = { overflowOpen = false; onAction(PassDetailAction.Duplicate) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_customize_pass)) },
-                                leadingIcon = { Icon(Icons.Default.Visibility, null) },
-                                onClick = {
-                                    overflowOpen = false
-                                    onAction(PassDetailAction.OpenPassCustomization)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_configure_reminder)) },
-                                leadingIcon = { Icon(Icons.Default.Notifications, null) },
-                                enabled = pass != null,
-                                onClick = {
-                                    overflowOpen = false
-                                    if (remindersGloballyEnabled) {
-                                        configureReminder = true
-                                    } else {
-                                        onAction(PassDetailAction.OpenReminderSettings)
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_manage_tags)) },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
-                                onClick = {
-                                    overflowOpen = false
-                                    tagMenuOpen = true
-                                },
-                            )
+                            // An existing note opens its own dialog from the note card, so only a missing note needs an entry.
                             if (pass?.notes.isNullOrBlank()) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.pass_detail_add_note)) },
                                     leadingIcon = { Icon(Icons.Default.EditNote, null) },
-                                    onClick = {
-                                        overflowOpen = false
-                                        editNotesDialog = true
-                                    },
+                                    onClick = { close(); editNotesDialog = true },
                                 )
                             }
-                            if (!pass?.notes.isNullOrBlank()) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_manage_tags)) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
+                                onClick = { close(); tagMenuOpen = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_customize_pass)) },
+                                leadingIcon = { Icon(Icons.Default.Visibility, null) },
+                                onClick = { close(); onAction(PassDetailAction.OpenPassCustomization) },
+                            )
+                            HorizontalDivider()
+                            // The quick action buttons offer sharing and reminders. A pass view without them keeps both here.
+                            if (!quickActionsVisible) {
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.pass_detail_remove_note)) },
-                                    leadingIcon = { Icon(Icons.Default.DeleteOutline, null) },
-                                    onClick = {
-                                        overflowOpen = false
-                                        onAction(PassDetailAction.SetNotes(""))
-                                    },
+                                    text = { Text(stringResource(R.string.pass_detail_share_pass)) },
+                                    leadingIcon = { Icon(Icons.Default.Share, null) },
+                                    onClick = { close(); onAction(PassDetailAction.Share) },
                                 )
+                                if (pass?.calendarEvent != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.pass_detail_configure_reminder)) },
+                                        leadingIcon = { Icon(Icons.Default.Notifications, null) },
+                                        onClick = {
+                                            close()
+                                            if (remindersGloballyEnabled) configureReminder = true else onAction(PassDetailAction.OpenReminderSettings)
+                                        },
+                                    )
+                                }
                             }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_export_as_image)) },
+                                leadingIcon = { Icon(Icons.Default.Image, null) },
+                                onClick = { close(); onAction(PassDetailAction.OpenImageExport) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_save_pass_file)) },
+                                leadingIcon = { Icon(Icons.Default.SaveAlt, null) },
+                                onClick = { close(); onAction(PassDetailAction.Export) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.pass_detail_duplicate)) },
+                                leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
+                                onClick = { close(); onAction(PassDetailAction.Duplicate) },
+                            )
+                            HorizontalDivider()
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -389,38 +381,22 @@ fun PassDetailScreen(
                                     )
                                 },
                                 enabled = !allPassesProtected,
-                                onClick = {
-                                    overflowOpen = false
-                                    onAction(PassDetailAction.SetProtected(pass?.isProtected != true))
-                                },
+                                onClick = { close(); onAction(PassDetailAction.SetProtected(pass?.isProtected != true)) },
                             )
                             DropdownMenuItem(
                                 text = {
-                                    Text(
-                                        stringResource(
-                                            if (pass?.isArchived == true) R.string.home_restore else R.string.home_archive,
-                                        ),
-                                    )
+                                    Text(stringResource(if (pass?.isArchived == true) R.string.home_restore else R.string.home_archive))
                                 },
                                 leadingIcon = {
-                                    Icon(
-                                        if (pass?.isArchived == true) Icons.Default.Restore else Icons.Default.Archive,
-                                        null,
-                                    )
+                                    Icon(if (pass?.isArchived == true) Icons.Default.Restore else Icons.Default.Archive, null)
                                 },
-                                enabled = pass != null,
-                                onClick = {
-                                    overflowOpen = false
-                                    onAction(PassDetailAction.SetArchived(pass?.isArchived != true))
-                                },
+                                onClick = { close(); onAction(PassDetailAction.SetArchived(pass?.isArchived != true)) },
                             )
+                            HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.pass_detail_delete_pass)) },
-                                leadingIcon = { Icon(Icons.Default.Delete, null) },
-                                onClick = {
-                                    overflowOpen = false
-                                    onAction(PassDetailAction.Delete)
-                                },
+                                text = { Text(stringResource(R.string.pass_detail_delete_pass), color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                                onClick = { close(); onAction(PassDetailAction.Delete) },
                             )
                         }
                         DropdownMenu(expanded = tagMenuOpen, onDismissRequest = { tagMenuOpen = false }) {
@@ -455,13 +431,6 @@ fun PassDetailScreen(
                     }
                 },
             )
-        },
-        floatingActionButton = {
-            if (pass != null) {
-                FloatingActionButton(onClick = { onAction(PassDetailAction.Edit) }) {
-                    Icon(Icons.Default.Edit, stringResource(R.string.pass_detail_edit_pass))
-                }
-            }
         },
     ) { padding ->
         if (pass == null) {

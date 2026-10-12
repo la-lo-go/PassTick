@@ -19,13 +19,13 @@ class MainActivityRecoveryTest {
         composeRule.waitUntilAtLeastOneExists(hasText("Recovery pass"), timeoutMillis = 15_000)
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Recovery pass").performClick()
-        composeRule.onNodeWithContentDescription("Edit pass").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Pass actions").assertIsDisplayed()
 
         composeRule.activityRule.scenario.recreate()
 
         composeRule.waitForIdle()
         composeRule.waitUntilAtLeastOneExists(hasText("Recovery pass"), timeoutMillis = 15_000)
-        composeRule.onNodeWithContentDescription("Edit pass").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Pass actions").assertIsDisplayed()
         composeRule.onNodeWithText("Recovery pass").assertIsDisplayed()
     }
 }

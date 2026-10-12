@@ -75,7 +75,7 @@ class HomeScrollAfterDetailTest {
     }
 
     private fun detailNodes(): Int =
-        composeRule.onAllNodesWithContentDescription("Edit pass").fetchSemanticsNodes().size
+        composeRule.onAllNodesWithContentDescription("Pass actions").fetchSemanticsNodes().size
 
     private fun visibleCards(): List<String> =
         (1..30).mapNotNull { index ->

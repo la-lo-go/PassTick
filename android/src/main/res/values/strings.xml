@@ -49,7 +49,6 @@
     <string name="pass_detail_end">End</string>
     <string name="pass_detail_export_as_image">Export as image</string>
     <string name="pass_detail_save_pass_file">Save pass file</string>
-    <string name="pass_detail_save_code">Save code</string>
     <string name="pass_detail_customize_pass">Customize pass</string>
     <string name="pass_detail_configure_reminder">Configure reminder</string>
     <string name="pass_detail_manage_tags">Manage tags</string>
@@ -71,7 +70,7 @@
         <item quantity="other">%d fields from the back of the pass</item>
     </plurals>
     <string name="pass_detail_add_note">Add note</string>
-    <string name="pass_detail_remove_note">Remove note</string>
+    <string name="pass_detail_delete_note">Delete note</string>
     <string name="pass_detail_save_note">Save note</string>
     <string name="pass_detail_no_barcode">No barcode</string>
     <string name="pass_detail_code_page">Code %1$d of %2$d</string>
