@@ -36,6 +36,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import org.junit.Rule
 import org.junit.Test
+import androidx.compose.ui.test.hasSetTextAction
+import org.ligi.passandroid.ui.state.PassBarcodeUiModel
 import org.ligi.passandroid.BuildConfig
 import org.ligi.passandroid.repository.AppSettings
 import org.ligi.passandroid.repository.ThemeMode
@@ -467,46 +469,98 @@ class PassScreensTest {
     }
 
     @Test
-    fun editorExposesPassFieldsAndBarcodeWithoutArtworkControls() {
+    fun editorSummarizesEverySectionAndOpensOneAtATime() {
         val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
-            barcodeFormat = PassBarCodeFormat.QR_CODE,
-            barcodeMessage = "payload",
-            fields = listOf(PassFieldUiModel("gate", "Gate", "A12", false, null)),
+            barcodes = (1..4).map { PassBarcodeUiModel(PassBarCodeFormat.QR_CODE, "code-$it", null) },
+            fields = listOf(
+                PassFieldUiModel("gate", "Gate", "A12", false, "secondaryFields"),
+                PassFieldUiModel("terms", "Terms", "No refunds", true, "backFields"),
+            ),
         )
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass, onAction = {}) }
         }
 
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(1)
-        composeRule.onNodeWithText("Code").performClick()
-        composeRule.onNodeWithText("Barcode: QR CODE").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(2)
-        composeRule.onNodeWithText("Images").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(5)
-        composeRule.onNodeWithText("Artwork").assertDoesNotExist()
+        composeRule.onNodeWithText("4 codes").assertIsDisplayed()
+        composeRule.onNodeWithText("1 on the ticket · 1 on the back").performClick()
         composeRule.onNodeWithText("Gate").assertIsDisplayed()
-        composeRule.onNodeWithText("Add field").assertIsDisplayed()
+        composeRule.onNodeWithText("Codes").performClick()
+        composeRule.onNodeWithText("Gate").assertDoesNotExist()
+        composeRule.onAllNodesWithContentDescription("Remove code").assertCountEquals(4)
     }
 
     @Test
-    fun createEditorShowsNewPassTitleAndCollapsedImagesSection() {
+    fun editorKeepsEveryCodeWhenItSaves() {
+        val actions = mutableListOf<EditPassAction>()
+        val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
+            barcodes = (1..4).map { PassBarcodeUiModel(PassBarCodeFormat.QR_CODE, "code-$it", "Ticket $it") },
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass, onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithText("Basics").performClick()
+        composeRule.onAllNodes(hasSetTextAction())[0].performTextInput(" 2")
+        composeRule.onNodeWithContentDescription("Save and go back").performClick()
+
+        val saved = (actions.single() as EditPassAction.Save).draft
+        assertThat(saved.codes.map { it.message }).containsExactly("code-1", "code-2", "code-3", "code-4")
+        assertThat(saved.codes.map { it.alternativeText }).containsExactly("Ticket 1", "Ticket 2", "Ticket 3", "Ticket 4")
+    }
+
+    @Test
+    fun editorMovesAFieldToAnotherSlot() {
+        val actions = mutableListOf<EditPassAction>()
+        val pass = pass("one", "Boarding pass", PassType.BOARDING).copy(
+            fields = listOf(PassFieldUiModel("gate", "Gate", "A12", false, "secondaryFields")),
+        )
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass, onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithText("Fields").performClick()
+        composeRule.onNodeWithText("Gate").performClick()
+        composeRule.onNodeWithText("Back").performClick()
+        composeRule.onNodeWithContentDescription("Save and go back").performClick()
+
+        val field = (actions.single() as EditPassAction.Save).draft.fields.single()
+        assertThat(field.hidden).isTrue()
+        assertThat(field.hint).isEqualTo("backFields")
+    }
+
+    @Test
+    fun editorOpensTheSectionWithTheError() {
+        val actions = mutableListOf<EditPassAction>()
+        composeRule.setContent {
+            PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass("one", "Boarding pass", PassType.BOARDING), onAction = actions::add) }
+        }
+
+        composeRule.onNodeWithText("Codes").performClick()
+        composeRule.onNodeWithText("Add code").performClick()
+        composeRule.onNodeWithContentDescription("Save and go back").performClick()
+
+        assertThat(actions).isEmpty()
+        composeRule.onNodeWithText("Add the code data or remove the code.").assertIsDisplayed()
+    }
+
+    @Test
+    fun createEditorShowsNewPassTitleAndOpensBasics() {
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass = null, onAction = {}) }
         }
 
         composeRule.onNodeWithText("New pass").assertIsDisplayed()
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(2)
-        composeRule.onNodeWithText("Images").assertIsDisplayed()
+        composeRule.onNodeWithText("Name").assertIsDisplayed()
     }
 
     @Test
-    fun createEditorRejectsAnEmptyDescription() {
+    fun createEditorRejectsAnEmptyName() {
         val actions = mutableListOf<EditPassAction>()
         composeRule.setContent {
             PassTheme(ThemeMode.LIGHT) { EditPassScreen(pass = null, onAction = actions::add) }
         }
 
-        composeRule.onNodeWithTag("edit_pass_list").performScrollToIndex(6)
+        composeRule.onNodeWithTag("edit_pass_list").performScrollToNode(hasText("Save and close"))
         composeRule.onNodeWithText("Save and close").performClick()
 
         assertThat(actions).isEmpty()

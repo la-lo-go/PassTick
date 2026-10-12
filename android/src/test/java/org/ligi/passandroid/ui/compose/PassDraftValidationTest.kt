@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.ligi.passandroid.model.pass.PassBarCodeFormat
 import org.ligi.passandroid.model.pass.PassType
+import org.ligi.passandroid.ui.state.PassCodeDraft
 import org.ligi.passandroid.ui.state.PassDraft
 import org.ligi.passandroid.ui.state.PassFieldUiModel
 import org.ligi.passandroid.ui.state.PassLocationDraft
@@ -24,7 +25,7 @@ class PassDraftValidationTest {
 
     @Test
     fun `rejects a barcode format without data`() {
-        val draft = validDraft().copy(barcodeFormat = PassBarCodeFormat.QR_CODE, barcodeMessage = "")
+        val draft = validDraft().copy(codes = listOf(PassCodeDraft(PassBarCodeFormat.QR_CODE, "ok"), PassCodeDraft(PassBarCodeFormat.QR_CODE, "")))
 
         assertThat(validatePassDraft(draft)).isEqualTo(PassDraftIssue.BARCODE_MISSING)
     }
@@ -98,9 +99,6 @@ class PassDraftValidationTest {
         creator = "Rail operator",
         type = PassType.EVENT,
         accentColor = 0xFF2859C5.toInt(),
-        barcodeFormat = null,
-        barcodeMessage = "",
-        barcodeAlternativeText = "",
         fields = emptyList(),
     )
 }

@@ -127,11 +127,12 @@ data class PassUpdate(
     val creator: String,
     val type: PassType,
     val accentColor: Int,
-    val barcodeFormat: PassBarCodeFormat?,
-    val barcodeMessage: String,
-    val barcodeAlternativeText: String,
     val fields: List<PassFieldSnapshot>,
+    /** Every code of the pass, in display order. */
+    val codes: List<PassBarcodeSnapshot> = emptyList(),
     val artworkUpdates: List<PassArtworkUpdate> = emptyList(),
+    /** Image kinds to delete. A replacement of the same kind wins over its removal. */
+    val artworkRemovals: Set<PassArtworkKind> = emptySet(),
     val calendarTimeSpan: PassTimeSpanSnapshot? = null,
     val locations: List<PassLocationSnapshot> = emptyList(),
 )
@@ -415,6 +416,7 @@ class FilePassRepository(
             ?: error("Pass not found")
         applyUpdate(pass, update)
         passStore.save(pass)
+        removeArtwork(id, update.artworkRemovals - update.artworkUpdates.map(PassArtworkUpdate::kind).toSet())
         writeArtwork(id, update.artworkUpdates)
         passStore.notifyChange()
     }
@@ -550,13 +552,15 @@ class FilePassRepository(
                 lon = location.longitude
             }
         }
-        pass.barCode = update.barcodeFormat?.let { format ->
-            org.ligi.passandroid.model.pass.BarCode(format, update.barcodeMessage).apply {
-                alternativeText = update.barcodeAlternativeText.ifBlank { null }
+        // The first code is the legacy single code; the others follow it, like an imported pass stores them.
+        val codes = update.codes.mapNotNull { code ->
+            val format = code.format ?: return@mapNotNull null
+            org.ligi.passandroid.model.pass.BarCode(format, code.message.orEmpty()).apply {
+                alternativeText = code.alternativeText?.ifBlank { null }
             }
         }
-        // The editor manages a single code; imported extra codes would otherwise stay stale.
-        pass.barCodes = mutableListOf()
+        pass.barCode = codes.firstOrNull()
+        pass.barCodes = codes.drop(1).toMutableList()
     }
 
     private fun writeArtwork(id: String, updates: List<PassArtworkUpdate>) {
@@ -574,6 +578,11 @@ class FilePassRepository(
             File(directory, artwork.kind.fileName + PassImpl.FILETYPE_IMAGES)
                 .writeBytes(DocumentImportProcessor.encodePng(bitmap))
         }
+    }
+
+    private fun removeArtwork(id: String, kinds: Set<PassArtworkKind>) {
+        val directory = passStore.getPathForID(id)
+        kinds.forEach { kind -> staleArtworkFiles(directory, kind).forEach(File::delete) }
     }
 
     private fun staleArtworkFiles(directory: File, kind: PassArtworkKind): List<File> =

@@ -1117,13 +1117,12 @@ private fun PassDraft.toPassUpdate(): PassUpdate {
     creator = creator,
     type = type,
     accentColor = accentColor,
-    barcodeFormat = barcodeFormat,
-    barcodeMessage = barcodeMessage,
-    barcodeAlternativeText = barcodeAlternativeText,
     fields = fields.map {
         org.ligi.passandroid.repository.PassFieldSnapshot(it.key, it.label, it.value, it.hidden, it.hint)
     },
+    codes = codes.map { org.ligi.passandroid.repository.PassBarcodeSnapshot(it.format, it.message, it.alternativeText) },
     artworkUpdates = artworkUpdates.map { PassArtworkUpdate(it.kind, it.uri) },
+    artworkRemovals = artworkRemovals,
     calendarTimeSpan = toTimeSpan(),
     locations = locations.map { location ->
         PassLocationSnapshot(

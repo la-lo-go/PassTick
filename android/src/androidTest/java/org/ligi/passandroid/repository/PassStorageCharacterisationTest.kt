@@ -100,9 +100,6 @@ class PassStorageCharacterisationTest {
         creator = "Issuer",
         type = PassType.EVENT,
         accentColor = 0,
-        barcodeFormat = null,
-        barcodeMessage = "",
-        barcodeAlternativeText = "",
         fields = emptyList(),
         artworkUpdates = artworkUpdates,
     )

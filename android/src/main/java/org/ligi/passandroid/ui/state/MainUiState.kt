@@ -201,16 +201,18 @@ fun PassLocationUiModel.toPlatformLocation() = PlatformLocation(
     longitude = longitude.takeUnless { latitude == 0.0 && it == 0.0 && !name.isNullOrBlank() },
 )
 
+/** One code in the editor. The data may be blank while the user types; validation rejects a blank code. */
+data class PassCodeDraft(val format: PassBarCodeFormat, val message: String, val alternativeText: String = "")
+
 data class PassDraft(
     val description: String,
     val creator: String,
     val type: PassType,
     val accentColor: Int,
-    val barcodeFormat: PassBarCodeFormat?,
-    val barcodeMessage: String,
-    val barcodeAlternativeText: String,
     val fields: List<PassFieldUiModel>,
+    val codes: List<PassCodeDraft> = emptyList(),
     val artworkUpdates: List<PassArtworkDraft> = emptyList(),
+    val artworkRemovals: Set<PassArtworkKind> = emptySet(),
     val calendarStart: String = "",
     val calendarEnd: String = "",
     val locations: List<PassLocationDraft> = emptyList(),
