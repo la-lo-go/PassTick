@@ -66,6 +66,18 @@ class ImageExportOptionsTest {
     }
 
     @Test
+    fun `a stored sixteen by nine ratio becomes nine by sixteen with the same orientation`() {
+        listOf(PassImageOrientation.PORTRAIT, PassImageOrientation.LANDSCAPE).forEach { orientation ->
+            val stored = StoredPassExportOptions("RATIO_16_9", orientation.name, null, null)
+
+            val decoded = decodePassExportOptions(PassExportTemplate.TICKET, stored)
+
+            assertThat(decoded.aspectRatio).isEqualTo(PassImageAspectRatio.RATIO_9_16)
+            assertThat(decoded.orientation).isEqualTo(orientation)
+        }
+    }
+
+    @Test
     fun `unknown stored values fall back to the defaults`() {
         val stored = StoredPassExportOptions("HUGE", "DIAGONAL", null, setOf("unknown"))
 
@@ -100,7 +112,7 @@ class ImageExportOptionsTest {
 
     @Test
     fun `orientation applies only to fixed ratios that are not square`() {
-        assertThat(PassExportTemplate.TICKET.hasOrientation(PassImageAspectRatio.RATIO_16_9)).isTrue()
+        assertThat(PassExportTemplate.TICKET.hasOrientation(PassImageAspectRatio.RATIO_9_16)).isTrue()
         assertThat(PassExportTemplate.TICKET.hasOrientation(PassImageAspectRatio.AUTO_HEIGHT)).isFalse()
         assertThat(PassExportTemplate.TICKET.hasOrientation(PassImageAspectRatio.SQUARE)).isFalse()
         assertThat(PassExportTemplate.STORY.hasOrientation(PassImageAspectRatio.RATIO_9_16)).isFalse()

@@ -33,7 +33,8 @@ The export draws a white card with the fields as a plain list. The labels are fi
 - The upright ticket on a sheet puts up to four codes in one row, so a pass with many codes fits one page. The narrow stub of the landscape ticket keeps two codes per row.
 - Field selection is transient: the export screen keeps excluded field keys only for the current export. The fields show as toggle chips in a folded "Fields" section. The folded section shows the count of included fields.
 - A wide frame (a landscape ratio) gets a landscape ticket: the details on one side, the code stub on the other, and an upright perforation. A landscape sheet uses the same ticket.
-- In a fixed frame the ticket fills the frame. The layout width is the narrowest that lets the content fit the frame height, so the text stays as large as possible. Then the ticket stretches to the frame height, and the code part takes the extra space with larger codes. An upright frame tries two codes per row and all codes in one row, and keeps the layout with the best balance of text size and code size.
+- In a fixed frame the ticket fills the frame. The layout width is the narrowest that lets the content fit the frame height, so the text stays as large as possible. Then the ticket stretches to the frame height, and the code part takes the extra space with larger codes. An upright frame tries two codes per row and all codes in one row. It keeps the layout with the best balance of text size and code size, and the text size counts twice. A layout whose codes are smaller than 17 % of the frame size is not used.
+- The Ticket template has no 16:9 choice. Orientation selects the long side, so 9:16 in landscape is 16:9. A stored 16:9 value decodes to 9:16 with the same orientation.
 - The preview shows the export canvas on a tonal surface with a hairline edge, so a change of ratio or orientation is visible with a transparent background.
 - Several square codes share a grid. The Code template selects the column count that gives the largest codes in the frame.
 - The format is a segmented single choice. Styles and content are toggle chips with a check mark.
@@ -42,7 +43,7 @@ The export draws a white card with the fields as a plain list. The labels are fi
 
 ## Preserved behavior
 
-- Ratios Auto, 1:1, 4:5, 3:4, 9:16, 16:9, and A4, with portrait and landscape.
+- Ratios Auto, 1:1, 4:5, 3:4, 9:16, and A4, with portrait and landscape. A landscape 9:16 is the former 16:9.
 - Content toggles: artwork, details, notes, code, date, location, and hidden fields. A toggle shows only when the pass has the data.
 - PNG to `Pictures/PassTick`, with clean-up when the write fails. Share through FileProvider. Print through the system dialog.
 - Zoomable preview with a loading indicator.

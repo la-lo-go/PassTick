@@ -146,12 +146,12 @@ class PassImageExporterTest {
     }
 
     @Test
-    fun landscapeFlipsSixteenNineToWiderThanTall() {
+    fun landscapeTurnsNineSixteenWiderThanTall() {
         val landscape = render(
-            request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.RATIO_16_9, orientation = PassImageOrientation.LANDSCAPE)),
+            request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.RATIO_9_16, orientation = PassImageOrientation.LANDSCAPE)),
         )
         val portrait = render(
-            request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.RATIO_16_9, orientation = PassImageOrientation.PORTRAIT)),
+            request(options = PassImageExportOptions(aspectRatio = PassImageAspectRatio.RATIO_9_16, orientation = PassImageOrientation.PORTRAIT)),
         )
         assertThat(landscape.width).isGreaterThan(landscape.height)
         assertThat(portrait.height).isGreaterThan(portrait.width)

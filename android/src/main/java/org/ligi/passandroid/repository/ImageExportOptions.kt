@@ -31,7 +31,6 @@ enum class PassExportTemplate(
             PassImageAspectRatio.RATIO_4_5,
             PassImageAspectRatio.RATIO_3_4,
             PassImageAspectRatio.RATIO_9_16,
-            PassImageAspectRatio.RATIO_16_9,
             PassImageAspectRatio.A4,
         ),
         PassExportContent.entries.toSet(),
@@ -195,6 +194,8 @@ internal fun decodePassExportOptions(template: PassExportTemplate, stored: Store
     val defaults = template.defaultOptions
     val ratio = stored.aspectRatio
         ?.let { runCatching { PassImageAspectRatio.valueOf(it) }.getOrNull() }
+        // Orientation selects the long side, so 16:9 is the same shape as 9:16 and only 9:16 stays a choice.
+        ?.let { if (it == PassImageAspectRatio.RATIO_16_9) PassImageAspectRatio.RATIO_9_16 else it }
         ?.takeIf { it in template.aspectRatios }
         ?: defaults.aspectRatio
     val orientation = stored.orientation?.let { runCatching { PassImageOrientation.valueOf(it) }.getOrNull() } ?: defaults.orientation

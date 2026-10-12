@@ -65,11 +65,19 @@ internal class PassExportRenderer(
     ) {
         /**
          * Text and codes both shrink as the layout gets wider, and codes shrink as they share less room. The product of
-         * the two scales balances them, so neither the text nor the codes end up tiny.
+         * the scales balances them, so neither the text nor the codes end up tiny.
          */
         val score: Float get() {
             val scale = shrink / (width + 2 * FRAME_MARGIN)
-            return codeWidth * scale * scale
+            // The text scale counts twice: a pass reads badly with tiny text. The code share keeps the codes scannable.
+            return codeWidth * scale * scale * scale
+        }
+
+        /** The code width per code against the frame size, the square root of the frame area. */
+        val codeShare: Float get() {
+            val frameWidth = width + 2 * FRAME_MARGIN
+            val frameArea = frameWidth * (frameHeight + 2 * FRAME_MARGIN)
+            return codeWidth * shrink / kotlin.math.sqrt(frameArea)
         }
     }
 
@@ -103,7 +111,7 @@ internal class PassExportRenderer(
                 painter.wideTicket(width, height)!!
             }
         }
-        return landscape ?: upright.maxBy { it.score }
+        return landscape ?: upright.filter { it.codeShare >= MIN_CODE_SHARE }.ifEmpty { upright }.maxBy { it.score }
     }
 
     private fun codePage(): ExportPage {
@@ -257,6 +265,8 @@ internal class PassExportRenderer(
         private const val BACKDROP = 0xFFF2F2F5.toInt()
         private const val MUTED = 0xFF5F5E66.toInt()
         private const val FRAME_MARGIN = 12f
+        // Below this share of the frame size, codes in a long row get too small to scan from a screen.
+        private const val MIN_CODE_SHARE = 0.17f
         private val UPRIGHT_TICKET_WIDTHS = (280..840 step 40).map(Int::toFloat)
         // The landscape ticket starts at its usual width, so the details column never breaks words.
         private val WIDE_TICKET_WIDTHS = (640..1240 step 60).map(Int::toFloat)
