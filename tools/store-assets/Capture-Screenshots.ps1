@@ -74,7 +74,8 @@ if ($LASTEXITCODE -ne 0) { throw "Could not install the app on $target." }
 if ($LASTEXITCODE -ne 0) { throw "Could not install the test app on $target." }
 
 & $adb -s $target shell "settings put system system_locales en-US" | Out-Null
-& $adb -s $target shell "setprop persist.sys.timezone Europe/Madrid" | Out-Null
+# Emulators without root reject this property. The emulator launch option already sets the time zone.
+try { & $adb -s $target shell "setprop persist.sys.timezone Europe/Madrid" 2>$null | Out-Null } catch { }
 & $adb -s $target shell "rm -rf /sdcard/Android/data/$packageName/files/screenshots" | Out-Null
 
 # The capture test hides the navigation bar, so capture only needs the education prompt suppressed.
